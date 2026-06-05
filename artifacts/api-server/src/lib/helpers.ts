@@ -39,6 +39,7 @@ export async function getUserWithStats(userId: number, viewerId?: number) {
     displayName: user[0].displayName,
     bio: user[0].bio,
     avatarUrl: user[0].avatarUrl,
+    bannerUrl: user[0].bannerUrl,
     followerCount: followerCount?.count ?? 0,
     followingCount: followingCount?.count ?? 0,
     postCount: postCount?.count ?? 0,

@@ -62,9 +62,12 @@ router.get("/users/me/profile", requireAuth, async (req, res) => {
 router.patch("/users/me/profile", requireAuth, async (req, res) => {
   try {
     const { displayName, bio } = req.body;
+    const updateData: Record<string, unknown> = {};
+    if (displayName !== undefined) updateData.displayName = displayName;
+    if (bio !== undefined) updateData.bio = bio;
     await db
       .update(usersTable)
-      .set({ displayName, bio })
+      .set(updateData)
       .where(eq(usersTable.id, req.user!.id));
 
     const user = await getUserWithStats(req.user!.id, req.user!.id);
@@ -83,6 +86,21 @@ router.post("/users/me/avatar", requireAuth, upload.single("file"), async (req, 
     }
     const url = `/api/uploads/${req.file.filename}`;
     await db.update(usersTable).set({ avatarUrl: url }).where(eq(usersTable.id, req.user!.id));
+    res.json({ url, type: "image" });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/users/me/banner", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const url = `/api/uploads/${req.file.filename}`;
+    await db.update(usersTable).set({ bannerUrl: url }).where(eq(usersTable.id, req.user!.id));
     res.json({ url, type: "image" });
   } catch (err) {
     req.log.error(err);
