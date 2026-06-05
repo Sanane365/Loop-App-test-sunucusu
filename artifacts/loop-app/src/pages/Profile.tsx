@@ -9,15 +9,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAuth } from "@/lib/auth";
 import { PostCard } from "@/components/shared/PostCard";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, ImagePlus, Pencil } from "lucide-react";
+import { Camera, ImagePlus, Pencil, MessageCircle, Shield } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 export default function Profile() {
   const params = useParams();
   const { user: me } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
 
   const isMe = !params.userId || params.userId === "me" || parseInt(params.userId) === me?.id;
   const targetUserId = isMe ? me?.id : parseInt(params.userId || "0");
@@ -191,13 +193,23 @@ export default function Profile() {
                   Profili Düzenle
                 </Button>
               ) : (
-                <Button
-                  onClick={handleFollowToggle}
-                  variant={profile.isFollowing ? "outline" : "default"}
-                  className="rounded-full font-semibold px-6"
-                >
-                  {profile.isFollowing ? "Takibi Bırak" : "Takip Et"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleFollowToggle}
+                    variant={profile.isFollowing ? "outline" : "default"}
+                    className="rounded-full font-semibold px-5"
+                  >
+                    {profile.isFollowing ? "Takibi Bırak" : "Takip Et"}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={() => setLocation(`/dm/${profile.id}`)}
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                  </Button>
+                </div>
               )}
             </div>
 

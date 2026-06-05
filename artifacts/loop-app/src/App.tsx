@@ -14,6 +14,8 @@ import Chat from "@/pages/Chat";
 import Voice from "@/pages/Voice";
 import Profile from "@/pages/Profile";
 import Notifications from "@/pages/Notifications";
+import Admin from "@/pages/Admin";
+import DirectMessages from "@/pages/DirectMessages";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,9 @@ function Router() {
       <Route path="/profile/me" component={Profile} />
       <Route path="/profile/:userId" component={Profile} />
       <Route path="/notifications" component={Notifications} />
+      <Route path="/admin" component={Admin} />
+      <Route path="/dm" component={DirectMessages} />
+      <Route path="/dm/:userId" component={DirectMessages} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -7,6 +7,8 @@ import storiesRouter from "./stories";
 import chatRouter from "./chat";
 import notificationsRouter from "./notifications";
 import exploreRouter from "./explore";
+import adminRouter from "./admin";
+import dmRouter from "./dm";
 
 const router: IRouter = Router();
 
@@ -18,5 +20,7 @@ router.use(storiesRouter);
 router.use(chatRouter);
 router.use(notificationsRouter);
 router.use(exploreRouter);
+router.use(adminRouter);
+router.use(dmRouter);
 
 export default router;

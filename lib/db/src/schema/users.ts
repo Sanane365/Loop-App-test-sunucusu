@@ -10,6 +10,11 @@ export const usersTable = pgTable("users", {
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
   bannerUrl: text("banner_url"),
+  role: text("role").notNull().default("user"),
+  isBanned: boolean("is_banned").notNull().default(false),
+  banReason: text("ban_reason"),
+  bannedAt: timestamp("banned_at"),
+  lastSeenAt: timestamp("last_seen_at"),
   passwordHash: text("password_hash").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -28,8 +33,19 @@ export const sessionsTable = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const bansTable = pgTable("bans", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => usersTable.id, { onDelete: "cascade" }),
+  ipAddress: text("ip_address"),
+  reason: text("reason"),
+  bannedBy: integer("banned_by").notNull().references(() => usersTable.id),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertUserSchema = createInsertSchema(usersTable).omit({ id: true, createdAt: true });
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof usersTable.$inferSelect;
 export type Follow = typeof followsTable.$inferSelect;
 export type Session = typeof sessionsTable.$inferSelect;
+export type Ban = typeof bansTable.$inferSelect;

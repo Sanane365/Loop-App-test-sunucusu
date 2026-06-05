@@ -1,4 +1,4 @@
-import { Bell, Menu, User, LogOut, Settings, Home, Search, MessageCircle, Mic } from "lucide-react";
+import { Bell, Menu, User, LogOut, Settings, Home, Search, MessageCircle, Mic, Mail, Shield } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -12,6 +12,9 @@ export function Header() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const logout = useLogout();
+
+  const isAdmin = user?.role === "admin";
+  const isMod = user?.role === "moderator" || isAdmin;
 
   function handleLogout() {
     logout.mutate(undefined, {
@@ -29,6 +32,7 @@ export function Header() {
     { href: "/chat", label: "Genel Sohbet", icon: MessageCircle },
     { href: "/voice", label: "Sesli Odalar", icon: Mic },
     { href: "/notifications", label: "Bildirimler", icon: Bell },
+    { href: "/dm", label: "Mesajlarım", icon: Mail },
   ];
 
   return (
@@ -49,6 +53,14 @@ export function Header() {
           >
             <Bell className="w-6 h-6" />
             <span className="absolute top-0 right-0.5 w-2 h-2 bg-primary rounded-full" />
+          </Link>
+
+          <Link
+            href="/dm"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="header-dm"
+          >
+            <Mail className="w-6 h-6" />
           </Link>
 
           <Sheet open={open} onOpenChange={setOpen}>
@@ -78,12 +90,17 @@ export function Header() {
                       {user?.username && (
                         <span className="text-sm text-muted-foreground">@{user.username}</span>
                       )}
+                      {isMod && (
+                        <span className={`text-[10px] font-semibold ${isAdmin ? "text-destructive" : "text-blue-500"}`}>
+                          {isAdmin ? "Admin" : "Moderatör"}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </SheetTitle>
               </SheetHeader>
 
-              <nav className="flex-1 py-3">
+              <nav className="flex-1 py-3 overflow-y-auto">
                 {navItems.map(({ href, label, icon: Icon }) => (
                   <Link
                     key={href}
@@ -106,6 +123,18 @@ export function Header() {
                   >
                     <User className="w-5 h-5 text-primary" />
                     <span className="font-medium">Profilim</span>
+                  </Link>
+                )}
+
+                {isMod && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"
+                    data-testid="menu-link-admin"
+                  >
+                    <Shield className={`w-5 h-5 ${isAdmin ? "text-destructive" : "text-blue-500"}`} />
+                    <span className="font-medium">Admin Paneli</span>
                   </Link>
                 )}
               </nav>

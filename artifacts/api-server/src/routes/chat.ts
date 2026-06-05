@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { chatMessagesTable, voiceRoomsTable, voiceRoomParticipantsTable, usersTable } from "@workspace/db";
-import { eq, desc, lt, and } from "drizzle-orm";
+import { eq, desc, lt, and, gt } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { getUserWithStats } from "../lib/helpers";
 import multer from "multer";
@@ -248,6 +248,29 @@ router.post("/voice-rooms/:roomId/leave", requireAuth, async (req, res) => {
         )
       );
     res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /chat/active-users — users active in last 5 minutes
+router.get("/chat/active-users", async (req, res) => {
+  try {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const users = await db
+      .select({
+        id: usersTable.id,
+        username: usersTable.username,
+        displayName: usersTable.displayName,
+        avatarUrl: usersTable.avatarUrl,
+        lastSeenAt: usersTable.lastSeenAt,
+      })
+      .from(usersTable)
+      .where(gt(usersTable.lastSeenAt, fiveMinAgo))
+      .orderBy(desc(usersTable.lastSeenAt))
+      .limit(50);
+    res.json(users);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

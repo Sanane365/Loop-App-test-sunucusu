@@ -14,6 +14,10 @@ export interface User {
   bio?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
+  /** @nullable */
+  bannerUrl?: string | null;
+  role?: string;
+  isBanned?: boolean;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;
