@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, Mic, Send, SquareSquare, X, Users } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Search, Mic, Send, SquareSquare, X, Users, ImagePlus, StopCircle } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useListChatMessages, useSendChatMessage, getListChatMessagesQueryKey } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,6 +11,7 @@ import { tr } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 const TENOR_KEY = "LIVDSRZULELA";
 
@@ -32,12 +33,14 @@ interface MentionUser {
 export default function Chat() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [content, setContent] = useState("");
   const { data: messages, isLoading } = useListChatMessages({ query: { queryKey: getListChatMessagesQueryKey() } });
   const sendMutation = useSendChatMessage();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // GIF state
   const [gifSearch, setGifSearch] = useState("");
@@ -47,8 +50,10 @@ export default function Chat() {
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Active users
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
@@ -58,6 +63,12 @@ export default function Chat() {
   const [mentionSearch, setMentionSearch] = useState<string | null>(null);
   const [mentionUsers, setMentionUsers] = useState<MentionUser[]>([]);
   const [mentionIndex, setMentionIndex] = useState(0);
+  // Map username → userId for click navigation
+  const mentionMapRef = useRef<Record<string, number>>({});
+
+  // Playing voice
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -77,11 +88,6 @@ export default function Chat() {
     if (res.ok) setActiveUsers(await res.json());
   };
 
-  const handleActiveOpen = () => {
-    fetchActiveUsers();
-    setActiveOpen(true);
-  };
-
   // @mention autocomplete
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -95,15 +101,14 @@ export default function Chat() {
       const query = mentionMatch[1];
       setMentionSearch(query);
       setMentionIndex(0);
-      if (query.length >= 0) {
-        try {
-          const res = await fetch(`/api/users?q=${encodeURIComponent(query)}`);
-          if (res.ok) {
-            const users = await res.json();
-            setMentionUsers(users.slice(0, 6));
-          }
-        } catch { setMentionUsers([]); }
-      }
+      try {
+        const res = await fetch(`/api/users?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+          const users: MentionUser[] = await res.json();
+          setMentionUsers(users.slice(0, 6));
+          users.forEach(u => { mentionMapRef.current[u.username] = u.id; });
+        }
+      } catch { setMentionUsers([]); }
     } else {
       setMentionSearch(null);
       setMentionUsers([]);
@@ -111,27 +116,33 @@ export default function Chat() {
   };
 
   const insertMention = (u: MentionUser) => {
+    mentionMapRef.current[u.username] = u.id;
     const cursor = inputRef.current?.selectionStart ?? content.length;
     const textBeforeCursor = content.slice(0, cursor);
     const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
     if (mentionMatch) {
       const before = textBeforeCursor.slice(0, textBeforeCursor.length - mentionMatch[0].length);
       const after = content.slice(cursor);
-      setContent(`${before}@${u.username} ${after}`);
+      const newContent = `${before}@${u.username} ${after}`;
+      setContent(newContent);
     }
     setMentionSearch(null);
     setMentionUsers([]);
-    inputRef.current?.focus();
+    setTimeout(() => inputRef.current?.focus(), 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (mentionSearch !== null && mentionUsers.length > 0) {
       if (e.key === "ArrowDown") { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionUsers.length); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionUsers.length) % mentionUsers.length); return; }
-      if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(mentionUsers[mentionIndex]); return; }
+      if (e.key === "Tab") { e.preventDefault(); insertMention(mentionUsers[mentionIndex]); return; }
+      if (e.key === "Enter") { e.preventDefault(); insertMention(mentionUsers[mentionIndex]); return; }
       if (e.key === "Escape") { setMentionSearch(null); setMentionUsers([]); return; }
     }
-    if (e.key === "Enter" && !e.shiftKey) handleSend();
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
   };
 
   const searchGifs = async (q?: string) => {
@@ -157,11 +168,19 @@ export default function Chat() {
   };
 
   const handleSend = () => {
-    if (!content.trim()) return;
-    sendMutation.mutate({ data: { type: "text", content } }, {
+    const text = content.trim();
+    if (!text) return;
+    const toSend = text;
+    setContent("");
+    setMentionSearch(null);
+    setMentionUsers([]);
+    sendMutation.mutate({ data: { type: "text", content: toSend } }, {
       onSuccess: () => {
-        setContent("");
         queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() });
+      },
+      onError: () => {
+        setContent(toSend);
+        toast({ title: "Hata", description: "Mesaj gönderilemedi.", variant: "destructive" });
       }
     });
   };
@@ -172,40 +191,106 @@ export default function Chat() {
     });
   };
 
+  const handleImageUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch("/api/chat/media", { method: "POST", body: formData });
+      if (res.ok) {
+        queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() });
+      } else {
+        toast({ title: "Hata", description: "Fotoğraf gönderilemedi.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Hata", description: "Fotoğraf gönderilemedi.", variant: "destructive" });
+    }
+  };
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+        ? "audio/webm;codecs=opus"
+        : MediaRecorder.isTypeSupported("audio/webm")
+          ? "audio/webm"
+          : "audio/ogg";
+
+      const recorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = [];
+
       recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+        stream.getTracks().forEach(t => t.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size < 100) return; // Empty recording
+        const ext = mimeType.includes("ogg") ? ".ogg" : ".webm";
         const formData = new FormData();
-        formData.append("file", audioBlob);
+        formData.append("file", audioBlob, `voice${ext}`);
         try {
           const res = await fetch("/api/chat/voice", { method: "POST", body: formData });
-          if (res.ok) queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() });
+          if (res.ok) {
+            queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() });
+          }
         } catch { /* ignore */ }
       };
-      recorder.start();
+
+      recorder.start(200); // collect data every 200ms
       setIsRecording(true);
-    } catch { /* microphone denied */ }
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch {
+      toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından mikrofon iznini etkinleştir.", variant: "destructive" });
+    }
   };
 
   const stopRecording = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(t => t.stop());
       setIsRecording(false);
+      setRecordingSeconds(0);
     }
+  };
+
+  const handlePlayVoice = (msgId: number, voiceUrl: string) => {
+    if (playingId === msgId) {
+      audioRef.current?.pause();
+      setPlayingId(null);
+      return;
+    }
+    if (audioRef.current) { audioRef.current.pause(); }
+    const audio = new Audio(voiceUrl);
+    audioRef.current = audio;
+    audio.play();
+    setPlayingId(msgId);
+    audio.onended = () => setPlayingId(null);
+  };
+
+  const navigateToMentionedUser = async (username: string) => {
+    const cached = mentionMapRef.current[username];
+    if (cached) { setLocation(`/profile/${cached}`); return; }
+    try {
+      const res = await fetch(`/api/users?q=${encodeURIComponent(username)}`);
+      if (res.ok) {
+        const users: { id: number; username: string }[] = await res.json();
+        const exact = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        if (exact) { mentionMapRef.current[username] = exact.id; setLocation(`/profile/${exact.id}`); }
+      }
+    } catch { /* ignore */ }
   };
 
   const renderMessage = (text: string) => {
     const parts = text.split(/(@\w+)/g);
     return parts.map((part, i) =>
       part.startsWith("@") ? (
-        <span key={i} className="text-primary font-semibold cursor-pointer hover:underline">{part}</span>
+        <span
+          key={i}
+          className="text-primary font-semibold cursor-pointer hover:underline"
+          onClick={() => navigateToMentionedUser(part.slice(1))}
+        >
+          {part}
+        </span>
       ) : part
     );
   };
@@ -220,7 +305,7 @@ export default function Chat() {
             variant="ghost"
             size="sm"
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={handleActiveOpen}
+            onClick={() => { fetchActiveUsers(); setActiveOpen(true); }}
           >
             <Users className="w-4 h-4" />
             Aktif Kullanıcılar
@@ -254,18 +339,35 @@ export default function Chat() {
                     </div>
                     {msg.type === "text" && (
                       <div className={`px-4 py-2 rounded-2xl ${isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card border border-border rounded-tl-sm"}`}>
-                        <p className="text-sm whitespace-pre-wrap">{renderMessage(msg.content ?? "")}</p>
+                        <p className="text-sm whitespace-pre-wrap break-words">{renderMessage(msg.content ?? "")}</p>
+                      </div>
+                    )}
+                    {msg.type === "image" && msg.content && (
+                      <div className="rounded-2xl overflow-hidden border border-border max-w-[220px]">
+                        <img src={msg.content} alt="görsel" className="w-full h-auto object-cover" />
                       </div>
                     )}
                     {msg.type === "gif" && msg.gifUrl && (
                       <img src={msg.gifUrl} alt="GIF" className="rounded-xl max-w-[200px] h-auto border border-border" />
                     )}
                     {msg.type === "voice" && msg.voiceUrl && (
-                      <div className={`px-4 py-3 rounded-2xl flex items-center gap-2 ${isMe ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-card border border-border rounded-tl-sm"}`}>
-                        <div className="w-0 h-0 border-t-4 border-t-transparent border-l-[6px] border-l-current border-b-4 border-b-transparent ml-1" />
-                        <div className="w-24 h-1.5 bg-current/30 rounded-full"><div className="w-1/3 h-full bg-current rounded-full" /></div>
-                        <span className="text-[10px]">{msg.voiceDuration || 0}s</span>
-                      </div>
+                      <button
+                        onClick={() => handlePlayVoice(msg.id, msg.voiceUrl!)}
+                        className={`px-4 py-3 rounded-2xl flex items-center gap-3 transition-colors ${isMe ? "bg-primary text-primary-foreground rounded-tr-sm hover:bg-primary/90" : "bg-card border border-border rounded-tl-sm hover:bg-muted"}`}
+                      >
+                        {playingId === msg.id ? (
+                          <StopCircle className="w-5 h-5 flex-shrink-0" />
+                        ) : (
+                          <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-current border-b-[6px] border-b-transparent ml-0.5 flex-shrink-0" />
+                        )}
+                        <div className="flex gap-0.5 items-center h-4">
+                          {Array(12).fill(0).map((_, i) => (
+                            <div key={i} className={`w-0.5 rounded-full bg-current transition-all ${playingId === msg.id ? "animate-pulse" : ""}`}
+                              style={{ height: `${20 + Math.sin(i * 1.2) * 14}%` }} />
+                          ))}
+                        </div>
+                        <span className="text-xs font-mono">{msg.voiceDuration || 0}s</span>
+                      </button>
                     )}
                   </div>
                 </div>
@@ -325,7 +427,30 @@ export default function Chat() {
             </div>
           )}
 
+          {/* Recording indicator */}
+          {isRecording && (
+            <div className="flex items-center gap-2 px-2 pb-2">
+              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+              <span className="text-xs text-destructive font-medium">Kaydediliyor... {recordingSeconds}s</span>
+              <span className="text-xs text-muted-foreground ml-auto">Dur butonuna bas</span>
+            </div>
+          )}
+
           <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); e.target.value = ""; }}
+            />
+            <Button
+              variant="ghost" size="icon"
+              className="text-muted-foreground rounded-full flex-shrink-0"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImagePlus className="w-5 h-5" />
+            </Button>
             <Button
               variant="ghost" size="icon"
               className={`text-muted-foreground rounded-full flex-shrink-0 ${gifOpen ? "text-primary bg-primary/10" : ""}`}
@@ -348,14 +473,19 @@ export default function Chat() {
               <Button size="icon" className="rounded-full flex-shrink-0" onClick={handleSend} disabled={sendMutation.isPending}>
                 <Send className="w-5 h-5" />
               </Button>
+            ) : isRecording ? (
+              <Button
+                size="icon"
+                className="rounded-full flex-shrink-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={stopRecording}
+              >
+                <StopCircle className="w-5 h-5" />
+              </Button>
             ) : (
               <Button
                 size="icon" variant="secondary"
-                className={`rounded-full flex-shrink-0 ${isRecording ? "bg-destructive text-destructive-foreground animate-pulse" : "bg-primary/10 text-primary hover:bg-primary/20"}`}
-                onMouseDown={startRecording}
-                onMouseUp={stopRecording}
-                onTouchStart={startRecording}
-                onTouchEnd={stopRecording}
+                className="rounded-full flex-shrink-0 bg-primary/10 text-primary hover:bg-primary/20"
+                onClick={startRecording}
               >
                 <Mic className="w-5 h-5" />
               </Button>

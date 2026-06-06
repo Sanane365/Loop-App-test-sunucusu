@@ -2,9 +2,9 @@ import { useListVoiceRooms, useJoinVoiceRoom, useLeaveVoiceRoom, useCreateVoiceR
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Mic, MicOff, Video, VideoOff, Users, Plus, Radio, PhoneOff, Crown } from "lucide-react";
+import { Mic, MicOff, Video, VideoOff, Users, Plus, Radio, PhoneOff, Crown, MonitorUp, MonitorOff } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,22 +19,65 @@ export default function Voice() {
   const leaveMutation = useLeaveVoiceRoom();
   const createMutation = useCreateVoiceRoom();
   const queryClient = useQueryClient();
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
   const [newRoomDesc, setNewRoomDesc] = useState("");
   const [activeRoomId, setActiveRoomId] = useState<number | null>(null);
-  const [micOn, setMicOn] = useState(true);
+
+  // Media state
+  const [micOn, setMicOn] = useState(false);
   const [camOn, setCamOn] = useState(false);
+  const [screenOn, setScreenOn] = useState(false);
+
+  // Streams
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const camStreamRef = useRef<MediaStream | null>(null);
+  const screenStreamRef = useRef<MediaStream | null>(null);
+
+  // Video elements
+  const camVideoRef = useRef<HTMLVideoElement>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
 
   const activeRoom = rooms?.find(r => r.id === activeRoomId);
+
+  // Cleanup all streams on leave
+  const stopAllStreams = useCallback(() => {
+    micStreamRef.current?.getTracks().forEach(t => t.stop());
+    micStreamRef.current = null;
+    camStreamRef.current?.getTracks().forEach(t => t.stop());
+    camStreamRef.current = null;
+    screenStreamRef.current?.getTracks().forEach(t => t.stop());
+    screenStreamRef.current = null;
+    setMicOn(false);
+    setCamOn(false);
+    setScreenOn(false);
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => () => stopAllStreams(), [stopAllStreams]);
+
+  // Attach camera stream to video element
+  useEffect(() => {
+    if (camVideoRef.current && camStreamRef.current && camOn) {
+      camVideoRef.current.srcObject = camStreamRef.current;
+    }
+  }, [camOn]);
+
+  // Attach screen stream to video element
+  useEffect(() => {
+    if (screenVideoRef.current && screenStreamRef.current && screenOn) {
+      screenVideoRef.current.srcObject = screenStreamRef.current;
+    }
+  }, [screenOn]);
 
   const handleJoin = (roomId: number) => {
     joinMutation.mutate({ roomId }, {
       onSuccess: () => {
         setActiveRoomId(roomId);
-        setMicOn(true);
-        setCamOn(false);
         queryClient.invalidateQueries({ queryKey: getListVoiceRoomsQueryKey() });
+        // Auto-enable mic on join
+        enableMic();
       },
       onError: () => {
         toast({ title: "Hata", description: "Odaya katılırken bir sorun oluştu.", variant: "destructive" });
@@ -44,6 +87,7 @@ export default function Voice() {
 
   const handleLeave = () => {
     if (!activeRoomId) return;
+    stopAllStreams();
     leaveMutation.mutate({ roomId: activeRoomId }, {
       onSuccess: () => {
         setActiveRoomId(null);
@@ -60,9 +104,8 @@ export default function Voice() {
         setNewRoomName("");
         setNewRoomDesc("");
         setActiveRoomId(room.id);
-        setMicOn(true);
-        setCamOn(false);
         queryClient.invalidateQueries({ queryKey: getListVoiceRoomsQueryKey() });
+        enableMic();
       },
       onError: () => {
         toast({ title: "Hata", description: "Oda oluşturulamadı.", variant: "destructive" });
@@ -70,11 +113,86 @@ export default function Voice() {
     });
   };
 
+  const enableMic = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      micStreamRef.current = stream;
+      setMicOn(true);
+    } catch {
+      toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından mikrofon iznini etkinleştir.", variant: "destructive" });
+    }
+  };
+
+  const toggleMic = async () => {
+    if (micOn) {
+      micStreamRef.current?.getTracks().forEach(t => t.stop());
+      micStreamRef.current = null;
+      setMicOn(false);
+    } else {
+      await enableMic();
+    }
+  };
+
+  const toggleCamera = async () => {
+    if (camOn) {
+      camStreamRef.current?.getTracks().forEach(t => t.stop());
+      camStreamRef.current = null;
+      if (camVideoRef.current) camVideoRef.current.srcObject = null;
+      setCamOn(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        camStreamRef.current = stream;
+        setCamOn(true);
+        // Attach after state update
+        setTimeout(() => {
+          if (camVideoRef.current) {
+            camVideoRef.current.srcObject = stream;
+            camVideoRef.current.play().catch(() => {});
+          }
+        }, 50);
+      } catch {
+        toast({ title: "Kamera erişimi reddedildi", description: "Tarayıcı ayarlarından kamera iznini etkinleştir.", variant: "destructive" });
+      }
+    }
+  };
+
+  const toggleScreen = async () => {
+    if (screenOn) {
+      screenStreamRef.current?.getTracks().forEach(t => t.stop());
+      screenStreamRef.current = null;
+      if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
+      setScreenOn(false);
+    } else {
+      try {
+        const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true });
+        screenStreamRef.current = stream;
+        setScreenOn(true);
+        // Handle user stopping screen share via browser UI
+        stream.getVideoTracks()[0].onended = () => {
+          screenStreamRef.current = null;
+          if (screenVideoRef.current) screenVideoRef.current.srcObject = null;
+          setScreenOn(false);
+        };
+        setTimeout(() => {
+          if (screenVideoRef.current) {
+            screenVideoRef.current.srcObject = stream;
+            screenVideoRef.current.play().catch(() => {});
+          }
+        }, 50);
+      } catch {
+        // User cancelled or permission denied — not an error to show
+        setScreenOn(false);
+      }
+    }
+  };
+
   if (activeRoom) {
     return (
       <AppLayout>
-        <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] p-4">
-          <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)] p-4 gap-4">
+          {/* Room header */}
+          <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Radio className="w-5 h-5 text-primary animate-pulse" />
@@ -90,27 +208,58 @@ export default function Voice() {
             </div>
           </div>
 
+          {/* Screen share preview */}
+          {screenOn && (
+            <div className="rounded-xl overflow-hidden bg-black border border-border relative">
+              <video
+                ref={screenVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full max-h-48 object-contain"
+              />
+              <div className="absolute top-2 left-2 bg-black/60 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
+                <MonitorUp className="w-3 h-3" /> Ekran paylaşılıyor
+              </div>
+            </div>
+          )}
+
+          {/* Camera preview (self) */}
+          {camOn && (
+            <div className="rounded-xl overflow-hidden bg-black border border-primary/40 relative self-end w-32">
+              <video
+                ref={camVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full aspect-video object-cover scale-x-[-1]"
+              />
+              <div className="absolute bottom-1 left-1 text-[10px] text-white bg-black/50 px-1 rounded">Sen</div>
+            </div>
+          )}
+
+          {/* Participants grid */}
           <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               {activeRoom.participants?.map((p) => {
                 const isHost = p.id === activeRoom.createdBy;
                 const isCurrentUser = p.id === user?.id;
                 return (
-                  <div key={p.id} className="flex flex-col items-center gap-2 p-3 bg-card border border-border rounded-2xl relative">
+                  <div key={p.id} className={`flex flex-col items-center gap-2 p-3 bg-card border rounded-2xl relative transition-all ${isCurrentUser && micOn ? "border-primary/60 shadow-[0_0_12px_rgba(139,92,246,0.2)]" : "border-border"}`}>
                     {isHost && (
                       <div className="absolute top-2 right-2">
                         <Crown className="w-3.5 h-3.5 text-yellow-500" />
                       </div>
                     )}
                     <div className="relative">
-                      <Avatar className="w-16 h-16 border-2 border-primary/20">
+                      <Avatar className={`w-16 h-16 border-2 transition-all ${isCurrentUser && micOn ? "border-primary animate-pulse" : "border-primary/20"}`}>
                         <AvatarImage src={p.avatarUrl || ""} />
                         <AvatarFallback className="text-xl bg-primary/10 text-primary">
                           {p.displayName.charAt(0).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       {isCurrentUser && (
-                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-card ${micOn ? 'bg-green-500' : 'bg-destructive'}`}>
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border-2 border-card ${micOn ? "bg-green-500" : "bg-destructive"}`}>
                           {micOn
                             ? <Mic className="w-2.5 h-2.5 text-white" />
                             : <MicOff className="w-2.5 h-2.5 text-white" />
@@ -128,13 +277,22 @@ export default function Voice() {
             </div>
           </div>
 
-          <div className="mt-6 flex items-center justify-center gap-4">
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-3 flex-wrap pb-2">
             <button
-              onClick={() => setMicOn(v => !v)}
-              className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl transition-colors ${micOn ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'}`}
+              onClick={toggleMic}
+              className={`flex flex-col items-center gap-1.5 p-3.5 rounded-2xl transition-colors ${micOn ? "bg-green-500/10 text-green-600 hover:bg-green-500/20" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
             >
               {micOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
-              <span className="text-[10px] font-medium">{micOn ? "Mikrofon" : "Kapalı"}</span>
+              <span className="text-[10px] font-medium">{micOn ? "Açık" : "Kapalı"}</span>
+            </button>
+
+            <button
+              onClick={toggleCamera}
+              className={`flex flex-col items-center gap-1.5 p-3.5 rounded-2xl transition-colors ${camOn ? "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20" : "bg-secondary text-muted-foreground hover:bg-secondary/80"}`}
+            >
+              {camOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+              <span className="text-[10px] font-medium">{camOn ? "Açık" : "Kamera"}</span>
             </button>
 
             <button
@@ -146,11 +304,11 @@ export default function Voice() {
             </button>
 
             <button
-              onClick={() => setCamOn(v => !v)}
-              className={`flex flex-col items-center gap-1.5 p-4 rounded-2xl transition-colors ${camOn ? 'bg-secondary text-secondary-foreground hover:bg-secondary/80' : 'bg-secondary/50 text-muted-foreground hover:bg-secondary/80'}`}
+              onClick={toggleScreen}
+              className={`flex flex-col items-center gap-1.5 p-3.5 rounded-2xl transition-colors ${screenOn ? "bg-orange-500/10 text-orange-600 hover:bg-orange-500/20" : "bg-secondary text-muted-foreground hover:bg-secondary/80"}`}
             >
-              {camOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
-              <span className="text-[10px] font-medium">{camOn ? "Kamera" : "Kapalı"}</span>
+              {screenOn ? <MonitorOff className="w-6 h-6" /> : <MonitorUp className="w-6 h-6" />}
+              <span className="text-[10px] font-medium">{screenOn ? "Paylaşıyor" : "Ekran"}</span>
             </button>
           </div>
         </div>

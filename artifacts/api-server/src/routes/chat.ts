@@ -93,9 +93,34 @@ router.post("/chat/voice", requireAuth, upload.single("file"), async (req, res) 
       return;
     }
     const voiceUrl = `/api/uploads/${req.file.filename}`;
+
+    // Calculate rough duration from file size (webm ~16kbps)
+    const durationSec = Math.max(1, Math.round(req.file.size / 2000));
+
     const [msg] = await db
       .insert(chatMessagesTable)
-      .values({ userId: req.user!.id, type: "voice", voiceUrl })
+      .values({ userId: req.user!.id, type: "voice", voiceUrl, voiceDuration: durationSec })
+      .returning();
+
+    const user = await getUserWithStats(req.user!.id, req.user!.id);
+    res.status(201).json({ ...msg, user, createdAt: msg.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /chat/media — image/video upload to chat
+router.post("/chat/media", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    const mediaUrl = `/api/uploads/${req.file.filename}`;
+    const [msg] = await db
+      .insert(chatMessagesTable)
+      .values({ userId: req.user!.id, type: "image", content: mediaUrl })
       .returning();
 
     const user = await getUserWithStats(req.user!.id, req.user!.id);
