@@ -4,7 +4,7 @@ import { StoryRow } from "@/components/shared/StoryRow";
 import { PostCard } from "@/components/shared/PostCard";
 
 export default function Home() {
-  const { data: posts, isLoading } = useListPosts({ query: { queryKey: getListPostsQueryKey() } });
+  const { data: posts, isLoading } = useListPosts(undefined, { query: { queryKey: getListPostsQueryKey() } });
 
   return (
     <AppLayout>

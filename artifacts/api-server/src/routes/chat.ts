@@ -279,6 +279,51 @@ router.post("/voice-rooms/:roomId/leave", requireAuth, async (req, res) => {
   }
 });
 
+// ── WebRTC Signaling (in-memory) ─────────────────────────────────────────────
+// roomId → targetUserId → Signal[]
+const signalStore = new Map<number, Map<number, { fromUserId: number; type: string; data: unknown }[]>>();
+
+function storeSignal(roomId: number, targetUserId: number, signal: { fromUserId: number; type: string; data: unknown }) {
+  if (!signalStore.has(roomId)) signalStore.set(roomId, new Map());
+  const room = signalStore.get(roomId)!;
+  if (!room.has(targetUserId)) room.set(targetUserId, []);
+  room.get(targetUserId)!.push(signal);
+}
+
+function drainSignals(roomId: number, targetUserId: number) {
+  const room = signalStore.get(roomId);
+  if (!room) return [];
+  const signals = room.get(targetUserId) ?? [];
+  room.delete(targetUserId);
+  return signals;
+}
+
+// POST /voice-rooms/:roomId/signal — send a WebRTC signal to a specific peer
+router.post("/voice-rooms/:roomId/signal", requireAuth, (req, res) => {
+  try {
+    const roomId = parseInt(req.params["roomId"]!);
+    const { targetUserId, type, data } = req.body as { targetUserId: number; type: string; data: unknown };
+    if (!targetUserId || !type) { res.status(400).json({ error: "targetUserId and type required" }); return; }
+    storeSignal(roomId, targetUserId, { fromUserId: req.user!.id, type, data });
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /voice-rooms/:roomId/signals — poll and drain signals addressed to me
+router.get("/voice-rooms/:roomId/signals", requireAuth, (req, res) => {
+  try {
+    const roomId = parseInt(req.params["roomId"]!);
+    const signals = drainSignals(roomId, req.user!.id);
+    res.json(signals);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /chat/active-users — users active in last 5 minutes
 router.get("/chat/active-users", async (req, res) => {
   try {

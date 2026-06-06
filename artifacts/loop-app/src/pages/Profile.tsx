@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useGetUser, useListPosts, useFollowUser, useUnfollowUser, getGetUserQueryKey, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useGetUser, useListPosts, useFollowUser, useUnfollowUser, getGetUserQueryKey, getGetMeQueryKey, getListPostsQueryKey } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -25,12 +25,12 @@ export default function Profile() {
   const targetUserId = isMe ? me?.id : parseInt(params.userId || "0");
 
   const { data: profile, isLoading: profileLoading } = useGetUser(targetUserId || 0, {
-    query: { enabled: !!targetUserId }
+    query: { queryKey: getGetUserQueryKey(targetUserId || 0), enabled: !!targetUserId }
   });
 
   const { data: posts, isLoading: postsLoading } = useListPosts(
     { userId: targetUserId },
-    { query: { enabled: !!targetUserId } }
+    { query: { queryKey: getListPostsQueryKey({ userId: targetUserId }), enabled: !!targetUserId } }
   );
 
   const followMutation = useFollowUser();

@@ -86,6 +86,7 @@ export default function DirectMessages() {
       const interval = setInterval(() => fetchMessages(uid), 3000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [userId]);
 
   useEffect(() => {

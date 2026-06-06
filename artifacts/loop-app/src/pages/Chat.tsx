@@ -35,7 +35,7 @@ export default function Chat() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [content, setContent] = useState("");
-  const { data: messages, isLoading } = useListChatMessages({ query: { queryKey: getListChatMessagesQueryKey() } });
+  const { data: messages, isLoading } = useListChatMessages(undefined, { query: { queryKey: getListChatMessagesQueryKey() } });
   const sendMutation = useSendChatMessage();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -342,7 +342,7 @@ export default function Chat() {
                         <p className="text-sm whitespace-pre-wrap break-words">{renderMessage(msg.content ?? "")}</p>
                       </div>
                     )}
-                    {msg.type === "image" && msg.content && (
+                    {(msg.type as string) === "image" && msg.content && (
                       <div className="rounded-2xl overflow-hidden border border-border max-w-[220px]">
                         <img src={msg.content} alt="görsel" className="w-full h-auto object-cover" />
                       </div>
