@@ -110,12 +110,18 @@ export default function Voice() {
 
     // Add local mic track
     if (micStreamRef.current) {
-      micStreamRef.current.getAudioTracks().forEach(t => pc.addTrack(t, micStreamRef.current!));
+      micStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = micOn;
+        pc.addTrack(track, micStreamRef.current!);
+      });
     }
+
     // Add local screen tracks
-    if (screenStreamRef.current) {
+    // Add local screen tracks (Sadece gerçekten ekran paylaşımı açıksa track ekle)
+    if (screenOn && screenStreamRef.current) {
       screenStreamRef.current.getTracks().forEach(t => pc.addTrack(t, screenStreamRef.current!));
     }
+
 
     pc.onicecandidate = (e) => {
       if (e.candidate) sendSignal(peerId, "ice-candidate", e.candidate.toJSON());
@@ -123,10 +129,9 @@ export default function Voice() {
 
     pc.ontrack = (e) => {
       const track = e.track;
-      const stream = e.streams[0] ?? new MediaStream([track]);
+      const stream = e.streams[0] || new MediaStream([track]);
 
       if (track.kind === "audio") {
-        // Auto-play remote audio
         const audio = new Audio();
         audio.srcObject = stream;
         audio.autoplay = true;
@@ -139,7 +144,7 @@ export default function Voice() {
       }
     };
 
-    // Renegotiation for screen share added later (initiator only)
+    // Renegotiation for screen share or camera added later (initiator only)
     pc.onnegotiationneeded = async () => {
       if (!isInitiator) return;
       if (pc.signalingState !== "stable") return;
@@ -148,16 +153,28 @@ export default function Voice() {
         if (pc.signalingState !== "stable") return;
         await pc.setLocalDescription(offer);
         sendSignal(peerId, "offer", pc.localDescription);
-      } catch {}
+      } catch (error) {
+        console.error(error);
+      }
     };
 
     peersRef.current.set(peerId, { pc, isInitiator });
     return pc;
-  }, [sendSignal, activeRoom]);
+  }, [sendSignal, activeRoom, micOn]);
+
+
+
+
 
   // ─── Handle incoming signals ──────────────────────────────────────────────
   const handleSignal = useCallback(async (signal: { fromUserId: number; type: string; data: any }) => {
-    const { fromUserId, type, data } = signal;
+     const { fromUserId, type, data } = signal;
+    if (type === "screen-share-stopped") {
+      remoteScreensRef.current.delete(fromUserId);
+      setRemoteScreens(new Map(remoteScreensRef.current));
+      return;
+    }
+
 
     if (type === "offer") {
       let entry = peersRef.current.get(fromUserId);
@@ -239,78 +256,171 @@ export default function Voice() {
   // ─── Media controls ───────────────────────────────────────────────────────
   const enableMic = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      micStreamRef.current = stream;
-      setMicOn(true);
-      // Add track to all existing peer connections
-      peersRef.current.forEach(({ pc }) => {
-        stream.getAudioTracks().forEach(t => pc.addTrack(t, stream));
+      // Hem mikrofonu hem de kamerayı aynı anda istiyoruz
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: { width: 320, height: 240, frameRate: 15 }
       });
-    } catch {
-      toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından izni etkinleştir.", variant: "destructive" });
-    }
-  };
 
-  const toggleMic = async () => {
-    if (micOn) {
-      micStreamRef.current?.getTracks().forEach(t => t.stop());
-      micStreamRef.current = null;
-      setMicOn(false);
-    } else {
-      await enableMic();
-    }
-  };
+      micStreamRef.current = stream;
 
-  const toggleCamera = async () => {
-    if (camOn) {
-      camStreamRef.current?.getTracks().forEach(t => t.stop());
-      camStreamRef.current = null;
-      if (camVideoRef.current) camVideoRef.current.srcObject = null;
+      setMicOn(true);
       setCamOn(false);
-    } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-        camStreamRef.current = stream;
-        setCamOn(true);
-        setTimeout(() => {
-          if (camVideoRef.current) { camVideoRef.current.srcObject = stream; camVideoRef.current.play().catch(() => {}); }
-        }, 50);
-      } catch {
-        toast({ title: "Kamera erişimi reddedildi", description: "Tarayıcı ayarlarından izni etkinleştir.", variant: "destructive" });
+
+      // İlk girişte kamera kapalı başlasın diye video izini pasif yapıyoruz
+      stream.getVideoTracks().forEach(track => {
+        track.enabled = false;
+      });
+      // Eğer dosyanın yukarısında setCameraOn tanımlıysa kapalı başlatıyoruz
+      if (typeof setCameraOn === 'function') {
+        setCameraOn(false);
       }
+
+      // Hem ses hem video izlerini mevcut tüm bağlantılara (odadaki diğer kişilere) gönderiyoruz
+      peersRef.current.forEach(({ pc }) => {
+        stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      });
+    } catch (error) {
+      toast({ 
+        title: "Medya erişimi reddedildi", 
+        description: "Tarayıcı ayarlarından mikrofon ve kamera izinlerini etkinleştirin.", 
+        variant: "destructive" 
+      });
     }
   };
+
+  
+  const toggleMic = () => {
+    if (!micStreamRef.current) {
+      enableMic();
+      return;
+    }
+
+    const nextState = !micOn;
+
+    micStreamRef.current.getAudioTracks().forEach(track => {
+      track.enabled = nextState;
+    });
+
+    setMicOn(nextState);
+  };
+
+ 
+
+const toggleCamera = async () => {
+  if (camOn) {
+    camStreamRef.current?.getVideoTracks().forEach(t => {
+      t.enabled = false;
+    });
+
+    setCamOn(false);
+    return;
+  }
+
+  try {
+    if (
+      camStreamRef.current &&
+      camStreamRef.current.getVideoTracks().length > 0
+    ) {
+      camStreamRef.current.getVideoTracks().forEach(t => {
+        t.enabled = true;
+      });
+
+      setCamOn(true);
+
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = camStreamRef.current;
+        camVideoRef.current.play().catch(() => {});
+      }
+    } else {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true
+      });
+
+      camStreamRef.current = stream;
+      setCamOn(true);
+
+      if (camVideoRef.current) {
+        camVideoRef.current.srcObject = stream;
+        camVideoRef.current.play().catch(() => {});
+      }
+
+      peersRef.current.forEach(({ pc }) => {
+        stream.getVideoTracks().forEach(track => {
+          pc.addTrack(track, stream);
+        });
+      });
+    }
+  } catch (error) {
+    toast({
+      title: "Kamera erişimi reddedildi",
+      description: "Tarayıcı ayarlarından izni etkinleştirin.",
+      variant: "destructive"
+    });
+  }
+};// toggleCamera fonksiyonunun asıl bitişi burası olmalı
+
+
+
 
   const toggleScreen = async () => {
     if (screenOn) {
-      // Remove screen tracks from all PCs (only initiators renegotiate)
-      peersRef.current.forEach(({ pc }) => {
-        pc.getSenders().filter(s => s.track?.kind === "video").forEach(s => pc.removeTrack(s));
-      });
+      // 1. Kendi ekranımızdaki akışı durduruyoruz
       screenStreamRef.current?.getTracks().forEach(t => t.stop());
       screenStreamRef.current = null;
-      if (localScreenVideoRef.current) localScreenVideoRef.current.srcObject = null;
       setScreenOn(false);
+
+      if (localScreenVideoRef.current) {
+        localScreenVideoRef.current.srcObject = null;
+      }
+
+      // 2. ÖNEMLİ: Odadaki diğer herkesin bağlantısından bu ekran izini tamamen söküyoruz
+      peersRef.current.forEach(({ pc }) => {
+        pc.getSenders().forEach(sender => {
+          // Eğer gönderilen iz video ise ve mikrofon/kamera akışına ait değilse (yani ekransa) kaldırıyoruz
+          if (sender.track?.kind === "video" && sender.track !== camStreamRef.current?.getVideoTracks()[0]) {
+            pc.removeTrack(sender);
+          }
+        });
+      });
+
+      // 3. Karşı tarafların ekranından tamamen yok olmak için odaya sinyal gönderiyoruz
+      // Not: Projendeki tam fonksiyon adına göre 'sendSignal' kullanıyoruz
+      activeRoom?.participants?.forEach(p => {
+        if (p.id !== user?.id) {
+          sendSignal(p.id, "screen-share-stopped", {});
+        }
+      });
+
     } else {
       try {
         const stream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true, audio: true });
         screenStreamRef.current = stream;
         setScreenOn(true);
-        // Add screen track to all existing PCs → triggers onnegotiationneeded on initiators
-        peersRef.current.forEach(({ pc }) => {
-          stream.getTracks().forEach((t: MediaStreamTrack) => pc.addTrack(t, stream));
-        });
-        stream.getVideoTracks()[0].onended = () => {
-          screenStreamRef.current = null;
-          if (localScreenVideoRef.current) localScreenVideoRef.current.srcObject = null;
-          setScreenOn(false);
-        };
+
         setTimeout(() => {
-          if (localScreenVideoRef.current) { localScreenVideoRef.current.srcObject = stream; localScreenVideoRef.current.play().catch(() => {}); }
+          if (localScreenVideoRef.current) {
+            localScreenVideoRef.current.srcObject = stream;
+            localScreenVideoRef.current.play().catch(() => {});
+          }
         }, 50);
-      } catch { /* user cancelled */ }
+
+        // Ekran kapandığında otomatik olarak tetiklenmesi için dinleyici ekliyoruz
+        stream.getVideoTracks()[0].onended = () => {
+          toggleScreen();
+        };
+
+        // Mevcut bağlantılara ekran akışını ekliyoruz
+        peersRef.current.forEach(({ pc }) => {
+          stream.getTracks().forEach(t => pc.addTrack(t, stream));
+        });
+      } catch (error) {
+        console.error("Ekran paylaşımı başlatılamadı:", error);
+      }
     }
   };
+
 
   // ─── Join / Leave ─────────────────────────────────────────────────────────
   const doLeave = () => {

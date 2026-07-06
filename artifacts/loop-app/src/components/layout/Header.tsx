@@ -13,8 +13,16 @@ export function Header() {
   const queryClient = useQueryClient();
   const logout = useLogout();
 
-  const isAdmin = user?.role === "admin";
-  const isMod = user?.role === "moderator" || isAdmin;
+  // 1. Admin e-posta listesi
+  const adminEmails = [
+    "copoglumihammetyasin@gmail.com",
+    "copogluhakki@gmail.com",
+    "tabiiisanane@gmail.com"
+  ];
+
+  // 2. Yetki kontrolü (Kullanıcı mami ise veya e-postası listedeyse)
+  const isMod = !!(user && (user.username === "mami" || (user.email && adminEmails.includes(user.email))));
+  const isAdmin = isMod; // Aşağıda hata vermemesi için isAdmin değişkenini de tanımladık
 
   function handleLogout() {
     logout.mutate(undefined, {
@@ -35,6 +43,11 @@ export function Header() {
     { href: "/dm", label: "Mesajlarım", icon: Mail },
   ];
 
+  // Eğer yetkiliyse listeye dinamik olarak bir kere ekliyoruz
+  if (isMod) {
+    navItems.push({ href: "/admin", label: "Admin Paneli", icon: Shield });
+  }
+
   return (
     <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="flex h-14 items-center justify-between px-4 max-w-screen-md mx-auto">
@@ -45,126 +58,115 @@ export function Header() {
           <span className="text-xl font-bold tracking-tight text-foreground">loop</span>
         </Link>
 
-        <div className="flex items-center gap-4">
-          <Link
-            href="/notifications"
-            className="relative text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="header-notifications"
-          >
-            <Bell className="w-6 h-6" />
-            <span className="absolute top-0 right-0.5 w-2 h-2 bg-primary rounded-full" />
-          </Link>
+        <div className="flex items-center gap-4">  
+          <Link  
+            href="/notifications"  
+            className="relative text-muted-foreground hover:text-foreground transition-colors"  
+            data-testid="header-notifications"  
+          >  
+            <Bell className="w-6 h-6" />  
+            <span className="absolute top-0 right-0.5 w-2 h-2 bg-primary rounded-full" />  
+          </Link>  
 
-          <Link
-            href="/dm"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="header-dm"
-          >
-            <Mail className="w-6 h-6" />
-          </Link>
+          <Link  
+            href="/dm"  
+            className="text-muted-foreground hover:text-foreground transition-colors"  
+            data-testid="header-dm"  
+          >  
+            <Mail className="w-6 h-6" />  
+          </Link>  
 
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <button
-                className="text-muted-foreground hover:text-foreground transition-colors"
-                data-testid="header-menu"
-              >
-                <Menu className="w-6 h-6" />
-              </button>
-            </SheetTrigger>
+          <Sheet open={open} onOpenChange={setOpen}>  
+            <SheetTrigger asChild>  
+              <button  
+                className="text-muted-foreground hover:text-foreground transition-colors"  
+                data-testid="header-menu"  
+              >  
+                <Menu className="w-6 h-6" />  
+              </button>  
+            </SheetTrigger>  
 
-            <SheetContent side="right" className="w-72 p-0 flex flex-col">
-              <SheetHeader className="p-5 border-b border-border">
-                <SheetDescription className="sr-only">Gezinme menüsü</SheetDescription>
-                <SheetTitle className="text-left">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg overflow-hidden">
-                      {user?.avatarUrl ? (
-                        <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
-                      ) : (
-                        user?.displayName?.charAt(0).toUpperCase() ?? "?"
-                      )}
-                    </div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-semibold text-foreground truncate">{user?.displayName ?? "Misafir"}</span>
-                      {user?.username && (
-                        <span className="text-sm text-muted-foreground">@{user.username}</span>
-                      )}
-                      {isMod && (
-                        <span className={`text-[10px] font-semibold ${isAdmin ? "text-destructive" : "text-blue-500"}`}>
-                          {isAdmin ? "Admin" : "Moderatör"}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </SheetTitle>
-              </SheetHeader>
+            <SheetContent side="right" className="w-72 p-0 flex flex-col">  
+              <SheetHeader className="p-5 border-b border-border">  
+                <SheetDescription className="sr-only">Gezinme menüsü</SheetDescription>  
+                <SheetTitle className="text-left">  
+                  <div className="flex items-center gap-3">  
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-lg overflow-hidden">  
+                      {user?.avatarUrl ? (  
+                        <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />  
+                      ) : (  
+                        user?.displayName?.charAt(0).toUpperCase() ?? "?"  
+                      )}  
+                    </div>  
+                    <div className="flex flex-col min-w-0">  
+                      <span className="font-semibold text-foreground truncate">{user?.displayName ?? "Misafir"}</span>  
+                      {user?.username && (  
+                        <span className="text-sm text-muted-foreground">@{user.username}</span>  
+                      )}  
+                        {isMod && (  
+                          <span className={`text-[10px] font-semibold ${user?.username === "mami" ? "text-destructive" : "text-blue-500"}`}>  
+                            {user?.username === "mami" ? "Admin" : "Moderatör"}  
+                          </span>  
+                        )}
 
-              <nav className="flex-1 py-3 overflow-y-auto">
-                {navItems.map(({ href, label, icon: Icon }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"
-                    data-testid={`menu-link-${label}`}
-                  >
-                    <Icon className="w-5 h-5 text-primary" />
-                    <span className="font-medium">{label}</span>
-                  </Link>
-                ))}
+                    </div>  
+                  </div>  
+                </SheetTitle>  
+              </SheetHeader>  
 
-                {user && (
-                  <Link
-                    href="/profile/me"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"
-                    data-testid="menu-link-profile"
-                  >
-                    <User className="w-5 h-5 text-primary" />
-                    <span className="font-medium">Profilim</span>
-                  </Link>
-                )}
+              <nav className="flex-1 py-3 overflow-y-auto">  
+                {navItems.map(({ href, label, icon: Icon }) => (  
+                  <Link  
+                    key={href}  
+                    href={href}  
+                    onClick={() => setOpen(false)}  
+                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"  
+                    data-testid={`menu-link-${label}`}  
+                  >  
+                    <Icon className="w-5 h-5 text-primary" />  
+                    <span className="font-medium">{label}</span>  
+                  </Link>  
+                ))}  
 
-                {isMod && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"
-                    data-testid="menu-link-admin"
-                  >
-                    <Shield className={`w-5 h-5 ${isAdmin ? "text-destructive" : "text-blue-500"}`} />
-                    <span className="font-medium">Admin Paneli</span>
-                  </Link>
-                )}
-              </nav>
+                {user && (  
+                  <Link  
+                    href="/profile/me"  
+                    onClick={() => setOpen(false)}  
+                    className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors"  
+                    data-testid="menu-link-profile"  
+                  >  
+                    <User className="w-5 h-5 text-primary" />  
+                    <span className="font-medium">Profilim</span>  
+                  </Link>  
+                )}  
+              </nav>  
 
-              <div className="border-t border-border p-3">
-                {user ? (
-                  <button
-                    onClick={handleLogout}
-                    disabled={logout.isPending}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors font-medium"
-                    data-testid="menu-logout"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    {logout.isPending ? "Çıkış yapılıyor..." : "Çıkış Yap"}
-                  </button>
-                ) : (
-                  <Link
-                    href="/login"
-                    onClick={() => setOpen(false)}
-                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground font-medium justify-center"
-                    data-testid="menu-login"
-                  >
-                    Giriş Yap
-                  </Link>
-                )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-      </div>
+              <div className="border-t border-border p-3">  
+                {user ? (  
+                  <button  
+                    onClick={handleLogout}  
+                    disabled={logout.isPending}  
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors font-medium"  
+                    data-testid="menu-logout"  
+                  >  
+                    <LogOut className="w-5 h-5" />  
+                    {logout.isPending ? "Çıkış yapılıyor..." : "Çıkış Yap"}  
+                  </button>  
+                ) : (  
+                  <Link  
+                    href="/login"  
+                    onClick={() => setOpen(false)}  
+                    className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-primary text-primary-foreground font-medium justify-center"  
+                    data-testid="menu-login"  
+                  >  
+                    Giriş Yap  
+                  </Link>  
+                )}  
+              </div>  
+            </SheetContent>  
+          </Sheet>  
+        </div>  
+      </div>  
     </header>
   );
 }

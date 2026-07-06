@@ -1,4 +1,6 @@
 import { Router, type IRouter } from "express";
+
+// Tüm alt rotaları içeri aktarıyoruz
 import healthRouter from "./health";
 import authRouter from "./auth";
 import usersRouter from "./users";
@@ -12,6 +14,7 @@ import dmRouter from "./dm";
 
 const router: IRouter = Router();
 
+// Rotaları Express Router'a kaydediyoruz
 router.use(healthRouter);
 router.use(authRouter);
 router.use(usersRouter);
@@ -20,7 +23,10 @@ router.use(storiesRouter);
 router.use(chatRouter);
 router.use(notificationsRouter);
 router.use(exploreRouter);
-router.use(adminRouter);
+router.use("/admin", adminRouter);
 router.use(dmRouter);
+
+// ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
+// Bu dosya sadece API'yi yönetmeli.
 
 export default router;
