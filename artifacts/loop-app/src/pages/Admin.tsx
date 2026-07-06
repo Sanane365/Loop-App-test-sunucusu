@@ -113,8 +113,7 @@ export default function Admin() {
   const isMod =
     isAdmin ||
     !!(
-      user?.role === "moderator" ||
-      (user?.email && adminEmails.includes(user.email))
+      user?.role === "moderator"
     );
 
   useEffect(() => {

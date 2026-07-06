@@ -29,19 +29,39 @@ router.get("/posts", async (req, res) => {
   try {
     const viewerId = req.user?.id;
     const userId = req.query["userId"] ? parseInt(req.query["userId"] as string) : undefined;
+    const bookmarked = req.query["bookmarked"] === "true";
+    const liked = req.query["liked"] === "true";
+    const mediaOnly = req.query["mediaOnly"] === "true";
     const page = req.query["page"] ? parseInt(req.query["page"] as string) : 1;
     const limit = 20;
     const offset = (page - 1) * limit;
 
     let posts;
-    if (userId) {
-      posts = await db
-        .select()
-        .from(postsTable)
-        .where(eq(postsTable.userId, userId))
-        .orderBy(desc(postsTable.createdAt))
+
+    if (bookmarked && viewerId) {
+      const bms = await db
+        .select({ postId: bookmarksTable.postId })
+        .from(bookmarksTable)
+        .where(eq(bookmarksTable.userId, viewerId))
+        .orderBy(desc(bookmarksTable.createdAt))
         .limit(limit)
         .offset(offset);
+      const ids = bms.map((b) => b.postId);
+      posts = ids.length > 0 ? await db.select().from(postsTable).where(inArray(postsTable.id, ids)) : [];
+    } else if (liked && viewerId) {
+      const lks = await db
+        .select({ postId: likesTable.postId })
+        .from(likesTable)
+        .where(eq(likesTable.userId, viewerId))
+        .orderBy(desc(likesTable.createdAt))
+        .limit(limit)
+        .offset(offset);
+      const ids = lks.map((l) => l.postId);
+      posts = ids.length > 0 ? await db.select().from(postsTable).where(inArray(postsTable.id, ids)) : [];
+    } else if (userId) {
+      let q = db.select().from(postsTable).where(eq(postsTable.userId, userId)).$dynamic();
+      if (mediaOnly) q = q.where(and(eq(postsTable.userId, userId), sql`${postsTable.mediaUrl} IS NOT NULL`));
+      posts = await q.orderBy(desc(postsTable.createdAt)).limit(limit).offset(offset);
     } else {
       posts = await db
         .select()

@@ -119,7 +119,7 @@ export default function Voice() {
     // Add local screen tracks
     // Add local screen tracks (Sadece gerçekten ekran paylaşımı açıksa track ekle)
     if (screenOn && screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(t => pc.addTrack(t, screenStreamRef.current!));
+      screenStreamRef.current.getTracks().forEach((t: MediaStreamTrack) => pc.addTrack(t, screenStreamRef.current!));
     }
 
 
@@ -271,10 +271,7 @@ export default function Voice() {
       stream.getVideoTracks().forEach(track => {
         track.enabled = false;
       });
-      // Eğer dosyanın yukarısında setCameraOn tanımlıysa kapalı başlatıyoruz
-      if (typeof setCameraOn === 'function') {
-        setCameraOn(false);
-      }
+      setCamOn(false);
 
       // Hem ses hem video izlerini mevcut tüm bağlantılara (odadaki diğer kişilere) gönderiyoruz
       peersRef.current.forEach(({ pc }) => {
@@ -309,7 +306,7 @@ export default function Voice() {
 
 const toggleCamera = async () => {
   if (camOn) {
-    camStreamRef.current?.getVideoTracks().forEach(t => {
+    camStreamRef.current?.getVideoTracks().forEach((t: MediaStreamTrack) => {
       t.enabled = false;
     });
 
@@ -322,7 +319,7 @@ const toggleCamera = async () => {
       camStreamRef.current &&
       camStreamRef.current.getVideoTracks().length > 0
     ) {
-      camStreamRef.current.getVideoTracks().forEach(t => {
+      camStreamRef.current.getVideoTracks().forEach((t: MediaStreamTrack) => {
         t.enabled = true;
       });
 
@@ -367,7 +364,7 @@ const toggleCamera = async () => {
   const toggleScreen = async () => {
     if (screenOn) {
       // 1. Kendi ekranımızdaki akışı durduruyoruz
-      screenStreamRef.current?.getTracks().forEach(t => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop());
       screenStreamRef.current = null;
       setScreenOn(false);
 
@@ -413,7 +410,7 @@ const toggleCamera = async () => {
 
         // Mevcut bağlantılara ekran akışını ekliyoruz
         peersRef.current.forEach(({ pc }) => {
-          stream.getTracks().forEach(t => pc.addTrack(t, stream));
+          stream.getTracks().forEach((t: MediaStreamTrack) => pc.addTrack(t, stream));
         });
       } catch (error) {
         console.error("Ekran paylaşımı başlatılamadı:", error);
@@ -431,9 +428,9 @@ const toggleCamera = async () => {
     remoteScreensRef.current.clear();
     setRemoteScreens(new Map());
     // Stop all local streams
-    micStreamRef.current?.getTracks().forEach(t => t.stop()); micStreamRef.current = null;
-    camStreamRef.current?.getTracks().forEach(t => t.stop()); camStreamRef.current = null;
-    screenStreamRef.current?.getTracks().forEach(t => t.stop()); screenStreamRef.current = null;
+    micStreamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop()); micStreamRef.current = null;
+    camStreamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop()); camStreamRef.current = null;
+    screenStreamRef.current?.getTracks().forEach((t: MediaStreamTrack) => t.stop()); screenStreamRef.current = null;
     setMicOn(false); setCamOn(false); setScreenOn(false);
   };
 

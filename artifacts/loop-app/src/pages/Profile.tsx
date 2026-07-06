@@ -9,10 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { useAuth } from "@/lib/auth";
 import { PostCard } from "@/components/shared/PostCard";
 import { useQueryClient } from "@tanstack/react-query";
-import { Camera, ImagePlus, Pencil, MessageCircle, Shield } from "lucide-react";
+import { Camera, ImagePlus, Pencil, MessageCircle } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+
+type Tab = "posts" | "media" | "liked";
 
 export default function Profile() {
   const params = useParams();
@@ -20,18 +22,44 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<Tab>("posts");
 
   const isMe = !params.userId || params.userId === "me" || parseInt(params.userId) === me?.id;
   const targetUserId = isMe ? me?.id : parseInt(params.userId || "0");
 
   const { data: profile, isLoading: profileLoading } = useGetUser(targetUserId || 0, {
-    query: { queryKey: getGetUserQueryKey(targetUserId || 0), enabled: !!targetUserId }
+    query: { queryKey: getGetUserQueryKey(targetUserId || 0), enabled: !!targetUserId },
   });
 
   const { data: posts, isLoading: postsLoading } = useListPosts(
     { userId: targetUserId },
-    { query: { queryKey: getListPostsQueryKey({ userId: targetUserId }), enabled: !!targetUserId } }
+    { query: { queryKey: getListPostsQueryKey({ userId: targetUserId }), enabled: !!targetUserId && activeTab === "posts" } }
   );
+
+  const [mediaPosts, setMediaPosts] = useState<any[] | null>(null);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [likedPosts, setLikedPosts] = useState<any[] | null>(null);
+  const [likedLoading, setLikedLoading] = useState(false);
+
+  const handleTabChange = async (tab: Tab) => {
+    setActiveTab(tab);
+    if (tab === "media" && mediaPosts === null && !mediaLoading) {
+      setMediaLoading(true);
+      try {
+        const r = await fetch(`/api/posts?userId=${targetUserId}&mediaOnly=true`);
+        setMediaPosts(await r.json());
+      } catch { setMediaPosts([]); }
+      finally { setMediaLoading(false); }
+    }
+    if (tab === "liked" && likedPosts === null && !likedLoading && isMe) {
+      setLikedLoading(true);
+      try {
+        const r = await fetch("/api/posts?liked=true");
+        setLikedPosts(await r.json());
+      } catch { setLikedPosts([]); }
+      finally { setLikedLoading(false); }
+    }
+  };
 
   const followMutation = useFollowUser();
   const unfollowMutation = useUnfollowUser();
@@ -47,11 +75,11 @@ export default function Profile() {
     if (!profile) return;
     if (profile.isFollowing) {
       unfollowMutation.mutate({ userId: profile.id }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(profile.id) })
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(profile.id) }),
       });
     } else {
       followMutation.mutate({ userId: profile.id }, {
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(profile.id) })
+        onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(profile.id) }),
       });
     }
   };
@@ -112,12 +140,13 @@ export default function Profile() {
   if (profileLoading) {
     return (
       <AppLayout>
-        <div className="p-4 space-y-6">
-          <div className="flex items-center gap-4 animate-pulse">
-            <div className="w-24 h-24 rounded-full bg-card" />
-            <div className="space-y-2 flex-1">
-              <div className="h-6 w-32 bg-card rounded" />
-              <div className="h-4 w-24 bg-card rounded" />
+        <div className="p-4 space-y-6 animate-pulse">
+          <div className="h-36 bg-muted rounded-xl" />
+          <div className="flex items-end gap-4 -mt-12 px-4">
+            <div className="w-24 h-24 rounded-full bg-muted border-4 border-background" />
+            <div className="space-y-2 pb-2 flex-1">
+              <div className="h-5 w-32 bg-muted rounded" />
+              <div className="h-4 w-24 bg-muted rounded" />
             </div>
           </div>
         </div>
@@ -131,6 +160,15 @@ export default function Profile() {
 
   const bannerUrl = (profile as any).bannerUrl as string | null | undefined;
 
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "posts", label: "Gönderiler" },
+    { id: "media", label: "Medya" },
+    ...(isMe ? [{ id: "liked" as Tab, label: "Beğenilenler" }] : []),
+  ];
+
+  const currentPosts = activeTab === "posts" ? posts : activeTab === "media" ? mediaPosts : likedPosts;
+  const currentLoading = activeTab === "posts" ? postsLoading : activeTab === "media" ? mediaLoading : likedLoading;
+
   return (
     <AppLayout>
       <div className="pb-20">
@@ -139,7 +177,7 @@ export default function Profile() {
             {bannerUrl ? (
               <img src={bannerUrl} alt="Kapak" className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-r from-primary/20 to-accent/50" />
+              <div className="w-full h-full bg-gradient-to-br from-primary/30 via-violet-400/20 to-accent/40" />
             )}
             {isMe && (
               <>
@@ -148,7 +186,7 @@ export default function Profile() {
                   type="file"
                   accept="image/*,video/*"
                   className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); }}
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); }}
                 />
                 <button
                   onClick={() => bannerInputRef.current?.click()}
@@ -164,9 +202,9 @@ export default function Profile() {
           <div className="px-4 pb-4">
             <div className="flex justify-between items-end -mt-12 mb-4">
               <div className="relative">
-                <Avatar className="w-24 h-24 border-4 border-card bg-card">
+                <Avatar className="w-24 h-24 border-4 border-card bg-card shadow-md">
                   <AvatarImage src={profile.avatarUrl || ""} />
-                  <AvatarFallback className="text-3xl">{profile.displayName.charAt(0)}</AvatarFallback>
+                  <AvatarFallback className="text-3xl bg-primary/10 text-primary">{profile.displayName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 {isMe && (
                   <>
@@ -175,7 +213,7 @@ export default function Profile() {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }}
                     />
                     <button
                       onClick={() => avatarInputRef.current?.click()}
@@ -198,6 +236,7 @@ export default function Profile() {
                     onClick={handleFollowToggle}
                     variant={profile.isFollowing ? "outline" : "default"}
                     className="rounded-full font-semibold px-5"
+                    disabled={followMutation.isPending || unfollowMutation.isPending}
                   >
                     {profile.isFollowing ? "Takibi Bırak" : "Takip Et"}
                   </Button>
@@ -213,38 +252,70 @@ export default function Profile() {
               )}
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div>
                 <h1 className="text-xl font-bold">{profile.displayName}</h1>
-                <p className="text-muted-foreground">@{profile.username}</p>
+                <p className="text-muted-foreground text-sm">@{profile.username}</p>
               </div>
-
               {profile.bio && (
-                <p className="text-sm whitespace-pre-wrap">{profile.bio}</p>
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{profile.bio}</p>
               )}
-
-              <div className="flex items-center gap-4 text-sm text-muted-foreground pt-1">
-                <div className="flex gap-1 items-center">
-                  <strong className="text-foreground">{profile.followingCount}</strong> Takip Edilen
+              <div className="flex items-center gap-5 text-sm pt-1">
+                <div className="flex gap-1.5 items-center">
+                  <strong className="text-foreground font-bold">{profile.followingCount}</strong>
+                  <span className="text-muted-foreground">Takip Edilen</span>
                 </div>
-                <div className="flex gap-1 items-center">
-                  <strong className="text-foreground">{profile.followerCount}</strong> Takipçi
+                <div className="flex gap-1.5 items-center">
+                  <strong className="text-foreground font-bold">{profile.followerCount}</strong>
+                  <span className="text-muted-foreground">Takipçi</span>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Tabs */}
+          <div className="flex border-t border-border">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex-1 py-3 text-sm font-semibold transition-colors border-b-2 ${
+                  activeTab === tab.id
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="p-4 space-y-4">
-          <h2 className="font-bold text-lg">Gönderiler</h2>
-          {postsLoading ? (
-            <div className="text-center p-4">Yükleniyor...</div>
-          ) : posts?.length === 0 ? (
-            <div className="text-center p-8 text-muted-foreground bg-card rounded-xl border border-border">
-              Henüz gönderi yok
+          {currentLoading ? (
+            Array(2).fill(0).map((_, i) => (
+              <div key={i} className="h-40 bg-card animate-pulse rounded-xl border border-border" />
+            ))
+          ) : !currentPosts || currentPosts.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground bg-card rounded-xl border border-border">
+              {activeTab === "posts" && "Henüz gönderi yok"}
+              {activeTab === "media" && "Henüz medya paylaşımı yok"}
+              {activeTab === "liked" && "Henüz beğenilen gönderi yok"}
+            </div>
+          ) : activeTab === "media" ? (
+            <div className="grid grid-cols-3 gap-1">
+              {currentPosts.map((post: any) => (
+                <div key={post.id} className="aspect-square rounded-lg overflow-hidden bg-muted">
+                  {post.mediaType === "video" ? (
+                    <video src={post.mediaUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />
+                  )}
+                </div>
+              ))}
             </div>
           ) : (
-            posts?.map(post => <PostCard key={post.id} post={post} />)
+            currentPosts.map((post: any) => <PostCard key={post.id} post={post} />)
           )}
         </div>
       </div>
@@ -258,18 +329,13 @@ export default function Profile() {
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Görünen Ad</label>
-              <Input
-                value={editName}
-                onChange={e => setEditName(e.target.value)}
-                placeholder="Adın"
-                maxLength={60}
-              />
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Adın" maxLength={60} />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Biyografi</label>
               <Textarea
                 value={editBio}
-                onChange={e => setEditBio(e.target.value)}
+                onChange={(e) => setEditBio(e.target.value)}
                 placeholder="Kendinden bahset..."
                 className="resize-none"
                 rows={3}
@@ -278,9 +344,7 @@ export default function Profile() {
               <p className="text-xs text-muted-foreground text-right">{editBio.length}/200</p>
             </div>
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setEditOpen(false)} disabled={saving}>
-                İptal
-              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => setEditOpen(false)} disabled={saving}>İptal</Button>
               <Button className="flex-1" onClick={handleSaveProfile} disabled={saving || !editName.trim()}>
                 {saving ? "Kaydediliyor..." : "Kaydet"}
               </Button>

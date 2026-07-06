@@ -22,10 +22,8 @@ export function BottomNav() {
         <PlusCircle className="w-10 h-10" />
       </Link>
       
-      <Link href="/chat" className={`relative p-3 flex flex-col items-center gap-1 ${location === '/chat' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="nav-chat">
+      <Link href="/chat" className={`p-3 flex flex-col items-center gap-1 ${location === '/chat' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="nav-chat">
         <MessageCircle className="w-6 h-6" />
-        {/* Unread indicator mockup */}
-        <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-destructive rounded-full border-2 border-background"></span>
       </Link>
       
       <Link href="/voice" className={`p-3 flex flex-col items-center gap-1 ${location === '/voice' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="nav-voice">

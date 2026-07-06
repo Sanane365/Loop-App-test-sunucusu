@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { notificationsTable, postsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { getUserWithStats, enrichPost } from "../lib/helpers";
 
@@ -36,6 +36,19 @@ router.get("/notifications", requireAuth, async (req, res) => {
     );
 
     res.json(enriched);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/notifications/unread-count", requireAuth, async (req, res) => {
+  try {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(notificationsTable)
+      .where(and(eq(notificationsTable.userId, req.user!.id), eq(notificationsTable.isRead, false)));
+    res.json({ count: Number(result[0]?.count ?? 0) });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
