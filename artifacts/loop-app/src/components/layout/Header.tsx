@@ -1,4 +1,4 @@
-import { Bell, Menu, User, LogOut, Home, Search, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun } from "lucide-react";
+import { Bell, Search, User, LogOut, Home, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun, Menu } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -7,10 +7,15 @@ import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 
-export function Header() {
+interface HeaderProps {
+  feedType?: "akis" | "takipte";
+  onFeedChange?: (type: "akis" | "takipte") => void;
+}
+
+export function Header({ feedType, onFeedChange }: HeaderProps) {
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const logout = useLogout();
   const { dark, toggle: toggleDark } = useDarkMode();
@@ -56,24 +61,56 @@ export function Header() {
     navItems.push({ href: "/admin", label: "Admin Paneli", icon: Shield });
   }
 
+  const isHome = location === "/";
+
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-border">
+    <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
       <div className="flex h-14 items-center justify-between px-4 max-w-screen-md mx-auto">
-        <Link href="/" className="flex items-center gap-2" data-testid="header-logo">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 flex-shrink-0" data-testid="header-logo">
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
             ∞
           </div>
           <span className="text-xl font-bold tracking-tight text-foreground">loop</span>
         </Link>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleDark}
+        {/* Center: Feed toggle (only on home) */}
+        {isHome && feedType !== undefined && onFeedChange ? (
+          <div className="flex items-center bg-muted rounded-full p-1 gap-1">
+            <button
+              onClick={() => onFeedChange("akis")}
+              className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                feedType === "akis"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Akış
+            </button>
+            <button
+              onClick={() => onFeedChange("takipte")}
+              className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                feedType === "takipte"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Takipte
+            </button>
+          </div>
+        ) : (
+          <div />
+        )}
+
+        {/* Right icons */}
+        <div className="flex items-center gap-4">
+          <Link
+            href="/explore"
             className="text-muted-foreground hover:text-foreground transition-colors"
-            aria-label="Tema değiştir"
+            data-testid="header-search"
           >
-            {dark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-          </button>
+            <Search className="w-5 h-5" />
+          </Link>
 
           <Link
             href="/notifications"
@@ -81,20 +118,10 @@ export function Header() {
             data-testid="header-notifications"
             onClick={() => setUnreadCount(0)}
           >
-            <Bell className="w-6 h-6" />
+            <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-primary text-primary-foreground text-[10px] font-bold rounded-full flex items-center justify-center px-1 border border-background">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
+              <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
             )}
-          </Link>
-
-          <Link
-            href="/dm"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="header-dm"
-          >
-            <Mail className="w-6 h-6" />
           </Link>
 
           <Sheet open={open} onOpenChange={setOpen}>
@@ -103,7 +130,7 @@ export function Header() {
                 className="text-muted-foreground hover:text-foreground transition-colors"
                 data-testid="header-menu"
               >
-                <Menu className="w-6 h-6" />
+                <Menu className="w-5 h-5" />
               </button>
             </SheetTrigger>
 
