@@ -1,4 +1,5 @@
-import { useLogin } from "@workspace/api-client-react";
+import { useLogin, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,6 +16,7 @@ const loginSchema = z.object({
 
 export default function Login() {
   const login = useLogin();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -25,7 +27,9 @@ export default function Login() {
 
   function onSubmit(values: z.infer<typeof loginSchema>) {
     login.mutate({ data: values }, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        await queryClient.refetchQueries({ queryKey: getGetMeQueryKey() });
         toast({ title: "Giriş başarılı" });
         setLocation("/");
       },

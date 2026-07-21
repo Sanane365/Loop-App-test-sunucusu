@@ -1,4 +1,5 @@
-import { useRegister } from "@workspace/api-client-react";
+import { useRegister, getGetMeQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,6 +18,7 @@ const registerSchema = z.object({
 
 export default function Register() {
   const register = useRegister();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -27,7 +29,9 @@ export default function Register() {
 
   function onSubmit(values: z.infer<typeof registerSchema>) {
     register.mutate({ data: values }, {
-      onSuccess: () => {
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+        await queryClient.refetchQueries({ queryKey: getGetMeQueryKey() });
         toast({ title: "Kayıt başarılı" });
         setLocation("/");
       },
