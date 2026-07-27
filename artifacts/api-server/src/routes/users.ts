@@ -61,10 +61,11 @@ router.get("/users/me/profile", requireAuth, async (req, res) => {
 
 router.patch("/users/me/profile", requireAuth, async (req, res) => {
   try {
-    const { displayName, bio } = req.body;
+    const { displayName, bio, spotifyTrackId } = req.body;
     const updateData: Record<string, unknown> = {};
     if (displayName !== undefined) updateData.displayName = displayName;
     if (bio !== undefined) updateData.bio = bio;
+    if (spotifyTrackId !== undefined) updateData.spotifyTrackId = spotifyTrackId;
     await db
       .update(usersTable)
       .set(updateData)

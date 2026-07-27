@@ -10,6 +10,7 @@ export const usersTable = pgTable("users", {
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
   bannerUrl: text("banner_url"),
+  spotifyTrackId: text("spotify_track_id"),
   role: text("role").notNull().default("user"),
   isBanned: boolean("is_banned").notNull().default(false),
   banReason: text("ban_reason"),
