@@ -154,6 +154,7 @@ export default function DirectMessages() {
     try { return new Set(JSON.parse(localStorage.getItem("dm_hidden") || "[]")); } catch { return new Set(); }
   });
   const [menuId, setMenuId]           = useState<number | null>(null);
+  const [menuPos, setMenuPos]         = useState<{ top: number; right: number } | null>(null);
   const [muteDialogId, setMuteDialogId] = useState<number | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -731,72 +732,105 @@ export default function DirectMessages() {
                       {!isSelecting && (
                         <button
                           className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors -mr-1"
-                          onClick={e => { e.stopPropagation(); setMenuId(menuId === uid ? null : uid); }}
+                          onClick={e => {
+                            e.stopPropagation();
+                            if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
+                            const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                            setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                            setMenuId(uid);
+                          }}
                         >
                           <MoreVertical className="w-4 h-4 text-muted-foreground" />
                         </button>
                       )}
                     </div>
-
-                    {/* Açılır menü */}
-                    {menuId === uid && (
-                      <div className="absolute right-3 top-2 z-30 bg-card border border-border rounded-2xl shadow-xl overflow-hidden min-w-[180px]">
-                        <button
-                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left"
-                          onClick={() => togglePin(uid)}
-                        >
-                          <Pin className="w-4 h-4 text-primary" />
-                          {isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}
-                        </button>
-                        <button
-                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
-                          onClick={() => toggleFav(uid)}
-                        >
-                          <Heart className={`w-4 h-4 ${isFav ? "text-rose-400 fill-rose-400" : "text-rose-400"}`} />
-                          {isFav ? "Favoriden çıkar" : "Favori ekle"}
-                        </button>
-                        <button
-                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
-                          onClick={() => { setMuteDialogId(uid); }}
-                        >
-                          <BellOff className="w-4 h-4 text-muted-foreground" />
-                          {isMuted ? "Sesi aç" : "Sessize al"}
-                        </button>
-                        <button
-                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40 text-destructive"
-                          onClick={() => hideConvs(new Set([uid]))}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Sohbeti temizle
-                        </button>
-                      </div>
-                    )}
                   </div>
                 );
               })}
             </div>
           )}
 
-          {/* Çoklu seçim alt çubuğu */}
+          {/* Fixed açılır menü (liste overflow'undan kaçmak için dışarıda) */}
+          {menuId !== null && menuPos !== null && (() => {
+            const uid = menuId;
+            const isPinned = pinnedIds.has(uid);
+            const isFav    = favIds.has(uid);
+            const mutedUntil = mutedMap.get(uid);
+            const isMuted  = !!mutedUntil && mutedUntil > Date.now();
+            return (
+              <div
+                className="fixed z-50 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden min-w-[200px]"
+                style={{ top: menuPos.top, right: menuPos.right }}
+              >
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm hover:bg-muted/60 transition-colors text-left"
+                  onClick={() => togglePin(uid)}
+                >
+                  <Pin className="w-4 h-4 text-primary" />
+                  {isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
+                  onClick={() => toggleFav(uid)}
+                >
+                  <Heart className={`w-4 h-4 ${isFav ? "text-rose-400 fill-rose-400" : "text-rose-400"}`} />
+                  {isFav ? "Favoriden çıkar" : "Favori ekle"}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
+                  onClick={() => { setMuteDialogId(uid); setMenuId(null); setMenuPos(null); }}
+                >
+                  <BellOff className="w-4 h-4 text-muted-foreground" />
+                  {isMuted ? "Sesi aç" : "Sessize al"}
+                </button>
+                <button
+                  className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40 text-destructive"
+                  onClick={() => hideConvs(new Set([uid]))}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Sohbeti temizle
+                </button>
+              </div>
+            );
+          })()}
+
+          {/* Çoklu seçim alt çubuğu — nav barının üstünde (bottom-16 = 64px) */}
           {isSelecting && (
-            <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
-              <button
-                className="text-sm text-muted-foreground font-medium"
-                onClick={() => { setIsSelecting(false); setSelectedIds(new Set()); }}
-              >
-                İptal
-              </button>
-              <span className="text-sm font-semibold text-foreground">
-                {selectedIds.size} kişi seçildi
-              </span>
-              <button
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold disabled:opacity-40"
-                disabled={selectedIds.size === 0}
-                onClick={() => hideConvs(selectedIds)}
-              >
-                <Trash2 className="w-4 h-4" />
-                Temizle
-              </button>
+            <div className="fixed bottom-16 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 shadow-2xl">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  className="text-sm text-muted-foreground font-medium px-2 py-1"
+                  onClick={() => { setIsSelecting(false); setSelectedIds(new Set()); }}
+                >
+                  İptal
+                </button>
+                <span className="text-sm font-semibold text-foreground">
+                  {selectedIds.size} kişi seçildi
+                </span>
+                <button
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold disabled:opacity-40"
+                  disabled={selectedIds.size === 0}
+                  onClick={() => hideConvs(selectedIds)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Temizle
+                </button>
+              </div>
+              {/* Grup sohbeti butonu — en az 3 kişi seçilince görünür */}
+              {selectedIds.size >= 3 && (
+                <button
+                  className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
+                  onClick={() => {
+                    // ileriye dönük: grup sohbeti oluştur
+                    alert(`Grup sohbeti: ${selectedIds.size} kişiyle`);
+                    setIsSelecting(false);
+                    setSelectedIds(new Set());
+                  }}
+                >
+                  <MessageSquarePlus className="w-4 h-4" />
+                  Grup Sohbeti Oluştur ({selectedIds.size} kişi)
+                </button>
+              )}
             </div>
           )}
 
@@ -833,7 +867,7 @@ export default function DirectMessages() {
 
           {/* Menü kapatma backdrop */}
           {menuId !== null && (
-            <div className="fixed inset-0 z-20" onClick={() => setMenuId(null)} />
+            <div className="fixed inset-0 z-40" onClick={() => { setMenuId(null); setMenuPos(null); }} />
           )}
         </div>
 
