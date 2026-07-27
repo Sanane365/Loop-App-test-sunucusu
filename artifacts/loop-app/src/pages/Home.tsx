@@ -10,18 +10,17 @@ import { Link } from "wouter";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
 
-type FeedType = "akis" | "takipte";
-type FilterType = "trend" | "yakin" | "yeni" | "sana-ozel";
+type FilterType = "trend" | "takipte" | "yeni" | "bulten" | "sana-ozel";
 
 const filters: { id: FilterType; label: string; icon: React.ReactNode; color: string }[] = [
   { id: "trend", label: "Trend", icon: <TrendingUp className="w-3.5 h-3.5" />, color: "text-primary" },
-  { id: "yakin", label: "Yakın", icon: <MapPin className="w-3.5 h-3.5" />, color: "text-orange-500" },
+  { id: "takipte", label: "Takipte", icon: <MapPin className="w-3.5 h-3.5" />, color: "text-orange-500" },
   { id: "yeni", label: "Yeni", icon: <Leaf className="w-3.5 h-3.5" />, color: "text-green-500" },
+  { id: "bulten", label: "Bülten", icon: <Sparkles className="w-3.5 h-3.5" />, color: "text-purple-500" },
   { id: "sana-ozel", label: "Sana Özel", icon: <Sparkles className="w-3.5 h-3.5" />, color: "text-blue-500" },
 ];
 
 export default function Home() {
-  const [feedType, setFeedType] = useState<FeedType>("akis");
   const [activeFilter, setActiveFilter] = useState<FilterType>("trend");
   const { user } = useAuth();
 
@@ -31,7 +30,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-secondary/50 pb-16">
-      <Header feedType={feedType} onFeedChange={setFeedType} />
+      <Header />
       <main className="max-w-screen-md mx-auto min-h-[calc(100vh-3.5rem-4rem)]">
         <div className="pb-4">
 

@@ -74,44 +74,15 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
           <span className="text-xl font-bold tracking-tight text-foreground">loop</span>
         </Link>
 
-        {/* Center: Feed toggle (only on home) */}
-        {isHome && feedType !== undefined && onFeedChange ? (
-          <div className="flex items-center bg-muted rounded-full p-1 gap-1">
-            <button
-              onClick={() => onFeedChange("akis")}
-              className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                feedType === "akis"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Akış
-            </button>
-            <button
-              onClick={() => onFeedChange("takipte")}
-              className={`px-5 py-1.5 rounded-full text-sm font-semibold transition-all ${
-                feedType === "takipte"
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              Takipte
-            </button>
-          </div>
+        {/* Center: spacer */}
+        {isHome ? (
+          <div />
         ) : (
           <div />
         )}
 
         {/* Right icons */}
         <div className="flex items-center gap-4">
-          <Link
-            href="/explore"
-            className="text-muted-foreground hover:text-foreground transition-colors"
-            data-testid="header-search"
-          >
-            <Search className="w-5 h-5" />
-          </Link>
-
           <Link
             href="/notifications"
             className="relative text-muted-foreground hover:text-foreground transition-colors"
@@ -122,6 +93,14 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
             {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full" />
             )}
+          </Link>
+
+          <Link
+            href="/dm"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="header-dm"
+          >
+            <Mail className="w-5 h-5" />
           </Link>
 
           <Sheet open={open} onOpenChange={setOpen}>
