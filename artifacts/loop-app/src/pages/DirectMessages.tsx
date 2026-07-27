@@ -294,7 +294,7 @@ export default function DirectMessages() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full pb-20">
-        {/* Search bar */}
+        {/* Search bar — sticky */}
         <div className="px-4 pt-4 pb-3 bg-background sticky top-0 z-10 border-b border-border/50">
           <div className="flex items-center gap-2">
             <div className="flex-1 relative">
@@ -310,9 +310,49 @@ export default function DirectMessages() {
               <SlidersHorizontal className="w-4 h-4" />
             </button>
           </div>
+        </div>
 
-          {/* Filter tabs */}
-          <div className="flex gap-2 mt-3 overflow-x-auto hide-scrollbar pb-0.5">
+        <div className="flex-1 overflow-y-auto">
+          {/* Friend profile cards — horizontal scroll */}
+          {conversations.length > 0 && (
+            <div className="pt-4 pb-2 border-b border-border/40">
+              <div className="flex gap-4 px-4 overflow-x-auto hide-scrollbar pb-1">
+                {conversations.map((c, idx) => {
+                  const isOnline = idx < 4;
+                  return (
+                    <button
+                      key={c.user?.id ?? idx}
+                      onClick={() => setLocation(`/dm/${c.user?.id}`)}
+                      className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+                    >
+                      <div className="relative">
+                        <Avatar className="border-2 border-background shadow-md group-hover:scale-105 transition-transform" style={{ width: 58, height: 58 }}>
+                          <AvatarImage src={c.user?.avatarUrl || ""} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-lg">
+                            {c.user?.displayName?.charAt(0) ?? "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isOnline && (
+                          <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background" />
+                        )}
+                        {c.unreadCount > 0 && (
+                          <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary rounded-full border-2 border-background text-[9px] font-bold text-primary-foreground flex items-center justify-center">
+                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-medium text-foreground/80 max-w-[58px] truncate text-center leading-tight">
+                        {c.user?.displayName?.split(" ")[0] ?? "?"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Filter tabs — above conversation list */}
+          <div className="flex gap-2 px-4 py-3 overflow-x-auto hide-scrollbar border-b border-border/40 bg-background/80">
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -333,32 +373,6 @@ export default function DirectMessages() {
                 )}
               </button>
             ))}
-          </div>
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {/* Active Users banner */}
-          <div className="mx-4 mt-4 mb-3 bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <Sparkles className="w-4 h-4 text-primary" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-foreground leading-snug">DM kutun burada, hızlıca sohbetlere dön.</p>
-            </div>
-            <button className="flex items-center gap-2 flex-shrink-0 hover:opacity-80 transition-opacity">
-              <span className="text-xs font-semibold text-primary whitespace-nowrap">Aktif Kullanıcılar</span>
-              <div className="flex -space-x-2">
-                {ACTIVE_USERS.map((u, i) => (
-                  <div key={i} className={`w-6 h-6 rounded-full bg-gradient-to-br ${u.color} border-2 border-background flex items-center justify-center flex-shrink-0`}>
-                    <span className="text-[8px] font-bold text-white">{u.initial}</span>
-                  </div>
-                ))}
-                <div className="w-6 h-6 rounded-full bg-muted border-2 border-background flex items-center justify-center flex-shrink-0">
-                  <span className="text-[8px] font-bold text-muted-foreground">+</span>
-                </div>
-              </div>
-              <span className="text-muted-foreground text-sm">›</span>
-            </button>
           </div>
 
           {/* Conversations */}
