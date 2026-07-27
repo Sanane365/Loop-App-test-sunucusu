@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useParams, useLocation } from "wouter";
+import { useParams, useLocation, Link } from "wouter";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -314,10 +314,48 @@ export default function DirectMessages() {
 
         <div className="flex-1 overflow-y-auto">
           {/* Friend profile cards — horizontal scroll, square card style */}
-          {conversations.length > 0 && (
-            <div className="pt-4 pb-3 border-b border-border/40">
-              <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
-                {conversations.map((c, idx) => {
+          <div className="pt-4 pb-3 border-b border-border/40">
+            <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
+
+              {/* ── My own card with thought bubble ── */}
+              <Link href="/create" className="flex-shrink-0 w-[100px] flex flex-col active:scale-95 transition-transform block">
+                {/* Speech bubble — sits above the card */}
+                <div className="relative flex justify-center mb-1 z-10">
+                  <div className="relative bg-card border border-border shadow-md rounded-2xl px-2.5 py-1.5 max-w-[120px]">
+                    <p className="text-[8px] font-semibold text-foreground/80 text-center leading-tight">
+                      Düşüncelerini Loop diye paylaş :)
+                    </p>
+                    {/* tail pointing down */}
+                    <div
+                      className="absolute -bottom-[6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-card border-b border-r border-border rotate-45"
+                    />
+                  </div>
+                </div>
+
+                {/* Card body */}
+                <div className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
+                  {/* Top gradient band */}
+                  <div className="h-8 bg-gradient-to-r from-violet-500/40 via-purple-500/30 to-fuchsia-400/30" />
+
+                  {/* Avatar — overlaps band */}
+                  <div className="flex justify-center -mt-5 mb-2">
+                    <div className="relative">
+                      <Avatar className="border-[3px] border-card shadow-md ring-2 ring-primary/30" style={{ width: 44, height: 44 }}>
+                        <AvatarImage src={me?.avatarUrl || ""} />
+                        <AvatarFallback className="bg-gradient-to-br from-primary/30 to-violet-400/40 text-primary font-bold text-base">
+                          {me?.displayName?.charAt(0) ?? "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
+                    </div>
+                  </div>
+                  <p className="text-[11px] font-semibold text-primary truncate text-center px-2 pb-2.5 leading-tight">
+                    Sen
+                  </p>
+                </div>
+              </Link>
+
+              {conversations.map((c, idx) => {
                   const isOnline = idx < 4;
                   return (
                     <button
@@ -355,9 +393,8 @@ export default function DirectMessages() {
                     </button>
                   );
                 })}
-              </div>
             </div>
-          )}
+          </div>
 
           {/* Filter tabs — above conversation list */}
           <div className="flex gap-2 px-4 py-3 overflow-x-auto hide-scrollbar border-b border-border/40 bg-background/80">
