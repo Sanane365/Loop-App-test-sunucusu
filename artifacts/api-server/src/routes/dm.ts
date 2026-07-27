@@ -74,7 +74,7 @@ router.get("/dm/conversations", requireAuth, async (req, res) => {
     }
 
     const enriched = await Promise.all(conversations.map(async c => {
-      const [user] = await db.select({ id: usersTable.id, username: usersTable.username, displayName: usersTable.displayName, avatarUrl: usersTable.avatarUrl })
+      const [user] = await db.select({ id: usersTable.id, username: usersTable.username, displayName: usersTable.displayName, avatarUrl: usersTable.avatarUrl, thought: usersTable.thought })
         .from(usersTable).where(eq(usersTable.id, c.userId)).limit(1);
       return {
         user: user ?? null,

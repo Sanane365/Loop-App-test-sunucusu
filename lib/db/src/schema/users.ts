@@ -11,6 +11,7 @@ export const usersTable = pgTable("users", {
   avatarUrl: text("avatar_url"),
   bannerUrl: text("banner_url"),
   spotifyTrackId: text("spotify_track_id"),
+  thought: text("thought"),
   role: text("role").notNull().default("user"),
   isBanned: boolean("is_banned").notNull().default(false),
   banReason: text("ban_reason"),

@@ -19,6 +19,7 @@ interface DmUser {
   username: string;
   displayName: string;
   avatarUrl: string | null;
+  thought?: string | null;
 }
 
 interface DmMessage {
@@ -99,16 +100,31 @@ export default function DirectMessages() {
     setThoughtOpen(true);
     setTimeout(() => thoughtInputRef.current?.focus(), 50);
   };
-  const saveThought = () => {
+  const saveThought = async () => {
     const val = thoughtDraft.trim();
     setThought(val);
     localStorage.setItem("loop_thought", val);
     setThoughtOpen(false);
+    // persist to server so friends can see it
+    try {
+      await fetch("/api/users/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thought: val || null }),
+      });
+    } catch { /* silent */ }
   };
-  const clearThought = () => {
+  const clearThought = async () => {
     setThought("");
     localStorage.removeItem("loop_thought");
     setThoughtOpen(false);
+    try {
+      await fetch("/api/users/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thought: null }),
+      });
+    } catch { /* silent */ }
   };
 
   const fetchConversations = async () => {
@@ -340,88 +356,98 @@ export default function DirectMessages() {
           <div className="pt-4 pb-3 border-b border-border/40">
             <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
 
-              {/* ── My own card with thought bubble ── */}
-              <div className="flex-shrink-0 w-[72px] flex flex-col">
-                {/* Speech bubble — tıklanabilir */}
-                <button
-                  onClick={openThought}
-                  className="relative flex justify-center mb-1.5 z-10 group"
-                >
-                  <div className="relative bg-card border border-border shadow-md rounded-2xl px-2 py-1.5 w-[88px] hover:border-primary/50 transition-colors">
-                    <p className="text-[7.5px] font-medium text-foreground/70 text-center leading-tight line-clamp-2">
+              {/* ── My own card ── */}
+              <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
+                {/* Thought bubble */}
+                <button onClick={openThought} className="mb-2 group" style={{ width: 80 }}>
+                  <div className="relative bg-gradient-to-br from-primary/10 to-violet-400/10 border border-primary/25 rounded-2xl rounded-bl-sm px-2 py-1.5 shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
+                    <p className="text-[7px] font-medium text-foreground/75 text-center leading-snug line-clamp-3">
                       {thought || "Düşüncelerini Loop diye paylaş :)"}
                     </p>
-                    {/* tail */}
-                    <div className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-card border-b border-r border-border rotate-45" />
+                    {/* bubble tail bottom-left */}
+                    <div className="absolute -bottom-[5px] left-3 w-2.5 h-2.5 bg-gradient-to-br from-primary/10 to-violet-400/10 border-b border-r border-primary/25 rotate-45" />
                   </div>
                 </button>
-
-                {/* Card body — "Sen" */}
-                <button
-                  onClick={openThought}
-                  className="w-[58px] rounded-2xl bg-card border border-primary/30 shadow-sm hover:border-primary/60 hover:shadow-md transition-all active:scale-95 py-2.5 flex flex-col items-center gap-1.5"
-                >
-                  {/* Avatar with soft glow ring */}
+                {/* Avatar */}
+                <button onClick={openThought} className="flex flex-col items-center gap-1 active:scale-95 transition-transform">
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-[6px] scale-110" />
-                    <Avatar className="relative border-[2px] border-primary/40 shadow-sm" style={{ width: 32, height: 32 }}>
+                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-[5px] scale-125" />
+                    <Avatar className="relative ring-2 ring-primary/40 ring-offset-1 ring-offset-background shadow-md" style={{ width: 40, height: 40 }}>
                       <AvatarImage src={me?.avatarUrl || ""} />
-                      <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                      <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                         {me?.displayName?.charAt(0) ?? "?"}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-[1.5px] border-card" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background shadow-sm" />
                   </div>
-                  <p className="text-[9px] font-semibold text-primary leading-tight">Sen</p>
+                  <p className="text-[9px] font-bold text-primary leading-tight">Sen</p>
                 </button>
               </div>
 
               {conversations.map((c, idx) => {
                 const isOnline = idx < 4;
-                const colors = [
-                  "bg-violet-400/20 border-violet-400/40",
-                  "bg-pink-400/20 border-pink-400/40",
-                  "bg-blue-400/20 border-blue-400/40",
-                  "bg-emerald-400/20 border-emerald-400/40",
-                  "bg-orange-400/20 border-orange-400/40",
+                const friendThought = c.user?.thought;
+                const glowClasses = [
+                  "bg-violet-400/20", "bg-pink-400/20", "bg-blue-400/20",
+                  "bg-emerald-400/20", "bg-orange-400/20",
                 ];
-                const glowColors = [
-                  "bg-violet-400/25",
-                  "bg-pink-400/25",
-                  "bg-blue-400/25",
-                  "bg-emerald-400/25",
-                  "bg-orange-400/25",
+                const ringClasses = [
+                  "ring-violet-400/50", "ring-pink-400/50", "ring-blue-400/50",
+                  "ring-emerald-400/50", "ring-orange-400/50",
                 ];
-                const col = colors[idx % colors.length];
-                const glow = glowColors[idx % glowColors.length];
+                const bubbleBg = [
+                  "from-violet-400/10 to-purple-400/10 border-violet-300/30",
+                  "from-pink-400/10 to-rose-400/10 border-pink-300/30",
+                  "from-blue-400/10 to-indigo-400/10 border-blue-300/30",
+                  "from-emerald-400/10 to-green-400/10 border-emerald-300/30",
+                  "from-orange-400/10 to-amber-400/10 border-orange-300/30",
+                ];
+                const glow = glowClasses[idx % glowClasses.length];
+                const ring = ringClasses[idx % ringClasses.length];
+                const bub = bubbleBg[idx % bubbleBg.length];
                 return (
-                  <button
-                    key={c.user?.id ?? idx}
-                    onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                    className={`flex-shrink-0 w-[58px] rounded-2xl bg-card border shadow-sm hover:shadow-md transition-all active:scale-95 py-2.5 flex flex-col items-center gap-1.5 ${col}`}
-                  >
-                    <div className="relative">
-                      {/* soft glow behind avatar */}
-                      <div className={`absolute inset-0 rounded-full ${glow} blur-[6px] scale-110`} />
-                      <Avatar className="relative border-[2px] border-white/30 shadow-sm" style={{ width: 32, height: 32 }}>
-                        <AvatarImage src={c.user?.avatarUrl || ""} />
-                        <AvatarFallback className="bg-white/20 text-foreground font-bold text-xs">
-                          {c.user?.displayName?.charAt(0) ?? "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {isOnline && (
-                        <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-[1.5px] border-card" />
-                      )}
-                      {c.unreadCount > 0 && (
-                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary rounded-full border-[1.5px] border-card text-[7px] font-bold text-primary-foreground flex items-center justify-center">
-                          {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[9px] font-semibold text-foreground truncate max-w-[50px] text-center leading-tight">
-                      {c.user?.displayName?.split(" ")[0] ?? "?"}
-                    </p>
-                  </button>
+                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
+                    {/* Friend thought bubble — shown only when they have a thought */}
+                    {friendThought ? (
+                      <div className="mb-2" style={{ width: 80 }}>
+                        <div className={`relative bg-gradient-to-br ${bub} border rounded-2xl rounded-bl-sm px-2 py-1.5 shadow-sm`}>
+                          <p className="text-[7px] font-medium text-foreground/75 text-center leading-snug line-clamp-3">
+                            {friendThought}
+                          </p>
+                          <div className={`absolute -bottom-[5px] left-3 w-2.5 h-2.5 bg-gradient-to-br ${bub} border-b border-r rotate-45`} />
+                        </div>
+                      </div>
+                    ) : (
+                      /* spacer so avatar aligns with "Sen" card when no thought */
+                      <div className="mb-2" style={{ height: 0 }} />
+                    )}
+                    {/* Avatar */}
+                    <button
+                      onClick={() => setLocation(`/dm/${c.user?.id}`)}
+                      className="flex flex-col items-center gap-1 active:scale-95 transition-transform"
+                    >
+                      <div className="relative">
+                        <div className={`absolute inset-0 rounded-full ${glow} blur-[5px] scale-125`} />
+                        <Avatar className={`relative ring-2 ${ring} ring-offset-1 ring-offset-background shadow-md`} style={{ width: 40, height: 40 }}>
+                          <AvatarImage src={c.user?.avatarUrl || ""} />
+                          <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
+                            {c.user?.displayName?.charAt(0) ?? "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isOnline && (
+                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background shadow-sm" />
+                        )}
+                        {c.unreadCount > 0 && (
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-background text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm">
+                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[9px] font-semibold text-foreground/80 truncate text-center leading-tight" style={{ maxWidth: 48 }}>
+                        {c.user?.displayName?.split(" ")[0] ?? "?"}
+                      </p>
+                    </button>
+                  </div>
                 );
               })}
             </div>
