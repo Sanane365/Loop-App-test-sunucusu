@@ -356,57 +356,69 @@ export default function DirectMessages() {
                   </div>
                 </button>
 
-                {/* Card body */}
+                {/* Card body — "Sen" */}
                 <button
                   onClick={openThought}
-                  className="rounded-2xl bg-card border border-border shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all active:scale-95"
+                  className="w-[58px] rounded-2xl bg-card border border-primary/30 shadow-sm hover:border-primary/60 hover:shadow-md transition-all active:scale-95 py-2.5 flex flex-col items-center gap-1.5"
                 >
-                  <div className="h-7 bg-gradient-to-r from-violet-500/40 via-purple-500/30 to-fuchsia-400/30" />
-                  <div className="flex justify-center -mt-4 mb-1.5">
-                    <div className="relative">
-                      <Avatar className="border-[2px] border-card shadow-md ring-1 ring-primary/30" style={{ width: 36, height: 36 }}>
-                        <AvatarImage src={me?.avatarUrl || ""} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary/30 to-violet-400/40 text-primary font-bold text-sm">
-                          {me?.displayName?.charAt(0) ?? "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
-                    </div>
+                  {/* Avatar with soft glow ring */}
+                  <div className="relative">
+                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-[6px] scale-110" />
+                    <Avatar className="relative border-[2px] border-primary/40 shadow-sm" style={{ width: 32, height: 32 }}>
+                      <AvatarImage src={me?.avatarUrl || ""} />
+                      <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs">
+                        {me?.displayName?.charAt(0) ?? "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-[1.5px] border-card" />
                   </div>
-                  <p className="text-[10px] font-semibold text-primary truncate text-center px-1.5 pb-2 leading-tight">
-                    Sen
-                  </p>
+                  <p className="text-[9px] font-semibold text-primary leading-tight">Sen</p>
                 </button>
               </div>
 
               {conversations.map((c, idx) => {
                 const isOnline = idx < 4;
+                const colors = [
+                  "bg-violet-400/20 border-violet-400/40",
+                  "bg-pink-400/20 border-pink-400/40",
+                  "bg-blue-400/20 border-blue-400/40",
+                  "bg-emerald-400/20 border-emerald-400/40",
+                  "bg-orange-400/20 border-orange-400/40",
+                ];
+                const glowColors = [
+                  "bg-violet-400/25",
+                  "bg-pink-400/25",
+                  "bg-blue-400/25",
+                  "bg-emerald-400/25",
+                  "bg-orange-400/25",
+                ];
+                const col = colors[idx % colors.length];
+                const glow = glowColors[idx % glowColors.length];
                 return (
                   <button
                     key={c.user?.id ?? idx}
                     onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                    className="flex-shrink-0 w-[72px] rounded-2xl bg-card border border-border shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all group active:scale-95"
+                    className={`flex-shrink-0 w-[58px] rounded-2xl bg-card border shadow-sm hover:shadow-md transition-all active:scale-95 py-2.5 flex flex-col items-center gap-1.5 ${col}`}
                   >
-                    <div className="h-7 bg-gradient-to-r from-violet-500/30 via-purple-400/20 to-pink-400/20" />
-                    <div className="flex justify-center -mt-4 mb-1.5 relative">
-                      <div className="relative">
-                        <Avatar className="border-[2px] border-card shadow-md" style={{ width: 36, height: 36 }}>
-                          <AvatarImage src={c.user?.avatarUrl || ""} />
-                          <AvatarFallback className="bg-gradient-to-br from-primary/30 to-violet-400/40 text-primary font-bold text-sm">
-                            {c.user?.displayName?.charAt(0) ?? "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isOnline && (
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
-                        )}
-                        {c.unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center">
-                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                          </span>
-                        )}
-                      </div>
+                    <div className="relative">
+                      {/* soft glow behind avatar */}
+                      <div className={`absolute inset-0 rounded-full ${glow} blur-[6px] scale-110`} />
+                      <Avatar className="relative border-[2px] border-white/30 shadow-sm" style={{ width: 32, height: 32 }}>
+                        <AvatarImage src={c.user?.avatarUrl || ""} />
+                        <AvatarFallback className="bg-white/20 text-foreground font-bold text-xs">
+                          {c.user?.displayName?.charAt(0) ?? "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      {isOnline && (
+                        <span className="absolute bottom-0 right-0 w-2 h-2 bg-green-500 rounded-full border-[1.5px] border-card" />
+                      )}
+                      {c.unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-primary rounded-full border-[1.5px] border-card text-[7px] font-bold text-primary-foreground flex items-center justify-center">
+                          {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-[10px] font-semibold text-foreground truncate text-center px-1.5 pb-2 leading-tight">
+                    <p className="text-[9px] font-semibold text-foreground truncate max-w-[50px] text-center leading-tight">
                       {c.user?.displayName?.split(" ")[0] ?? "?"}
                     </p>
                   </button>
