@@ -11,6 +11,7 @@ import notificationsRouter from "./notifications";
 import exploreRouter from "./explore";
 import adminRouter from "./admin";
 import dmRouter from "./dm";
+import loopRouter from "./loop";
 
 const router: IRouter = Router();
 
@@ -25,6 +26,7 @@ router.use(notificationsRouter);
 router.use(exploreRouter);
 router.use("/admin", adminRouter);
 router.use(dmRouter);
+router.use(loopRouter);
 
 // ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
 // Bu dosya sadece API'yi yönetmeli.

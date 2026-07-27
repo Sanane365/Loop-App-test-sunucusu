@@ -161,53 +161,184 @@ export default function DirectMessages() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Loop Anlık Fotoğraf (Polaroid) ──────────────────────────────────
-  // Gerçek uygulamada /api/loop/photos'dan gelir; şimdilik mock veri
-  const [loopPhotos] = useState([
-    { id: "lp1", from: "Ahmet K.", initial: "A", color: "from-violet-400 to-purple-500",  ts: Date.now() - 180_000 },
-    { id: "lp2", from: "Zeynep",  initial: "Z", color: "from-pink-400 to-rose-500",       ts: Date.now() - 540_000 },
-    { id: "lp3", from: "Emre",    initial: "E", color: "from-sky-400 to-blue-500",        ts: Date.now() - 900_000 },
-  ]);
-  const [viewedPhotoIds, setViewedPhotoIds] = useState<Set<string>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("loop_viewed") || "[]")); } catch { return new Set(); }
-  });
-  const [loopViewerOpen, setLoopViewerOpen]   = useState(false);
-  const [loopViewIdx,    setLoopViewIdx]       = useState(0);
-  const [loopShareOpen,  setLoopShareOpen]     = useState(false);
+  // ── Loop Anlık Fotoğraf (Polaroid) — gerçek API ──────────────────────
+  interface LoopPhoto {
+    id: number;
+    mediaUrl: string;
+    createdAt: string;
+    viewed: boolean;
+    sender: { id: number; displayName: string; avatarUrl: string | null; username: string } | null;
+  }
+  interface LoopPhotoDetail {
+    id: number;
+    mediaUrl: string;
+    reactions: { emoji: string; user: { id: number; displayName: string; avatarUrl: string | null } | null }[];
+    replies: { content: string; user: { id: number; displayName: string; avatarUrl: string | null } | null; createdAt: string }[];
+  }
+
+  const [loopPhotos,     setLoopPhotos]     = useState<LoopPhoto[]>([]);
+  const [loopViewerOpen, setLoopViewerOpen] = useState(false);
+  const [loopViewIdx,    setLoopViewIdx]    = useState(0);
+  const [loopViewDetail, setLoopViewDetail] = useState<LoopPhotoDetail | null>(null);
+  const [loopViewReply,  setLoopViewReply]  = useState("");
+  const [loopShareOpen,  setLoopShareOpen]  = useState(false);
   const [loopSharePreview, setLoopSharePreview] = useState<string | null>(null);
+  const [loopShareFile,  setLoopShareFile]  = useState<File | null>(null);
+  const [loopSharing,    setLoopSharing]    = useState(false);
   const loopCamRef = useRef<HTMLInputElement>(null);
 
-  const unviewedPhotos = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
+  const unviewedPhotos = loopPhotos.filter(p => !p.viewed);
 
-  const openLoopViewer = () => {
-    const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
-    if (unviewed.length === 0) return;
-    setLoopViewIdx(0);
-    setLoopViewerOpen(true);
+  const fetchLoopPhotos = async () => {
+    try {
+      const res = await fetch("/api/loop/photos", { cache: "no-store" });
+      if (res.ok) setLoopPhotos(await res.json());
+    } catch { /* silent */ }
   };
 
-  const markAndAdvance = () => {
-    const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
-    const current  = unviewed[loopViewIdx];
-    if (current) {
-      setViewedPhotoIds(prev => {
-        const next = new Set([...prev, current.id]);
-        localStorage.setItem("loop_viewed", JSON.stringify([...next]));
-        return next;
-      });
+  const openLoopViewer = () => {
+    if (unviewedPhotos.length === 0) return;
+    setLoopViewIdx(0);
+    setLoopViewDetail(null);
+    setLoopViewReply("");
+    setLoopViewerOpen(true);
+    loadPhotoDetail(unviewedPhotos[0]!.id);
+  };
+
+  const loadPhotoDetail = async (photoId: number) => {
+    try {
+      const res = await fetch(`/api/loop/photos/${photoId}`, { cache: "no-store" });
+      if (res.ok) setLoopViewDetail(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const markAndAdvance = async () => {
+    const photo = unviewedPhotos[loopViewIdx];
+    if (photo) {
+      // Sunucuda görüldü olarak işaretle
+      await fetch(`/api/loop/photos/${photo.id}/view`, { method: "POST" }).catch(() => {});
+      setLoopPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, viewed: true } : p));
     }
-    if (loopViewIdx < unviewed.length - 1) {
-      setLoopViewIdx(i => i + 1);
+    if (loopViewIdx < unviewedPhotos.length - 1) {
+      const nextIdx = loopViewIdx + 1;
+      setLoopViewIdx(nextIdx);
+      setLoopViewDetail(null);
+      setLoopViewReply("");
+      loadPhotoDetail(unviewedPhotos[nextIdx]!.id);
     } else {
       setLoopViewerOpen(false);
+      setLoopViewDetail(null);
     }
+  };
+
+  const sendLoopReact = async (emoji: string) => {
+    const photo = unviewedPhotos[loopViewIdx];
+    if (!photo) return;
+    await fetch(`/api/loop/photos/${photo.id}/react`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji }),
+    }).catch(() => {});
+    loadPhotoDetail(photo.id);
+  };
+
+  const sendLoopReply = async () => {
+    const photo = unviewedPhotos[loopViewIdx];
+    if (!photo || !loopViewReply.trim()) return;
+    await fetch(`/api/loop/photos/${photo.id}/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: loopViewReply.trim() }),
+    }).catch(() => {});
+    setLoopViewReply("");
+    loadPhotoDetail(photo.id);
+    toast({ title: "Yanıt gönderildi ✨" });
   };
 
   const handleLoopShareFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setLoopSharePreview(url);
+    setLoopShareFile(file);
+    setLoopSharePreview(URL.createObjectURL(file));
+  };
+
+  const submitLoopShare = async () => {
+    if (!loopShareFile) return;
+    setLoopSharing(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", loopShareFile);
+      const res = await fetch("/api/loop/photos", { method: "POST", body: fd });
+      if (res.ok) {
+        toast({ title: "Anlık fotoğraf paylaşıldı! 📸", description: "Arkadaşların tek seferlik görebilir." });
+        setLoopShareOpen(false);
+        setLoopSharePreview(null);
+        setLoopShareFile(null);
+      } else {
+        toast({ title: "Hata", description: "Fotoğraf gönderilemedi.", variant: "destructive" });
+      }
+    } finally {
+      setLoopSharing(false);
+    }
+  };
+
+  // ── Düşünce Beğeni sistemi ──────────────────────────────────────────
+  interface ThoughtLiker { id: number; displayName: string; avatarUrl: string | null }
+  // Kendi thought'ımı beğenenler
+  const [myThoughtLikers, setMyThoughtLikers] = useState<ThoughtLiker[]>([]);
+  // Arkadaşların thought'larını beğenenler { userId -> likers[] }
+  const [friendThoughtLikers, setFriendThoughtLikers] = useState<Map<number, ThoughtLiker[]>>(new Map());
+  // Hangi arkadaşın thought'ını beğendim { userId -> boolean }
+  const [myLikes, setMyLikes] = useState<Set<number>>(new Set());
+  // Thought yanıt sheet
+  const [thoughtSheet, setThoughtSheet] = useState<{ userId: number; displayName: string; thought: string; avatarUrl: string | null } | null>(null);
+  const [thoughtReply,  setThoughtReply]  = useState("");
+
+  const fetchMyThoughtLikers = async () => {
+    if (!me?.id) return;
+    try {
+      const res = await fetch(`/api/thoughts/${me.id}/likes`, { cache: "no-store" });
+      if (res.ok) setMyThoughtLikers(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const fetchFriendThoughtLikers = async (friendId: number) => {
+    try {
+      const res = await fetch(`/api/thoughts/${friendId}/likes`, { cache: "no-store" });
+      if (res.ok) {
+        const likers: ThoughtLiker[] = await res.json();
+        setFriendThoughtLikers(prev => new Map(prev).set(friendId, likers));
+        // Benim beğeni durumumu güncelle
+        if (me?.id && likers.some(l => l.id === me.id)) {
+          setMyLikes(prev => new Set([...prev, friendId]));
+        }
+      }
+    } catch { /* silent */ }
+  };
+
+  const toggleThoughtLike = async (friendId: number) => {
+    const res = await fetch(`/api/thoughts/${friendId}/like`, { method: "POST" }).catch(() => null);
+    if (!res?.ok) return;
+    const data = await res.json() as { liked: boolean };
+    setMyLikes(prev => {
+      const next = new Set(prev);
+      data.liked ? next.add(friendId) : next.delete(friendId);
+      return next;
+    });
+    fetchFriendThoughtLikers(friendId);
+  };
+
+  const sendThoughtReply = async () => {
+    if (!thoughtSheet || !thoughtReply.trim()) return;
+    // Düşünce yanıtı = DM olarak gönder
+    await fetch(`/api/dm/${thoughtSheet.userId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: `💭 "${thoughtSheet.thought}"\n\n${thoughtReply.trim()}` }),
+    }).catch(() => {});
+    setThoughtReply("");
+    setThoughtSheet(null);
+    toast({ title: "Yanıt gönderildi 💬" });
   };
 
   const startLongPress = (id: number) => {
@@ -354,10 +485,24 @@ export default function DirectMessages() {
 
   useEffect(() => {
     fetchConversations();
-    // Arkadaş thought'larını canlı tutmak için 10sn'de bir yenile
-    const interval = setInterval(fetchConversations, 10000);
+    fetchLoopPhotos();
+    if (me?.id) fetchMyThoughtLikers();
+    const interval = setInterval(() => {
+      fetchConversations();
+      fetchLoopPhotos();
+      if (me?.id) fetchMyThoughtLikers();
+    }, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [me?.id]);
+
+  // Konuşmalar gelince thought likerlarını da çek
+  useEffect(() => {
+    conversations.forEach(c => {
+      if (c.user?.id && c.user.thought) {
+        fetchFriendThoughtLikers(c.user.id);
+      }
+    });
+  }, [conversations.map(c => c.user?.id).join(","), me?.id]);
 
   useEffect(() => {
     if (userId) {
@@ -582,6 +727,7 @@ export default function DirectMessages() {
                 {unviewedPhotos.slice(0, 3).map((photo, i) => {
                   const rotations = [-14, 8, -5];
                   const translateY = [0, -6, -12];
+                  const gradients = ["from-violet-400 to-purple-500", "from-pink-400 to-rose-500", "from-sky-400 to-blue-500"];
                   return (
                     <div
                       key={photo.id}
@@ -593,9 +739,15 @@ export default function DirectMessages() {
                     >
                       {/* Polaroid çerçeve */}
                       <div className="bg-white shadow-lg rounded-[3px] p-0.5 pb-2.5 w-10">
-                        <div className={`w-9 h-9 bg-gradient-to-br ${photo.color} rounded-[2px] flex items-center justify-center`}>
-                          <span className="text-white font-bold text-xs drop-shadow">{photo.initial}</span>
-                        </div>
+                        {photo.mediaUrl ? (
+                          <img src={`/api${photo.mediaUrl}`} alt="" className="w-9 h-9 object-cover rounded-[2px]" />
+                        ) : (
+                          <div className={`w-9 h-9 bg-gradient-to-br ${gradients[i % 3]} rounded-[2px] flex items-center justify-center`}>
+                            <span className="text-white font-bold text-xs drop-shadow">
+                              {photo.sender?.displayName?.charAt(0) ?? "?"}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -630,34 +782,40 @@ export default function DirectMessages() {
 
               {/* ── My own card ── */}
               <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
-                {/* Bubble slot — sabit yükseklik, tüm kartlar hizalı */}
-                <div className="h-[60px] flex items-end w-full mb-1.5">
+                {/* Bubble slot */}
+                <div className="h-[60px] flex items-end w-full mb-1.5 relative">
                   <button onClick={openThought} className="w-full group text-left">
-                    <ThoughtBubble
-                      text={thought || thoughtPlaceholder}
-                      isEmpty={!thought}
-                      color="primary"
-                    />
+                    <ThoughtBubble text={thought || thoughtPlaceholder} isEmpty={!thought} color="primary" />
                   </button>
+                  {/* Beni beğenenler — balon sağ üstünde küçük avatarlar */}
+                  {myThoughtLikers.length > 0 && (
+                    <div className="absolute -top-1 -right-1 flex -space-x-1 z-10">
+                      {myThoughtLikers.slice(0, 2).map(l => (
+                        <div key={l.id} className="relative">
+                          <Avatar className="ring-1 ring-white" style={{ width: 16, height: 16 }}>
+                            <AvatarImage src={l.avatarUrl || ""} />
+                            <AvatarFallback className="bg-primary text-white text-[6px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -top-1.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
+                            <Heart className="w-1.5 h-1.5 text-white fill-white" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {/* Kart — kamera butonu relative sarmalında */}
                 <div className="relative w-full">
-                  <button
-                    onClick={openThought}
-                    className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
-                  >
+                  <button onClick={openThought} className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5">
                     <div className="relative">
                       <Avatar className="ring-2 ring-primary/30 ring-offset-1 ring-offset-card" style={{ width: 40, height: 40 }}>
                         <AvatarImage src={me?.avatarUrl || ""} />
-                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                          {me?.displayName?.charAt(0) ?? "?"}
-                        </AvatarFallback>
+                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">{me?.displayName?.charAt(0) ?? "?"}</AvatarFallback>
                       </Avatar>
                       <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
                     </div>
                     <p className="text-[10px] font-bold text-primary">Sen</p>
                   </button>
-                  {/* Anlık fotoğraf kamerası — kart sağ üst */}
                   <button
                     onClick={e => { e.stopPropagation(); setLoopShareOpen(true); }}
                     className="absolute -top-1.5 -right-1.5 z-10 w-[22px] h-[22px] bg-primary rounded-full flex items-center justify-center shadow-md hover:bg-primary/90 active:scale-90 transition-all"
@@ -670,6 +828,9 @@ export default function DirectMessages() {
               {conversations.map((c, idx) => {
                 const isOnline = idx < 4;
                 const friendThought = c.user?.thought;
+                const fid = c.user?.id ?? -1;
+                const likers = friendThoughtLikers.get(fid) ?? [];
+                const iLiked = myLikes.has(fid);
                 const palettes = [
                   { border: "border-violet-400/50 hover:border-violet-500/70", ring: "ring-violet-400/40", color: "violet" as const },
                   { border: "border-pink-400/50 hover:border-pink-500/70",     ring: "ring-pink-400/40",   color: "pink" as const },
@@ -679,11 +840,32 @@ export default function DirectMessages() {
                 ];
                 const p = palettes[idx % palettes.length];
                 return (
-                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
-                    {/* Bubble slot — arkadaşın düşüncesi veya boşluk */}
-                    <div className="h-[60px] flex items-end w-full mb-1.5">
-                      {friendThought && (
-                        <ThoughtBubble text={friendThought} color={p.color} />
+                  <div key={fid} className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
+                    {/* Bubble slot — tıklanabilir + liker avatarları */}
+                    <div className="h-[60px] flex items-end w-full mb-1.5 relative">
+                      {friendThought ? (
+                        <button
+                          className="w-full text-left"
+                          onClick={() => setThoughtSheet({ userId: fid, displayName: c.user?.displayName ?? "", thought: friendThought, avatarUrl: c.user?.avatarUrl ?? null })}
+                        >
+                          <ThoughtBubble text={friendThought} color={p.color} />
+                        </button>
+                      ) : null}
+                      {/* Beğenenler — balon sağ üstünde */}
+                      {likers.length > 0 && (
+                        <div className="absolute -top-1 -right-1 flex -space-x-1 z-10 pointer-events-none">
+                          {likers.slice(0, 2).map(l => (
+                            <div key={l.id} className="relative">
+                              <Avatar className="ring-1 ring-white" style={{ width: 16, height: 16 }}>
+                                <AvatarImage src={l.avatarUrl || ""} />
+                                <AvatarFallback className="bg-violet-500 text-white text-[6px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <div className="absolute -top-1.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
+                                <Heart className="w-1.5 h-1.5 text-white fill-white" />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       )}
                     </div>
                     {/* Kart */}
@@ -694,13 +876,9 @@ export default function DirectMessages() {
                       <div className="relative">
                         <Avatar className={`ring-2 ring-offset-1 ring-offset-card ${p.ring}`} style={{ width: 40, height: 40 }}>
                           <AvatarImage src={c.user?.avatarUrl || ""} />
-                          <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
-                            {c.user?.displayName?.charAt(0) ?? "?"}
-                          </AvatarFallback>
+                          <AvatarFallback className="bg-muted text-foreground font-bold text-sm">{c.user?.displayName?.charAt(0) ?? "?"}</AvatarFallback>
                         </Avatar>
-                        {isOnline && (
-                          <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
-                        )}
+                        {isOnline && <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />}
                         {c.unreadCount > 0 && (
                           <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center px-1 shadow-sm">
                             {c.unreadCount > 9 ? "9+" : c.unreadCount}
@@ -711,6 +889,16 @@ export default function DirectMessages() {
                         {c.user?.displayName?.split(" ")[0] ?? "?"}
                       </p>
                     </button>
+                    {/* Beğen butonu — balon varsa balonun sağ alt köşesi */}
+                    {friendThought && (
+                      <button
+                        className={`mt-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold transition-colors ${iLiked ? "bg-rose-100 text-rose-500 dark:bg-rose-950" : "bg-muted/60 text-muted-foreground hover:bg-rose-50 hover:text-rose-400"}`}
+                        onClick={() => toggleThoughtLike(fid)}
+                      >
+                        <Heart className={`w-2.5 h-2.5 ${iLiked ? "fill-rose-500 text-rose-500" : ""}`} />
+                        {likers.length > 0 ? likers.length : ""}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -1011,35 +1199,96 @@ export default function DirectMessages() {
           )}
         </div>
 
-        {/* ── Loop Anlık Fotoğraf Görüntüleyici (tek seferlik) ── */}
+        {/* ── Loop Anlık Fotoğraf Görüntüleyici ── */}
         {loopViewerOpen && (() => {
-          const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
-          const photo    = unviewed[loopViewIdx];
+          const photo = unviewedPhotos[loopViewIdx];
           if (!photo) return null;
+          const minAgo = Math.max(0, Math.round((Date.now() - new Date(photo.createdAt).getTime()) / 60000));
           return (
-            <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
-              onClick={markAndAdvance}
-            >
-              <p className="text-white/60 text-xs mb-6 tracking-widest uppercase select-none">
-                Ekrana dokun — bir kez görüntülenecek
-              </p>
-
-              {/* Polaroid çerçeve */}
-              <div className="bg-white rounded-sm shadow-2xl p-3 pb-10 w-64 select-none"
-                style={{ transform: "rotate(-2deg)" }}
-              >
-                <div className={`w-full aspect-square bg-gradient-to-br ${photo.color} rounded-[2px] flex items-center justify-center`}>
-                  <span className="text-white font-bold text-5xl drop-shadow-lg">{photo.initial}</span>
+            <div className="fixed inset-0 z-[60] flex flex-col bg-black/95 backdrop-blur-md">
+              {/* Üst bar */}
+              <div className="flex items-center justify-between px-4 pt-10 pb-3">
+                <div className="flex items-center gap-2">
+                  <Avatar style={{ width: 28, height: 28 }}>
+                    <AvatarImage src={photo.sender?.avatarUrl || ""} />
+                    <AvatarFallback className="bg-violet-600 text-white text-[10px] font-bold">
+                      {photo.sender?.displayName?.charAt(0) ?? "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-white text-xs font-semibold leading-tight">{photo.sender?.displayName ?? "Biri"}</p>
+                    <p className="text-white/50 text-[10px]">{minAgo < 1 ? "Az önce" : `${minAgo} dk önce`}</p>
+                  </div>
                 </div>
-                <p className="text-center text-zinc-500 text-xs mt-3 font-medium">{photo.from}</p>
-                <p className="text-center text-zinc-400 text-[10px]">
-                  {Math.round((Date.now() - photo.ts) / 60000)} dk önce
-                </p>
+                <div className="flex gap-1">
+                  {unviewedPhotos.map((_, i) => (
+                    <div key={i} className={`h-1 w-6 rounded-full ${i === loopViewIdx ? "bg-white" : "bg-white/30"}`} />
+                  ))}
+                </div>
               </div>
 
-              <p className="text-white/40 text-[11px] mt-8 select-none">
-                {loopViewIdx + 1} / {unviewed.length}
-              </p>
+              {/* Polaroid fotoğraf */}
+              <div className="flex-1 flex items-center justify-center px-8">
+                <div className="bg-white rounded-sm shadow-2xl p-3 pb-10 w-full max-w-xs" style={{ transform: "rotate(-1.5deg)" }}>
+                  {photo.mediaUrl ? (
+                    <img src={`/api${photo.mediaUrl}`} alt="" className="w-full aspect-square object-cover rounded-[2px]" />
+                  ) : (
+                    <div className="w-full aspect-square bg-gradient-to-br from-violet-400 to-fuchsia-500 rounded-[2px] flex items-center justify-center">
+                      <span className="text-white font-bold text-5xl drop-shadow-lg">
+                        {photo.sender?.displayName?.charAt(0) ?? "?"}
+                      </span>
+                    </div>
+                  )}
+                  {/* Daha önce gelen tepkiler */}
+                  {loopViewDetail && loopViewDetail.reactions.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2 justify-center">
+                      {loopViewDetail.reactions.map((r, i) => (
+                        <span key={i} className="text-lg">{r.emoji}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Alt — tepki + yanıt */}
+              <div className="px-4 pb-10 space-y-3" onClick={e => e.stopPropagation()}>
+                {/* Emoji tepki row */}
+                <div className="flex justify-center gap-3">
+                  {["❤️","😂","😮","🔥","👏"].map(emoji => (
+                    <button
+                      key={emoji}
+                      className="text-2xl active:scale-125 transition-transform"
+                      onClick={() => sendLoopReact(emoji)}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+                {/* Yanıt yazma */}
+                <div className="flex gap-2">
+                  <input
+                    value={loopViewReply}
+                    onChange={e => setLoopViewReply(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") sendLoopReply(); }}
+                    placeholder="Yanıtla…"
+                    className="flex-1 px-4 py-2.5 rounded-2xl bg-white/10 text-white placeholder:text-white/40 text-sm focus:outline-none focus:ring-1 focus:ring-white/30"
+                  />
+                  <button
+                    onClick={sendLoopReply}
+                    disabled={!loopViewReply.trim()}
+                    className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40"
+                  >
+                    <Send className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+                {/* İlerle butonu */}
+                <button
+                  className="w-full py-2.5 rounded-2xl bg-white/10 text-white/80 text-sm font-semibold"
+                  onClick={markAndAdvance}
+                >
+                  {loopViewIdx < unviewedPhotos.length - 1 ? "Sonraki →" : "Kapat"}
+                </button>
+              </div>
             </div>
           );
         })()}
@@ -1047,11 +1296,9 @@ export default function DirectMessages() {
         {/* ── Loop Anlık Paylaş Bottom Sheet ── */}
         {loopShareOpen && (
           <div className="fixed inset-0 z-[60] flex flex-col justify-end">
-            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); }} />
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); setLoopShareFile(null); }} />
             <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
               <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
-
-              {/* Başlık */}
               <div className="flex items-center gap-2.5 mb-5">
                 <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Camera className="w-5 h-5 text-primary" />
@@ -1062,17 +1309,13 @@ export default function DirectMessages() {
                 </div>
               </div>
 
-              {/* Önizleme veya fotoğraf seçici */}
               {loopSharePreview ? (
                 <div className="flex flex-col items-center gap-4 mb-5">
-                  {/* Polaroid önizleme */}
                   <div className="bg-white rounded-sm shadow-xl p-3 pb-10 w-52" style={{ transform: "rotate(-1.5deg)" }}>
                     <img src={loopSharePreview} alt="Preview" className="w-full aspect-square object-cover rounded-[2px]" />
                   </div>
-                  <button
-                    className="text-xs text-muted-foreground underline underline-offset-2"
-                    onClick={() => { setLoopSharePreview(null); loopCamRef.current?.click(); }}
-                  >
+                  <button className="text-xs text-muted-foreground underline underline-offset-2"
+                    onClick={() => { setLoopSharePreview(null); setLoopShareFile(null); loopCamRef.current?.click(); }}>
                     Başka fotoğraf seç
                   </button>
                 </div>
@@ -1086,33 +1329,90 @@ export default function DirectMessages() {
                 </button>
               )}
 
-              <input
-                ref={loopCamRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                className="hidden"
-                onChange={handleLoopShareFile}
-              />
+              <input ref={loopCamRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleLoopShareFile} />
 
               <div className="flex gap-3">
-                <button
-                  className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                  onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); }}
-                >
+                <button className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                  onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); setLoopShareFile(null); }}>
                   İptal
                 </button>
                 <button
-                  disabled={!loopSharePreview}
+                  disabled={!loopShareFile || loopSharing}
                   className="flex-1 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 hover:bg-primary/90 transition-colors"
-                  onClick={() => {
-                    // Gerçek uygulamada POST /api/loop/photos
-                    setLoopShareOpen(false);
-                    setLoopSharePreview(null);
-                    toast({ title: "Anlık fotoğraf paylaşıldı! 📸", description: "Arkadaşların tek seferlik görebilir." });
-                  }}
+                  onClick={submitLoopShare}
                 >
-                  Paylaş ✨
+                  {loopSharing ? "Paylaşılıyor…" : "Paylaş ✨"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Düşünce Balonu Yanıt / Beğeni Sheet ── */}
+        {thoughtSheet && (
+          <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setThoughtSheet(null); setThoughtReply(""); }} />
+            <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
+              <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4" />
+
+              {/* Kimin düşüncesi */}
+              <div className="flex items-center gap-2.5 mb-4">
+                <Avatar className="ring-2 ring-primary/20" style={{ width: 36, height: 36 }}>
+                  <AvatarImage src={thoughtSheet.avatarUrl || ""} />
+                  <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
+                    {thoughtSheet.displayName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold leading-tight">{thoughtSheet.displayName}</p>
+                  <p className="text-xs text-muted-foreground italic truncate">"{thoughtSheet.thought}"</p>
+                </div>
+                {/* Beğen butonu */}
+                <button
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                    myLikes.has(thoughtSheet.userId)
+                      ? "bg-rose-100 text-rose-500 dark:bg-rose-950"
+                      : "bg-muted text-muted-foreground hover:bg-rose-50 hover:text-rose-400"
+                  }`}
+                  onClick={() => toggleThoughtLike(thoughtSheet.userId)}
+                >
+                  <Heart className={`w-4 h-4 ${myLikes.has(thoughtSheet.userId) ? "fill-rose-500 text-rose-500" : ""}`} />
+                  {myLikes.has(thoughtSheet.userId) ? "Beğenildi" : "Beğen"}
+                </button>
+              </div>
+
+              {/* Beğenenler listesi */}
+              {(friendThoughtLikers.get(thoughtSheet.userId) ?? []).length > 0 && (
+                <div className="flex items-center gap-1.5 mb-4 flex-wrap">
+                  <p className="text-xs text-muted-foreground">Beğenenler:</p>
+                  {(friendThoughtLikers.get(thoughtSheet.userId) ?? []).map(l => (
+                    <div key={l.id} className="flex items-center gap-1">
+                      <Avatar style={{ width: 20, height: 20 }}>
+                        <AvatarImage src={l.avatarUrl || ""} />
+                        <AvatarFallback className="bg-violet-500 text-white text-[8px]">{l.displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs text-muted-foreground">{l.displayName.split(" ")[0]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Yanıt yaz */}
+              <p className="text-xs text-muted-foreground mb-2">DM olarak yanıtla:</p>
+              <div className="flex gap-2">
+                <input
+                  value={thoughtReply}
+                  onChange={e => setThoughtReply(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") sendThoughtReply(); }}
+                  placeholder={`${thoughtSheet.displayName.split(" ")[0]}'e yanıt yaz…`}
+                  className="flex-1 px-4 py-2.5 rounded-2xl bg-muted/60 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <button
+                  onClick={sendThoughtReply}
+                  disabled={!thoughtReply.trim()}
+                  className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40"
+                >
+                  <Send className="w-4 h-4 text-white" />
                 </button>
               </div>
             </div>
