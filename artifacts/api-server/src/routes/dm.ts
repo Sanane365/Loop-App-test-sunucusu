@@ -83,6 +83,8 @@ router.get("/dm/conversations", requireAuth, async (req, res) => {
       };
     }));
 
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.set("Pragma", "no-cache");
     res.json(enriched);
   } catch (err) {
     req.log.error(err);

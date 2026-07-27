@@ -187,7 +187,7 @@ export default function DirectMessages() {
   };
 
   const fetchConversations = async () => {
-    const res = await fetch("/api/dm/conversations");
+    const res = await fetch("/api/dm/conversations", { cache: "no-store" });
     if (res.ok) setConversations(await res.json());
   };
 
@@ -209,7 +209,12 @@ export default function DirectMessages() {
     }
   };
 
-  useEffect(() => { fetchConversations(); }, []);
+  useEffect(() => {
+    fetchConversations();
+    // Arkadaş thought'larını canlı tutmak için 10sn'de bir yenile
+    const interval = setInterval(fetchConversations, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (userId) {
