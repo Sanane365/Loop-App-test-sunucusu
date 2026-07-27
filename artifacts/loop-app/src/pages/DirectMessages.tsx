@@ -9,6 +9,7 @@ import {
   Search, SlidersHorizontal, Mic, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
+  Camera, Users,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
@@ -159,6 +160,55 @@ export default function DirectMessages() {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Loop Anlık Fotoğraf (Polaroid) ──────────────────────────────────
+  // Gerçek uygulamada /api/loop/photos'dan gelir; şimdilik mock veri
+  const [loopPhotos] = useState([
+    { id: "lp1", from: "Ahmet K.", initial: "A", color: "from-violet-400 to-purple-500",  ts: Date.now() - 180_000 },
+    { id: "lp2", from: "Zeynep",  initial: "Z", color: "from-pink-400 to-rose-500",       ts: Date.now() - 540_000 },
+    { id: "lp3", from: "Emre",    initial: "E", color: "from-sky-400 to-blue-500",        ts: Date.now() - 900_000 },
+  ]);
+  const [viewedPhotoIds, setViewedPhotoIds] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("loop_viewed") || "[]")); } catch { return new Set(); }
+  });
+  const [loopViewerOpen, setLoopViewerOpen]   = useState(false);
+  const [loopViewIdx,    setLoopViewIdx]       = useState(0);
+  const [loopShareOpen,  setLoopShareOpen]     = useState(false);
+  const [loopSharePreview, setLoopSharePreview] = useState<string | null>(null);
+  const loopCamRef = useRef<HTMLInputElement>(null);
+
+  const unviewedPhotos = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
+
+  const openLoopViewer = () => {
+    const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
+    if (unviewed.length === 0) return;
+    setLoopViewIdx(0);
+    setLoopViewerOpen(true);
+  };
+
+  const markAndAdvance = () => {
+    const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
+    const current  = unviewed[loopViewIdx];
+    if (current) {
+      setViewedPhotoIds(prev => {
+        const next = new Set([...prev, current.id]);
+        localStorage.setItem("loop_viewed", JSON.stringify([...next]));
+        return next;
+      });
+    }
+    if (loopViewIdx < unviewed.length - 1) {
+      setLoopViewIdx(i => i + 1);
+    } else {
+      setLoopViewerOpen(false);
+    }
+  };
+
+  const handleLoopShareFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setLoopSharePreview(url);
+  };
 
   const startLongPress = (id: number) => {
     longPressTimer.current = setTimeout(() => {
@@ -519,8 +569,64 @@ export default function DirectMessages() {
 
         <div className="flex-1 overflow-y-auto">
           {/* Friend profile cards — horizontal scroll, square card style */}
-          <div className="pt-4 pb-3 border-b border-border/40">
-            <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
+          <div className="pt-4 pb-3 border-b border-border/40 relative">
+
+            {/* ── Polaroid Kamera Widget — sağ köşe ── */}
+            <button
+              onClick={openLoopViewer}
+              className="absolute right-0 top-0 z-10 flex flex-col items-center pt-1 pr-1 pointer-events-auto focus:outline-none"
+              style={{ width: 52 }}
+            >
+              {/* Polaroid fotoğraflar kameradan çıkıyor */}
+              <div className="relative w-10 mb-0.5" style={{ height: unviewedPhotos.length > 0 ? 48 : 0, transition: "height 0.3s" }}>
+                {unviewedPhotos.slice(0, 3).map((photo, i) => {
+                  const rotations = [-14, 8, -5];
+                  const translateY = [0, -6, -12];
+                  return (
+                    <div
+                      key={photo.id}
+                      className="absolute bottom-0 left-0 right-0"
+                      style={{
+                        transform: `rotate(${rotations[i % 3]}deg) translateY(${translateY[i % 3]}px)`,
+                        zIndex: 3 - i,
+                      }}
+                    >
+                      {/* Polaroid çerçeve */}
+                      <div className="bg-white shadow-lg rounded-[3px] p-0.5 pb-2.5 w-10">
+                        <div className={`w-9 h-9 bg-gradient-to-br ${photo.color} rounded-[2px] flex items-center justify-center`}>
+                          <span className="text-white font-bold text-xs drop-shadow">{photo.initial}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Kamera gövdesi — sadece üst kısmı görünür */}
+              <div className="relative w-10 overflow-hidden rounded-t-xl" style={{ height: 28 }}>
+                {/* Gövde */}
+                <div className="absolute inset-0 bg-zinc-800 rounded-t-xl" />
+                {/* Tepe çıkıntısı (vizör) */}
+                <div className="absolute top-0 left-1.5 right-1.5 h-1.5 bg-zinc-700 rounded-t-sm" />
+                {/* Lens */}
+                <div className="absolute inset-0 flex items-center justify-center mt-2">
+                  <div className="w-4 h-4 rounded-full bg-zinc-900 border-[1.5px] border-zinc-500 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-700 border border-zinc-500/60" />
+                  </div>
+                </div>
+                {/* Flash */}
+                <div className="absolute top-2 right-1.5 w-1.5 h-1 bg-amber-300/80 rounded-full" />
+              </div>
+
+              {/* Okunmamış rozet */}
+              {unviewedPhotos.length > 0 && (
+                <span className="absolute top-0 right-0 w-4 h-4 bg-primary rounded-full text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm z-20">
+                  {unviewedPhotos.length}
+                </span>
+              )}
+            </button>
+
+            <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1 pr-14">
 
               {/* ── My own card ── */}
               <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
@@ -534,22 +640,31 @@ export default function DirectMessages() {
                     />
                   </button>
                 </div>
-                {/* Kart */}
-                <button
-                  onClick={openThought}
-                  className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
-                >
-                  <div className="relative">
-                    <Avatar className="ring-2 ring-primary/30 ring-offset-1 ring-offset-card" style={{ width: 40, height: 40 }}>
-                      <AvatarImage src={me?.avatarUrl || ""} />
-                      <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                        {me?.displayName?.charAt(0) ?? "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
-                  </div>
-                  <p className="text-[10px] font-bold text-primary">Sen</p>
-                </button>
+                {/* Kart — kamera butonu relative sarmalında */}
+                <div className="relative w-full">
+                  <button
+                    onClick={openThought}
+                    className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
+                  >
+                    <div className="relative">
+                      <Avatar className="ring-2 ring-primary/30 ring-offset-1 ring-offset-card" style={{ width: 40, height: 40 }}>
+                        <AvatarImage src={me?.avatarUrl || ""} />
+                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
+                          {me?.displayName?.charAt(0) ?? "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
+                    </div>
+                    <p className="text-[10px] font-bold text-primary">Sen</p>
+                  </button>
+                  {/* Anlık fotoğraf kamerası — kart sağ üst */}
+                  <button
+                    onClick={e => { e.stopPropagation(); setLoopShareOpen(true); }}
+                    className="absolute -top-1.5 -right-1.5 z-10 w-[22px] h-[22px] bg-primary rounded-full flex items-center justify-center shadow-md hover:bg-primary/90 active:scale-90 transition-all"
+                  >
+                    <Camera className="w-2.5 h-2.5 text-primary-foreground" />
+                  </button>
+                </div>
               </div>
 
               {conversations.map((c, idx) => {
@@ -896,13 +1011,113 @@ export default function DirectMessages() {
           )}
         </div>
 
-        {/* FAB */}
-        <button
-          onClick={() => {}}
-          className="fixed bottom-20 right-4 w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-xl shadow-primary/30 hover:bg-primary/90 active:scale-95 transition-all z-20"
-        >
-          <MessageSquarePlus className="w-6 h-6 text-primary-foreground" />
-        </button>
+        {/* ── Loop Anlık Fotoğraf Görüntüleyici (tek seferlik) ── */}
+        {loopViewerOpen && (() => {
+          const unviewed = loopPhotos.filter(p => !viewedPhotoIds.has(p.id));
+          const photo    = unviewed[loopViewIdx];
+          if (!photo) return null;
+          return (
+            <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/90 backdrop-blur-md"
+              onClick={markAndAdvance}
+            >
+              <p className="text-white/60 text-xs mb-6 tracking-widest uppercase select-none">
+                Ekrana dokun — bir kez görüntülenecek
+              </p>
+
+              {/* Polaroid çerçeve */}
+              <div className="bg-white rounded-sm shadow-2xl p-3 pb-10 w-64 select-none"
+                style={{ transform: "rotate(-2deg)" }}
+              >
+                <div className={`w-full aspect-square bg-gradient-to-br ${photo.color} rounded-[2px] flex items-center justify-center`}>
+                  <span className="text-white font-bold text-5xl drop-shadow-lg">{photo.initial}</span>
+                </div>
+                <p className="text-center text-zinc-500 text-xs mt-3 font-medium">{photo.from}</p>
+                <p className="text-center text-zinc-400 text-[10px]">
+                  {Math.round((Date.now() - photo.ts) / 60000)} dk önce
+                </p>
+              </div>
+
+              <p className="text-white/40 text-[11px] mt-8 select-none">
+                {loopViewIdx + 1} / {unviewed.length}
+              </p>
+            </div>
+          );
+        })()}
+
+        {/* ── Loop Anlık Paylaş Bottom Sheet ── */}
+        {loopShareOpen && (
+          <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+            <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); }} />
+            <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
+              <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
+
+              {/* Başlık */}
+              <div className="flex items-center gap-2.5 mb-5">
+                <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Camera className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-base leading-tight">Loop diye anlık paylaş</p>
+                  <p className="text-xs text-muted-foreground">Arkadaşların tek seferlik görebilir</p>
+                </div>
+              </div>
+
+              {/* Önizleme veya fotoğraf seçici */}
+              {loopSharePreview ? (
+                <div className="flex flex-col items-center gap-4 mb-5">
+                  {/* Polaroid önizleme */}
+                  <div className="bg-white rounded-sm shadow-xl p-3 pb-10 w-52" style={{ transform: "rotate(-1.5deg)" }}>
+                    <img src={loopSharePreview} alt="Preview" className="w-full aspect-square object-cover rounded-[2px]" />
+                  </div>
+                  <button
+                    className="text-xs text-muted-foreground underline underline-offset-2"
+                    onClick={() => { setLoopSharePreview(null); loopCamRef.current?.click(); }}
+                  >
+                    Başka fotoğraf seç
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="w-full h-36 rounded-2xl border-2 border-dashed border-border hover:border-primary/40 bg-muted/30 flex flex-col items-center justify-center gap-2 mb-5 transition-colors"
+                  onClick={() => loopCamRef.current?.click()}
+                >
+                  <Camera className="w-8 h-8 text-muted-foreground/50" />
+                  <span className="text-sm text-muted-foreground">Fotoğraf seç veya çek</span>
+                </button>
+              )}
+
+              <input
+                ref={loopCamRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleLoopShareFile}
+              />
+
+              <div className="flex gap-3">
+                <button
+                  className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                  onClick={() => { setLoopShareOpen(false); setLoopSharePreview(null); }}
+                >
+                  İptal
+                </button>
+                <button
+                  disabled={!loopSharePreview}
+                  className="flex-1 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                  onClick={() => {
+                    // Gerçek uygulamada POST /api/loop/photos
+                    setLoopShareOpen(false);
+                    setLoopSharePreview(null);
+                    toast({ title: "Anlık fotoğraf paylaşıldı! 📸", description: "Arkadaşların tek seferlik görebilir." });
+                  }}
+                >
+                  Paylaş ✨
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Thought input bottom sheet ── */}
         {thoughtOpen && (
