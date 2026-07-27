@@ -313,37 +313,45 @@ export default function DirectMessages() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {/* Friend profile cards — horizontal scroll */}
+          {/* Friend profile cards — horizontal scroll, square card style */}
           {conversations.length > 0 && (
-            <div className="pt-4 pb-2 border-b border-border/40">
-              <div className="flex gap-4 px-4 overflow-x-auto hide-scrollbar pb-1">
+            <div className="pt-4 pb-3 border-b border-border/40">
+              <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
                 {conversations.map((c, idx) => {
                   const isOnline = idx < 4;
                   return (
                     <button
                       key={c.user?.id ?? idx}
                       onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                      className="flex flex-col items-center gap-1.5 flex-shrink-0 group"
+                      className="flex-shrink-0 w-[88px] rounded-2xl bg-card border border-border shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all group active:scale-95"
                     >
-                      <div className="relative">
-                        <Avatar className="border-2 border-background shadow-md group-hover:scale-105 transition-transform" style={{ width: 58, height: 58 }}>
-                          <AvatarImage src={c.user?.avatarUrl || ""} />
-                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-lg">
-                            {c.user?.displayName?.charAt(0) ?? "?"}
-                          </AvatarFallback>
-                        </Avatar>
-                        {isOnline && (
-                          <span className="absolute bottom-0.5 right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-background" />
-                        )}
-                        {c.unreadCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-primary rounded-full border-2 border-background text-[9px] font-bold text-primary-foreground flex items-center justify-center">
-                            {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                          </span>
-                        )}
+                      {/* Top gradient band */}
+                      <div className="h-9 bg-gradient-to-r from-violet-500/30 via-purple-400/20 to-pink-400/20" />
+
+                      {/* Avatar — overlaps band */}
+                      <div className="flex justify-center -mt-5 mb-2 relative">
+                        <div className="relative">
+                          <Avatar className="border-[3px] border-card shadow-md" style={{ width: 44, height: 44 }}>
+                            <AvatarImage src={c.user?.avatarUrl || ""} />
+                            <AvatarFallback className="bg-gradient-to-br from-primary/30 to-violet-400/40 text-primary font-bold text-base">
+                              {c.user?.displayName?.charAt(0) ?? "?"}
+                            </AvatarFallback>
+                          </Avatar>
+                          {isOnline && (
+                            <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
+                          )}
+                          {c.unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center">
+                              {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-[11px] font-medium text-foreground/80 max-w-[58px] truncate text-center leading-tight">
+
+                      {/* Name */}
+                      <p className="text-[11px] font-semibold text-foreground truncate text-center px-2 pb-2.5 leading-tight">
                         {c.user?.displayName?.split(" ")[0] ?? "?"}
-                      </span>
+                      </p>
                     </button>
                   );
                 })}
