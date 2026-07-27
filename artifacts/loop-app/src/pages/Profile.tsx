@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ImagePlus, Pencil, MessageCircle, Plus, MapPin, Calendar,
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
-  LayoutGrid, Clapperboard, Send, Video, X,
+  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -410,16 +410,17 @@ export default function Profile() {
 
         {/* ── Stats row ── */}
         <div className="mx-4 mt-4 bg-card border border-border rounded-2xl">
-          <div className="grid grid-cols-3 divide-x divide-border">
+          <div className="grid grid-cols-4 divide-x divide-border">
             {[
-              { value: profile.followerCount, label: "Takipçi", icon: "👥" },
-              { value: profile.followingCount, label: "Takip", icon: "👥" },
-              { value: postCount, label: "Gönderi", icon: "⊞" },
+              { value: profile.followerCount, label: "Takipçi", Icon: CheckCircle2 },
+              { value: profile.followingCount, label: "Takip", Icon: Plus },
+              { value: postCount, label: "Gönderi", Icon: LayoutGrid },
+              { value: (profile as any).likeCount ?? 0, label: "Beğeni", Icon: Heart },
             ].map((stat, i) => (
               <div key={i} className="flex flex-col items-center py-4 gap-1">
                 <span className="text-2xl font-black text-primary">{stat.value}</span>
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <span>{stat.icon}</span>
+                  <stat.Icon className="w-3 h-3" />
                   <span>{stat.label}</span>
                 </div>
               </div>
@@ -430,13 +431,24 @@ export default function Profile() {
         {/* ── Action buttons ── */}
         <div className="mx-4 mt-3 flex gap-2">
           {isMe ? (
-            <button
-              onClick={openEdit}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-colors shadow-md shadow-primary/20"
-            >
-              <Pencil className="w-4 h-4" />
-              Profili Düzenle
-            </button>
+            <>
+              <button
+                onClick={openEdit}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-foreground text-background font-bold text-sm hover:opacity-90 transition-opacity shadow-md"
+              >
+                Profili Düzenle
+              </button>
+              <button
+                onClick={() => {}}
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Mesaj
+              </button>
+              <button className="w-12 flex items-center justify-center rounded-2xl border border-border hover:bg-muted transition-colors">
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </>
           ) : (
             <>
               {/* Takip Et */}
@@ -445,20 +457,19 @@ export default function Profile() {
                 disabled={followMutation.isPending || unfollowMutation.isPending}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-colors shadow-md ${
                   profile.isFollowing
-                    ? "bg-muted border border-border text-foreground hover:bg-muted/80"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/20"
+                    ? "border border-border text-foreground hover:bg-muted/80"
+                    : "bg-foreground text-background hover:opacity-90"
                 }`}
               >
-                <CheckCircle2 className="w-4 h-4" />
                 {profile.isFollowing ? "Takiptesin" : "Takip Et"}
               </button>
 
               {/* Mesaj */}
               <button
                 onClick={() => setLocation(`/dm/${profile.id}`)}
-                className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl border border-border font-bold text-sm hover:bg-muted transition-colors"
               >
-                <Send className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4" />
                 Mesaj
               </button>
 
@@ -468,6 +479,28 @@ export default function Profile() {
               </button>
             </>
           )}
+        </div>
+
+        {/* ── Eserler card ── */}
+        <div className="mx-4 mt-3 bg-card border border-border rounded-2xl p-4 shadow-sm">
+          <div className="rounded-2xl p-4 bg-gradient-to-r from-violet-500 via-purple-500 to-pink-400">
+            <div className="flex items-start gap-3 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-white text-base leading-tight">Eserler</p>
+                <p className="text-white/80 text-xs mt-0.5">Kullanıcının yayınladığı eserler</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {["Deneme", "Deneme yapıyoruz"].map((tag) => (
+                <span key={tag} className="px-3 py-1 rounded-full bg-white/20 text-white text-xs font-medium">
+                  {tag}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── Anonymous Q&A card ── */}
@@ -484,22 +517,33 @@ export default function Profile() {
           </button>
         </div>
 
-        {/* ── Story Highlights ── */}
-        <div className="mt-5 px-4">
-          <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+        {/* ── Anılar (Story Highlights) ── */}
+        <div className="mt-4 mx-4 bg-card border border-border rounded-2xl p-4 shadow-sm">
+          {/* Header */}
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-5 h-5 text-primary" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm leading-tight">Anılar</p>
+              <p className="text-xs text-muted-foreground">Anılarını loop diye paylaş.</p>
+            </div>
+            <button className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold hover:bg-muted transition-colors flex-shrink-0">
+              Tümünü Gör
+            </button>
+          </div>
+          {/* Rounded-rect cards */}
+          <div className="flex gap-3 overflow-x-auto pb-1 hide-scrollbar">
             {HIGHLIGHTS.map((h, i) => (
               <div key={i} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${h.gradient} flex items-center justify-center shadow-lg border-2 border-background`}>
-                  <span className="text-2xl">{HIGHLIGHT_ICONS[i]}</span>
+                <div className={`w-[88px] h-[116px] rounded-[20px] bg-gradient-to-b ${h.gradient} flex items-end justify-center pb-4 shadow-md`}>
+                  <span className="text-3xl">{HIGHLIGHT_ICONS[i]}</span>
                 </div>
-                <span className="text-[11px] text-foreground/70 font-medium">{h.label}</span>
+                <span className="text-[11px] text-foreground/70 font-medium capitalize">{h.label}</span>
               </div>
             ))}
-            {/* Add new */}
             {isMe && (
               <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                <button className="w-16 h-16 rounded-full border-2 border-dashed border-border flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors">
-                  <Plus className="w-6 h-6 text-muted-foreground" />
+                <button className="w-[88px] h-[116px] rounded-[20px] border-2 border-dashed border-border flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors">
+                  <Plus className="w-7 h-7 text-muted-foreground" />
                 </button>
                 <span className="text-[11px] text-muted-foreground font-medium">Yeni</span>
               </div>
