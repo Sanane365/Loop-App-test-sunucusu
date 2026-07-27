@@ -483,9 +483,9 @@ export default function DirectMessages() {
       return true;
     })
     .sort((a, b) => {
-      const ap = pinnedIds.has(a.user?.id ?? -1) ? 0 : 1;
-      const bp = pinnedIds.has(b.user?.id ?? -1) ? 0 : 1;
-      return ap - bp;
+      const rank = (id: number) =>
+        pinnedIds.has(id) ? 0 : favIds.has(id) ? 1 : 2;
+      return rank(a.user?.id ?? -1) - rank(b.user?.id ?? -1);
     });
 
   const TABS: { id: FilterTab; label: string; count?: number }[] = [
@@ -655,11 +655,34 @@ export default function DirectMessages() {
                 const isSelected = selectedIds.has(uid);
 
                 return (
-                  <div key={uid} className="relative border-b border-border/30 last:border-0">
-                    {/* Kart */}
+                  <div
+                    key={uid}
+                    className={`relative transition-all duration-200
+                      ${isFav
+                        ? "mx-3 my-1.5 rounded-2xl overflow-hidden shadow-md shadow-violet-500/10"
+                        : "border-b border-border/30 last:border-0"
+                      }
+                    `}
+                  >
+                    {/* Favori arka plan gradyanı */}
+                    {isFav && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.08] via-purple-500/[0.06] to-fuchsia-500/[0.08] rounded-2xl pointer-events-none" />
+                    )}
+                    {isFav && (
+                      <div className="absolute inset-0 rounded-2xl ring-1 ring-violet-400/30 pointer-events-none" />
+                    )}
+
+                    {/* Sağ üst köşe — favori kalp rozeti */}
+                    {isFav && (
+                      <div className="absolute top-2 right-10 z-10 w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-sm shadow-violet-500/40">
+                        <Heart className="w-2.5 h-2.5 text-white fill-white" />
+                      </div>
+                    )}
+
+                    {/* Kart içeriği */}
                     <div
                       className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left select-none
-                        ${isSelected ? "bg-primary/8" : "hover:bg-muted/40 active:bg-muted/60"}
+                        ${isSelected ? "bg-primary/8" : isFav ? "hover:bg-violet-500/[0.06] active:bg-violet-500/10" : "hover:bg-muted/40 active:bg-muted/60"}
                         ${isSelecting ? "cursor-pointer" : ""}
                       `}
                       onClick={() => {
@@ -685,9 +708,12 @@ export default function DirectMessages() {
 
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
-                        <Avatar className="border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
+                        <Avatar
+                          className={`shadow-sm ${isFav ? "border-2 border-violet-400/50" : "border-2 border-background"}`}
+                          style={{ width: 52, height: 52 }}
+                        >
                           <AvatarImage src={c.user?.avatarUrl || ""} />
-                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-base">
+                          <AvatarFallback className={`font-bold text-base ${isFav ? "bg-gradient-to-br from-violet-400/30 to-fuchsia-400/20 text-violet-600" : "bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary"}`}>
                             {c.user?.displayName?.charAt(0) ?? "?"}
                           </AvatarFallback>
                         </Avatar>
@@ -700,26 +726,25 @@ export default function DirectMessages() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`font-bold text-[15px] truncate ${c.unreadCount > 0 ? "text-foreground" : "text-foreground/90"}`}>
+                            <span className={`font-bold text-[15px] truncate ${isFav ? "text-violet-700 dark:text-violet-300" : c.unreadCount > 0 ? "text-foreground" : "text-foreground/90"}`}>
                               {c.user?.displayName ?? "Bilinmiyor"}
                             </span>
                             {isPinned && <Pin className="w-3 h-3 text-primary/60 flex-shrink-0" />}
-                            {isFav && <Heart className="w-3 h-3 text-rose-400 flex-shrink-0" />}
                             {isMuted && <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
                           </div>
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">{time}</span>
+                          <span className={`text-[11px] flex-shrink-0 ${isFav ? "text-violet-400" : "text-muted-foreground"}`}>{time}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <p className={`text-sm truncate ${
                             c.unreadCount > 0
-                              ? "text-foreground font-medium"
-                              : isSpecial ? "text-muted-foreground italic" : "text-muted-foreground"
+                              ? isFav ? "text-violet-600 dark:text-violet-300 font-medium" : "text-foreground font-medium"
+                              : isSpecial ? "text-muted-foreground italic" : isFav ? "text-violet-500/80 dark:text-violet-400/80" : "text-muted-foreground"
                           }`}>
                             {preview}
                           </p>
                           <div className="flex-shrink-0 flex items-center gap-1.5">
                             {c.unreadCount > 0 && !isMuted && (
-                              <span className="min-w-[20px] h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                              <span className={`min-w-[20px] h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${isFav ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white" : "bg-primary text-primary-foreground"}`}>
                                 {c.unreadCount > 9 ? "9+" : c.unreadCount}
                               </span>
                             )}
@@ -731,7 +756,7 @@ export default function DirectMessages() {
                       {/* Üç nokta butonu */}
                       {!isSelecting && (
                         <button
-                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors -mr-1"
+                          className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors -mr-1 ${isFav ? "hover:bg-violet-500/10" : "hover:bg-muted"}`}
                           onClick={e => {
                             e.stopPropagation();
                             if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
@@ -740,7 +765,7 @@ export default function DirectMessages() {
                             setMenuId(uid);
                           }}
                         >
-                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                          <MoreVertical className={`w-4 h-4 ${isFav ? "text-violet-400" : "text-muted-foreground"}`} />
                         </button>
                       )}
                     </div>
