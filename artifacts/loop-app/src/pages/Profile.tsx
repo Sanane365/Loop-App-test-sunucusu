@@ -13,13 +13,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ImagePlus, Pencil, MessageCircle, Plus, MapPin, Calendar,
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
-  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star,
+  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 
-type Tab = "posts" | "reels" | "liked";
+type Tab = "posts" | "reels" | "bulletin" | "liked" | "reposted" | "saved";
 
 // Decorative story highlights
 const HIGHLIGHTS = [
@@ -503,20 +503,6 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Anonymous Q&A card ── */}
-        <div className="mx-4 mt-3 bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <span className="text-lg">🎭</span>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold">Anonim sorun mu var?</p>
-            <p className="text-xs text-muted-foreground">Hadi, içini dök. Burada yargı yok.</p>
-          </div>
-          <button className="text-primary text-sm font-bold flex-shrink-0 hover:text-primary/80 transition-colors">
-            Soru Sor
-          </button>
-        </div>
-
         {/* ── Anılar (Story Highlights) ── */}
         <div className="mt-4 mx-4 bg-card border border-border rounded-2xl p-4 shadow-sm">
           {/* Header */}
@@ -551,26 +537,45 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* ── Anonymous Q&A card ── */}
+        <div className="mx-4 mt-4 bg-card border border-border rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-[#1a0a2e] flex items-center justify-center flex-shrink-0 shadow-md">
+            <span className="text-2xl">🤖</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold truncate">Anonim bir soru g...</p>
+            <p className="text-xs text-muted-foreground">Sorular anonim kalır.</p>
+          </div>
+          <button className="px-4 py-2 rounded-full border border-border text-primary text-sm font-semibold flex-shrink-0 hover:bg-primary/5 transition-colors">
+            Soru Gönder
+          </button>
+        </div>
+
         {/* ── Tabs ── */}
-        <div className="mt-5 mx-4 flex border-b border-border">
-          {[
-            { id: "posts" as Tab, label: "Gönderiler", icon: <LayoutGrid className="w-4 h-4" /> },
-            { id: "reels" as Tab, label: "Reels", icon: <Clapperboard className="w-4 h-4" /> },
-            { id: "liked" as Tab, label: "Beğeniler", icon: <Heart className="w-4 h-4" /> },
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => handleTabChange(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+        <div className="mt-5 px-4">
+          <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+            {[
+              { id: "posts" as Tab, label: "Gönderiler", icon: <LayoutGrid className="w-3.5 h-3.5" /> },
+              { id: "reels" as Tab, label: "Loops", icon: <Play className="w-3.5 h-3.5" /> },
+              { id: "bulletin" as Tab, label: "Bülten", icon: <MessageCircle className="w-3.5 h-3.5" /> },
+              { id: "liked" as Tab, label: "Beğeniler", icon: <Heart className="w-3.5 h-3.5" /> },
+              { id: "reposted" as Tab, label: "Geri Paylaşımlar", icon: <Send className="w-3.5 h-3.5" /> },
+              { id: "saved" as Tab, label: "Kaydedilen", icon: <Bookmark className="w-3.5 h-3.5" /> },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => handleTabChange(tab.id)}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap flex-shrink-0 transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ── Posts grid ── */}
