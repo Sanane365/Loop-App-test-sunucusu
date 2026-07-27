@@ -76,34 +76,13 @@ const ACTIVE_USERS = [
 // ── Sevimli Düşünce Balonu ──────────────────────────────────────────
 type BubbleColor = "primary" | "violet" | "pink" | "sky" | "emerald" | "orange";
 
-const BUBBLE_TOKENS: Record<BubbleColor, {
-  bgClass: string; borderClass: string; textClass: string;
-  svgFill: string; svgStroke: string;
-}> = {
-  primary: {
-    bgClass: "bg-primary/10", borderClass: "border-primary/40", textClass: "text-primary",
-    svgFill: "rgba(124,58,237,0.10)", svgStroke: "rgba(124,58,237,0.40)",
-  },
-  violet: {
-    bgClass: "bg-violet-400/10", borderClass: "border-violet-400/40", textClass: "text-violet-600 dark:text-violet-300",
-    svgFill: "rgba(167,139,250,0.12)", svgStroke: "rgba(167,139,250,0.45)",
-  },
-  pink: {
-    bgClass: "bg-pink-400/10", borderClass: "border-pink-400/40", textClass: "text-pink-600 dark:text-pink-300",
-    svgFill: "rgba(244,114,182,0.12)", svgStroke: "rgba(244,114,182,0.45)",
-  },
-  sky: {
-    bgClass: "bg-sky-400/10", borderClass: "border-sky-400/40", textClass: "text-sky-600 dark:text-sky-300",
-    svgFill: "rgba(56,189,248,0.12)", svgStroke: "rgba(56,189,248,0.45)",
-  },
-  emerald: {
-    bgClass: "bg-emerald-400/10", borderClass: "border-emerald-400/40", textClass: "text-emerald-600 dark:text-emerald-300",
-    svgFill: "rgba(52,211,153,0.12)", svgStroke: "rgba(52,211,153,0.45)",
-  },
-  orange: {
-    bgClass: "bg-orange-400/10", borderClass: "border-orange-400/40", textClass: "text-orange-600 dark:text-orange-300",
-    svgFill: "rgba(251,146,60,0.12)", svgStroke: "rgba(251,146,60,0.45)",
-  },
+const BUBBLE_COLORS: Record<BubbleColor, { border: string; text: string; emoji: string }> = {
+  primary: { border: "rgba(124,58,237,0.45)", text: "#7c3aed",   emoji: "💜" },
+  violet:  { border: "rgba(139,92,246,0.45)", text: "#8b5cf6",   emoji: "✨" },
+  pink:    { border: "rgba(236,72,153,0.45)", text: "#ec4899",   emoji: "🌸" },
+  sky:     { border: "rgba(14,165,233,0.45)", text: "#0ea5e9",   emoji: "💙" },
+  emerald: { border: "rgba(16,185,129,0.45)", text: "#10b981",   emoji: "🌿" },
+  orange:  { border: "rgba(249,115,22,0.45)", text: "#f97316",   emoji: "🔥" },
 };
 
 function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
@@ -111,28 +90,42 @@ function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
   color?: BubbleColor;
   isEmpty?: boolean;
 }) {
-  const t = BUBBLE_TOKENS[color];
+  const c = BUBBLE_COLORS[color];
   return (
-    <div className="relative w-full">
-      {/* Balon gövdesi */}
-      <div className={`relative w-full rounded-2xl rounded-bl-none border-2 ${t.bgClass} ${t.borderClass} px-2.5 py-2 shadow-md`}>
-        {/* 💭 rozet — sağ üst */}
-        <span className="absolute -top-3 -right-0.5 text-[13px] drop-shadow-sm select-none leading-none">💭</span>
-        <p className={`text-[8px] font-semibold leading-snug line-clamp-3 tracking-tight ${t.textClass} ${isEmpty ? "opacity-50 italic" : ""}`}>
+    <div className="relative w-full" style={{ paddingBottom: 9 }}>
+      {/* Balon gövdesi — bg-card ile tam opak, kenarlık inline */}
+      <div
+        className="relative w-full bg-card rounded-2xl rounded-bl-none px-2.5 py-2 shadow-sm"
+        style={{ border: `2px solid ${c.border}` }}
+      >
+        {/* Emoji rozet — sağ üst köşe */}
+        <span
+          className="absolute select-none leading-none"
+          style={{ top: -10, right: 2, fontSize: 13 }}
+        >
+          {c.emoji}
+        </span>
+        <p
+          className={`text-[8px] font-semibold leading-snug line-clamp-3 tracking-tight ${isEmpty ? "italic" : ""}`}
+          style={{ color: isEmpty ? `${c.text}80` : c.text }}
+        >
           {text}
         </p>
       </div>
-      {/* Kuyruk — SVG, sol alt */}
-      <svg
-        style={{ position: "absolute", bottom: -9, left: 10 }}
-        width="13" height="10" viewBox="0 0 13 10"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        {/* Dış (kenarlık) kuyruk */}
-        <path d="M13 0 L0 10 L13 10 Z" fill={t.svgStroke} />
-        {/* İç (arka plan) kuyruk — 1px içeride */}
-        <path d="M13 1.5 L1.5 10 L13 10 Z" fill={t.svgFill} />
-      </svg>
+      {/* Kuyruk — döndürülmüş kare, sol alt köşeden çıkıyor */}
+      <div
+        className="absolute bg-card"
+        style={{
+          width: 10,
+          height: 10,
+          bottom: 4,
+          left: 11,
+          border: `2px solid ${c.border}`,
+          borderTop: "none",
+          borderRight: "none",
+          transform: "rotate(-45deg)",
+        }}
+      />
     </div>
   );
 }
