@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ImagePlus, Pencil, MessageCircle, Plus, MapPin, Calendar,
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
-  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark,
+  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark, Repeat2,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -242,7 +242,7 @@ export default function Profile() {
             onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); }} />
         )}
         <div
-          className={`relative w-full overflow-hidden rounded-b-[2.5rem] ${isMe ? "cursor-pointer" : ""}`}
+          className={`relative w-full overflow-hidden rounded-b-2xl ${isMe ? "cursor-pointer" : ""}`}
           style={{ height: "220px" }}
           onClick={() => isMe && bannerInputRef.current?.click()}
         >
@@ -271,10 +271,14 @@ export default function Profile() {
         </div>
 
         {/* ── Avatar row: overlaps banner bottom ── */}
-        <div className="px-5 flex items-end gap-4 -mt-16 mb-1">
-          {/* Avatar */}
+        <div className="px-5 flex items-end gap-4 -mt-18 mb-1">
+          {/* Avatar + "+" overlay */}
           <div className="relative flex-shrink-0">
-            <div className="w-32 h-32 rounded-full border-[5px] border-background shadow-2xl overflow-hidden bg-muted">
+            {isMe && (
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />
+            )}
+            <div className="w-36 h-36 rounded-full border-[5px] border-background shadow-2xl overflow-hidden bg-muted">
               {profile.avatarUrl ? (
                 <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
               ) : (
@@ -283,21 +287,16 @@ export default function Profile() {
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Large "+" button — separate, below-right of avatar */}
-          {isMe && (
-            <>
-              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />
+            {/* Purple "+" button — bottom-right of avatar, overlapping */}
+            {isMe && (
               <button
                 onClick={() => avatarInputRef.current?.click()}
-                className="w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-xl hover:bg-primary/90 active:scale-95 transition-all border-[3px] border-background mb-1"
+                className="absolute bottom-1 right-1 w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 active:scale-95 transition-all border-[3px] border-background"
               >
-                <Plus className="w-7 h-7 text-primary-foreground stroke-[2.5]" />
+                <Plus className="w-5 h-5 text-primary-foreground stroke-[2.5]" />
               </button>
-            </>
-          )}
+            )}
+          </div>
         </div>
 
         {/* ── Name section — fully below avatar ── */}
@@ -305,8 +304,6 @@ export default function Profile() {
           {/* Display name + verified */}
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black tracking-tight">{profile.displayName}</h1>
-            {/* Paper-plane verified icon like screenshot */}
-            <Send className="w-5 h-5 text-primary fill-primary/20 -rotate-12" />
           </div>
 
           {/* Username */}
@@ -559,7 +556,7 @@ export default function Profile() {
               { id: "reels" as Tab, label: "Loops", icon: <Play className="w-3.5 h-3.5" /> },
               { id: "bulletin" as Tab, label: "Bülten", icon: <MessageCircle className="w-3.5 h-3.5" /> },
               { id: "liked" as Tab, label: "Beğeniler", icon: <Heart className="w-3.5 h-3.5" /> },
-              { id: "reposted" as Tab, label: "Geri Paylaşımlar", icon: <Send className="w-3.5 h-3.5" /> },
+              { id: "reposted" as Tab, label: "Tekrar Paylaşım", icon: <Repeat2 className="w-3.5 h-3.5" /> },
               { id: "saved" as Tab, label: "Kaydedilen", icon: <Bookmark className="w-3.5 h-3.5" /> },
             ].map(tab => (
               <button
