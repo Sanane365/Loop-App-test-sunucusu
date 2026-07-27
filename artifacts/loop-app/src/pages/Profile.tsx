@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ImagePlus, Pencil, MessageCircle, Plus, MapPin, Calendar,
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
-  LayoutGrid, Clapperboard, Send,
+  LayoutGrid, Clapperboard, Send, Video,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -154,18 +154,20 @@ export default function Profile() {
   if (profileLoading) {
     return (
       <AppLayout>
-        <div className="animate-pulse space-y-4 p-4">
-          <div className="h-44 bg-muted rounded-3xl" />
-          <div className="flex gap-4 -mt-10 pl-2">
-            <div className="w-28 h-28 rounded-full bg-muted border-4 border-background" />
-            <div className="pt-12 space-y-2 flex-1">
-              <div className="h-5 w-28 bg-muted rounded" />
-              <div className="h-4 w-20 bg-muted rounded" />
+        <div className="animate-pulse">
+          <div className="h-52 bg-muted" />
+          <div className="px-4">
+            <div className="flex items-end gap-4 -mt-16">
+              <div className="w-32 h-32 rounded-full bg-muted border-[5px] border-background flex-shrink-0" />
+              <div className="w-14 h-14 rounded-full bg-muted mb-1" />
             </div>
+            <div className="mt-4 space-y-2">
+              <div className="h-7 w-36 bg-muted rounded" />
+              <div className="h-4 w-24 bg-muted rounded" />
+              <div className="h-4 w-48 bg-muted rounded" />
+            </div>
+            <div className="mt-4 h-24 bg-muted rounded-2xl" />
           </div>
-          <div className="h-24 bg-muted rounded-2xl" />
-          <div className="h-16 bg-muted rounded-2xl" />
-          <div className="h-14 bg-muted rounded-2xl" />
         </div>
       </AppLayout>
     );
@@ -185,100 +187,129 @@ export default function Profile() {
     <AppLayout>
       <div className="pb-24 bg-background">
 
-        {/* ── Banner ── */}
-        <div className="px-4 pt-4">
-          <div className="relative h-44 w-full rounded-3xl overflow-hidden">
-            {bannerUrl ? (
-              <img src={bannerUrl} alt="Kapak" className="w-full h-full object-cover" />
+        {/* ── Banner — full-width, supports photo & video ── */}
+        <div className="relative w-full overflow-hidden" style={{ height: "220px" }}>
+          {bannerUrl ? (
+            /* detect video by extension */
+            /\.(mp4|webm|mov|ogg)(\?|$)/i.test(bannerUrl) ? (
+              <video
+                src={bannerUrl}
+                className="w-full h-full object-cover"
+                autoPlay
+                loop
+                muted
+                playsInline
+              />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-violet-900 via-purple-600 to-fuchsia-400" />
-            )}
-            {/* Subtle vignette */}
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/20 pointer-events-none" />
-            {isMe && (
-              <>
-                <input ref={bannerInputRef} type="file" accept="image/*,video/*" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); }} />
-                <button
-                  onClick={() => bannerInputRef.current?.click()}
-                  className="absolute bottom-3 right-3 flex items-center gap-1.5 text-xs font-semibold bg-black/40 backdrop-blur-sm text-white px-3 py-1.5 rounded-full hover:bg-black/60 transition-colors"
-                >
-                  <ImagePlus className="w-3.5 h-3.5" />
-                  Kapak
-                </button>
-              </>
-            )}
-          </div>
+              <img src={bannerUrl} alt="Kapak" className="w-full h-full object-cover" />
+            )
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-violet-950 via-purple-700 to-fuchsia-500" />
+          )}
+
+          {/* Bottom fade so avatar blends in */}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/10 pointer-events-none" />
+
+          {/* Upload button — top right corner */}
+          {isMe && (
+            <>
+              <input ref={bannerInputRef} type="file" accept="image/*,video/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleBannerUpload(f); }} />
+              <button
+                onClick={() => bannerInputRef.current?.click()}
+                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center hover:bg-white/35 transition-colors shadow-md"
+                title="Kapak fotoğrafı veya video yükle"
+              >
+                <Video className="w-4 h-4 text-white" />
+              </button>
+            </>
+          )}
         </div>
 
-        {/* ── Avatar + Name ── */}
-        <div className="px-4 mt-3">
-          <div className="flex items-end gap-4">
-            {/* Avatar */}
-            <div className="relative flex-shrink-0 -mt-14">
-              <div className="w-28 h-28 rounded-full border-[3px] border-background shadow-xl overflow-hidden bg-muted">
-                {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/20 to-violet-400/30 flex items-center justify-center">
-                    <span className="text-4xl font-black text-primary">{profile.displayName.charAt(0)}</span>
-                  </div>
-                )}
-              </div>
-              {isMe && (
-                <>
-                  <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />
-                  <button
-                    onClick={() => avatarInputRef.current?.click()}
-                    className="absolute bottom-1 right-1 w-8 h-8 bg-primary rounded-full flex items-center justify-center border-2 border-background shadow-md hover:bg-primary/90 transition-colors"
-                  >
-                    <Plus className="w-4 h-4 text-primary-foreground" />
-                  </button>
-                </>
+        {/* ── Avatar row: overlaps banner bottom ── */}
+        <div className="px-5 flex items-end gap-4 -mt-16 mb-1">
+          {/* Avatar */}
+          <div className="relative flex-shrink-0">
+            <div className="w-32 h-32 rounded-full border-[5px] border-background shadow-2xl overflow-hidden bg-muted">
+              {profile.avatarUrl ? (
+                <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary/20 to-violet-400/30 flex items-center justify-center">
+                  <span className="text-5xl font-black text-primary">{profile.displayName.charAt(0)}</span>
+                </div>
               )}
             </div>
+          </div>
 
-            {/* Name info */}
-            <div className="flex-1 pb-1 space-y-1">
-              <div className="flex items-center gap-1.5">
-                <h1 className="text-xl font-black">{profile.displayName}</h1>
-                <BadgeCheck className="w-5 h-5 text-primary fill-primary/20" />
-              </div>
-              <p className="text-sm text-muted-foreground">@{profile.username}</p>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                <span className="flex items-center gap-1">
-                  <MapPin className="w-3 h-3" /> İstanbul, Türkiye
-                </span>
-                <span className="flex items-center gap-1">
-                  <Calendar className="w-3 h-3" /> 21 Kasım
-                </span>
-              </div>
-            </div>
+          {/* Large "+" button — separate, below-right of avatar */}
+          {isMe && (
+            <>
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                className="w-14 h-14 bg-primary rounded-full flex items-center justify-center shadow-xl hover:bg-primary/90 active:scale-95 transition-all border-[3px] border-background mb-1"
+              >
+                <Plus className="w-7 h-7 text-primary-foreground stroke-[2.5]" />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* ── Name section — fully below avatar ── */}
+        <div className="px-5 mt-3 space-y-1.5">
+          {/* Display name + verified */}
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black tracking-tight">{profile.displayName}</h1>
+            {/* Paper-plane verified icon like screenshot */}
+            <Send className="w-5 h-5 text-primary fill-primary/20 -rotate-12" />
+          </div>
+
+          {/* Username */}
+          <p className="text-[15px] text-muted-foreground">@{profile.username}</p>
+
+          {/* Location + date */}
+          <div className="flex items-center gap-5 text-[13px] text-muted-foreground pt-0.5">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3.5 h-3.5 text-primary/70" />
+              İstanbul, Türkiye
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-primary/70" />
+              21 Kasım
+            </span>
           </div>
         </div>
 
         {/* ── Bio card ── */}
-        <div className="mx-4 mt-4 bg-card border border-border rounded-2xl p-4 relative shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex-1">
-              <div className="flex items-center gap-1.5 mb-2">
-                <span className="text-primary text-xl font-black leading-none">"</span>
-                <span className="text-sm font-bold text-primary">Biyografi</span>
-              </div>
+        <div className="mx-4 mt-5 rounded-2xl overflow-hidden shadow-sm"
+          style={{ background: "color-mix(in srgb, hsl(var(--primary)) 7%, hsl(var(--card)))", border: "1px solid color-mix(in srgb, hsl(var(--primary)) 15%, transparent)" }}>
+          <div className="flex items-start gap-3 p-4">
+            {/* Large styled quotation marks */}
+            <div className="flex-shrink-0 mt-0.5">
+              <svg width="28" height="22" viewBox="0 0 28 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0 22V13.4C0 10.2667 0.666667 7.6 2 5.4C3.4 3.13333 5.4 1.26667 8 -0.200001L10 2.6C8.33333 3.66667 7.06667 4.86667 6.2 6.2C5.33333 7.53333 4.93333 9.13333 5 11H10V22H0ZM18 22V13.4C18 10.2667 18.6667 7.6 20 5.4C21.4 3.13333 23.4 1.26667 26 -0.200001L28 2.6C26.3333 3.66667 25.0667 4.86667 24.2 6.2C23.3333 7.53333 22.9333 9.13333 23 11H28V22H18Z"
+                  fill="hsl(var(--primary))" />
+              </svg>
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-primary mb-1.5">Biyografi</p>
               {profile.bio ? (
                 <p className="text-sm text-foreground/80 leading-relaxed whitespace-pre-wrap">{profile.bio}</p>
               ) : (
-                <p className="text-sm text-muted-foreground italic">Biyografi henüz eklenmemiş...</p>
+                <p className="text-sm text-muted-foreground italic">Henüz biyografi eklenmemiş...</p>
               )}
             </div>
+
+            {/* Circular pencil button */}
             {isMe && (
               <button
                 onClick={openEdit}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-foreground hover:bg-muted transition-colors flex-shrink-0"
+                className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors mt-0.5"
+                style={{ background: "color-mix(in srgb, hsl(var(--muted)) 80%, transparent)", border: "1px solid hsl(var(--border))" }}
               >
-                <Pencil className="w-3 h-3 text-primary" />
-                Düzenle
+                <Pencil className="w-4 h-4 text-primary/80" />
               </button>
             )}
           </div>
