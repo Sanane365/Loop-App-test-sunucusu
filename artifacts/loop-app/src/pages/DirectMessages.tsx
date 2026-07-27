@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import {
   Send, ImagePlus, ArrowLeft, MessageCircle,
   Search, SlidersHorizontal, Mic, Pin,
-  MessageSquarePlus, BadgeCheck, X,
+  MessageSquarePlus, X, MoreVertical,
+  BellOff, Heart, Trash2, CheckCircle2, Circle,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
@@ -138,6 +139,81 @@ export default function DirectMessages() {
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Konuşma kart özellikleri (localStorage) ──
+  const [pinnedIds, setPinnedIds] = useState<Set<number>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dm_pinned") || "[]")); } catch { return new Set(); }
+  });
+  const [favIds, setFavIds] = useState<Set<number>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dm_favs") || "[]")); } catch { return new Set(); }
+  });
+  const [mutedMap, setMutedMap] = useState<Map<number, number>>(() => {
+    try { return new Map(JSON.parse(localStorage.getItem("dm_muted") || "[]")); } catch { return new Map(); }
+  });
+  const [hiddenIds, setHiddenIds] = useState<Set<number>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("dm_hidden") || "[]")); } catch { return new Set(); }
+  });
+  const [menuId, setMenuId]           = useState<number | null>(null);
+  const [muteDialogId, setMuteDialogId] = useState<number | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startLongPress = (id: number) => {
+    longPressTimer.current = setTimeout(() => {
+      setIsSelecting(true);
+      setSelectedIds(new Set([id]));
+    }, 500);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const togglePin = (id: number) => {
+    setPinnedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      localStorage.setItem("dm_pinned", JSON.stringify([...next]));
+      return next;
+    });
+    setMenuId(null);
+  };
+  const toggleFav = (id: number) => {
+    setFavIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      localStorage.setItem("dm_favs", JSON.stringify([...next]));
+      return next;
+    });
+    setMenuId(null);
+  };
+  const muteFor = (id: number, hours: number) => {
+    setMutedMap(prev => {
+      const next = new Map(prev);
+      next.set(id, Date.now() + hours * 3600_000);
+      localStorage.setItem("dm_muted", JSON.stringify([...next]));
+      return next;
+    });
+    setMuteDialogId(null);
+    setMenuId(null);
+  };
+  const hideConvs = (ids: Set<number>) => {
+    setHiddenIds(prev => {
+      const next = new Set([...prev, ...ids]);
+      localStorage.setItem("dm_hidden", JSON.stringify([...next]));
+      return next;
+    });
+    setSelectedIds(new Set());
+    setIsSelecting(false);
+    setMenuId(null);
+  };
 
   const THOUGHT_PROMPTS = [
     "Bugün ne düşünüyorsun? 🌙",
@@ -389,18 +465,27 @@ export default function DirectMessages() {
   const totalUnread = conversations.reduce((s, c) => s + c.unreadCount, 0);
   const unreadCount = conversations.filter(c => c.unreadCount > 0).length;
 
-  const filteredConvs = conversations.filter(c => {
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        c.user?.displayName?.toLowerCase().includes(q) ||
-        c.user?.username?.toLowerCase().includes(q) ||
-        c.lastMessage.content?.toLowerCase().includes(q)
-      );
-    }
-    if (activeTab === "okunmamis") return c.unreadCount > 0;
-    return true;
-  });
+  const filteredConvs = conversations
+    .filter(c => {
+      const id = c.user?.id ?? -1;
+      if (hiddenIds.has(id)) return false;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        return (
+          c.user?.displayName?.toLowerCase().includes(q) ||
+          c.user?.username?.toLowerCase().includes(q) ||
+          c.lastMessage.content?.toLowerCase().includes(q)
+        );
+      }
+      if (activeTab === "okunmamis") return c.unreadCount > 0;
+      if (activeTab === "sabitlenen") return pinnedIds.has(id);
+      return true;
+    })
+    .sort((a, b) => {
+      const ap = pinnedIds.has(a.user?.id ?? -1) ? 0 : 1;
+      const bp = pinnedIds.has(b.user?.id ?? -1) ? 0 : 1;
+      return ap - bp;
+    });
 
   const TABS: { id: FilterTab; label: string; count?: number }[] = [
     { id: "tumu", label: "Tümü", count: totalUnread > 0 ? totalUnread : undefined },
@@ -556,71 +641,199 @@ export default function DirectMessages() {
           ) : (
             <div>
               {filteredConvs.map((c, idx) => {
+                const uid = c.user?.id ?? idx;
                 const preview = lastMsgPreview(c.lastMessage);
                 const isSpecial = isSpecialPreview(c.lastMessage);
                 const isAudio = c.lastMessage.mediaType === "audio";
                 const time = formatMsgTime(c.lastMessage.createdAt);
-                const isOnline = idx < 3; // decorative online indicator for first few
+                const isOnline = idx < 3;
+                const isPinned = pinnedIds.has(uid);
+                const isFav = favIds.has(uid);
+                const mutedUntil = mutedMap.get(uid);
+                const isMuted = !!mutedUntil && mutedUntil > Date.now();
+                const isSelected = selectedIds.has(uid);
 
                 return (
-                  <button
-                    key={c.user?.id ?? idx}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 active:bg-muted/60 transition-colors text-left border-b border-border/30 last:border-0"
-                    onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                  >
-                    {/* Avatar */}
-                    <div className="relative flex-shrink-0">
-                      <Avatar className="w-13 h-13 border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
-                        <AvatarImage src={c.user?.avatarUrl || ""} />
-                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-base">
-                          {c.user?.displayName?.charAt(0) ?? "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      {isOnline && (
-                        <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                  <div key={uid} className="relative border-b border-border/30 last:border-0">
+                    {/* Kart */}
+                    <div
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left select-none
+                        ${isSelected ? "bg-primary/8" : "hover:bg-muted/40 active:bg-muted/60"}
+                        ${isSelecting ? "cursor-pointer" : ""}
+                      `}
+                      onClick={() => {
+                        if (menuId !== null) { setMenuId(null); return; }
+                        if (isSelecting) { toggleSelect(uid); return; }
+                        setLocation(`/dm/${c.user?.id}`);
+                      }}
+                      onTouchStart={() => !isSelecting && startLongPress(uid)}
+                      onTouchEnd={cancelLongPress}
+                      onTouchMove={cancelLongPress}
+                      onMouseDown={() => !isSelecting && startLongPress(uid)}
+                      onMouseUp={cancelLongPress}
+                      onMouseLeave={cancelLongPress}
+                    >
+                      {/* Seçim checkbox */}
+                      {isSelecting && (
+                        <div className="flex-shrink-0 mr-1">
+                          {isSelected
+                            ? <CheckCircle2 className="w-5 h-5 text-primary" />
+                            : <Circle className="w-5 h-5 text-muted-foreground/50" />}
+                        </div>
+                      )}
+
+                      {/* Avatar */}
+                      <div className="relative flex-shrink-0">
+                        <Avatar className="border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
+                          <AvatarImage src={c.user?.avatarUrl || ""} />
+                          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-base">
+                            {c.user?.displayName?.charAt(0) ?? "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                        {isOnline && (
+                          <span className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
+                        )}
+                      </div>
+
+                      {/* İçerik */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className={`font-bold text-[15px] truncate ${c.unreadCount > 0 ? "text-foreground" : "text-foreground/90"}`}>
+                              {c.user?.displayName ?? "Bilinmiyor"}
+                            </span>
+                            {isPinned && <Pin className="w-3 h-3 text-primary/60 flex-shrink-0" />}
+                            {isFav && <Heart className="w-3 h-3 text-rose-400 flex-shrink-0" />}
+                            {isMuted && <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">{time}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={`text-sm truncate ${
+                            c.unreadCount > 0
+                              ? "text-foreground font-medium"
+                              : isSpecial ? "text-muted-foreground italic" : "text-muted-foreground"
+                          }`}>
+                            {preview}
+                          </p>
+                          <div className="flex-shrink-0 flex items-center gap-1.5">
+                            {c.unreadCount > 0 && !isMuted && (
+                              <span className="min-w-[20px] h-5 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                                {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                              </span>
+                            )}
+                            {isAudio && <Mic className="w-3.5 h-3.5 text-muted-foreground" />}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Üç nokta butonu */}
+                      {!isSelecting && (
+                        <button
+                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors -mr-1"
+                          onClick={e => { e.stopPropagation(); setMenuId(menuId === uid ? null : uid); }}
+                        >
+                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                        </button>
                       )}
                     </div>
 
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <div className="flex items-center gap-1 min-w-0">
-                          <span className={`font-bold text-[15px] truncate ${c.unreadCount > 0 ? "text-foreground" : "text-foreground/90"}`}>
-                            {c.user?.displayName ?? "Bilinmiyor"}
-                          </span>
-                          {idx % 3 === 0 && (
-                            <BadgeCheck className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-                          )}
-                        </div>
-                        <span className="text-[11px] text-muted-foreground flex-shrink-0">{time}</span>
+                    {/* Açılır menü */}
+                    {menuId === uid && (
+                      <div className="absolute right-3 top-2 z-30 bg-card border border-border rounded-2xl shadow-xl overflow-hidden min-w-[180px]">
+                        <button
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left"
+                          onClick={() => togglePin(uid)}
+                        >
+                          <Pin className="w-4 h-4 text-primary" />
+                          {isPinned ? "Sabitlemeyi kaldır" : "Sabitle"}
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
+                          onClick={() => toggleFav(uid)}
+                        >
+                          <Heart className={`w-4 h-4 ${isFav ? "text-rose-400 fill-rose-400" : "text-rose-400"}`} />
+                          {isFav ? "Favoriden çıkar" : "Favori ekle"}
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
+                          onClick={() => { setMuteDialogId(uid); }}
+                        >
+                          <BellOff className="w-4 h-4 text-muted-foreground" />
+                          {isMuted ? "Sesi aç" : "Sessize al"}
+                        </button>
+                        <button
+                          className="w-full flex items-center gap-2.5 px-4 py-3 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40 text-destructive"
+                          onClick={() => hideConvs(new Set([uid]))}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Sohbeti temizle
+                        </button>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <p className={`text-sm truncate ${
-                          c.unreadCount > 0
-                            ? "text-foreground font-medium"
-                            : isSpecial
-                              ? "text-muted-foreground italic"
-                              : "text-muted-foreground"
-                        }`}>
-                          {preview}
-                        </p>
-                        <div className="flex-shrink-0">
-                          {c.unreadCount > 0 ? (
-                            <span className="w-5 h-5 min-w-[20px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                              {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                            </span>
-                          ) : isAudio ? (
-                            <Mic className="w-3.5 h-3.5 text-muted-foreground" />
-                          ) : idx % 5 === 0 ? (
-                            <Pin className="w-3.5 h-3.5 text-muted-foreground" />
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
+          )}
+
+          {/* Çoklu seçim alt çubuğu */}
+          {isSelecting && (
+            <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border px-4 py-3 flex items-center justify-between gap-3 shadow-2xl">
+              <button
+                className="text-sm text-muted-foreground font-medium"
+                onClick={() => { setIsSelecting(false); setSelectedIds(new Set()); }}
+              >
+                İptal
+              </button>
+              <span className="text-sm font-semibold text-foreground">
+                {selectedIds.size} kişi seçildi
+              </span>
+              <button
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold disabled:opacity-40"
+                disabled={selectedIds.size === 0}
+                onClick={() => hideConvs(selectedIds)}
+              >
+                <Trash2 className="w-4 h-4" />
+                Temizle
+              </button>
+            </div>
+          )}
+
+          {/* Sessize al süresi seçici */}
+          {muteDialogId !== null && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center">
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMuteDialogId(null)} />
+              <div className="relative w-full max-w-sm bg-card rounded-t-3xl shadow-2xl px-4 pt-5 pb-10">
+                <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
+                <p className="text-base font-bold text-center mb-4">Sessiz Süresi</p>
+                {[
+                  { label: "1 saat",  hours: 1 },
+                  { label: "8 saat",  hours: 8 },
+                  { label: "24 saat", hours: 24 },
+                  { label: "1 hafta", hours: 168 },
+                ].map(opt => (
+                  <button
+                    key={opt.hours}
+                    className="w-full py-3.5 text-sm font-semibold text-center rounded-2xl hover:bg-muted/60 transition-colors border-b border-border/30 last:border-0"
+                    onClick={() => muteFor(muteDialogId, opt.hours)}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+                <button
+                  className="w-full mt-3 py-3 text-sm text-muted-foreground font-medium"
+                  onClick={() => setMuteDialogId(null)}
+                >
+                  İptal
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Menü kapatma backdrop */}
+          {menuId !== null && (
+            <div className="fixed inset-0 z-20" onClick={() => setMenuId(null)} />
           )}
         </div>
 
