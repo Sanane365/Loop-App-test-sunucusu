@@ -73,6 +73,70 @@ const ACTIVE_USERS = [
   { id: 3, initial: "M", color: "from-green-500 to-emerald-500" },
 ];
 
+// ── Sevimli Düşünce Balonu ──────────────────────────────────────────
+type BubbleColor = "primary" | "violet" | "pink" | "sky" | "emerald" | "orange";
+
+const BUBBLE_TOKENS: Record<BubbleColor, {
+  bgClass: string; borderClass: string; textClass: string;
+  svgFill: string; svgStroke: string;
+}> = {
+  primary: {
+    bgClass: "bg-primary/10", borderClass: "border-primary/40", textClass: "text-primary",
+    svgFill: "rgba(124,58,237,0.10)", svgStroke: "rgba(124,58,237,0.40)",
+  },
+  violet: {
+    bgClass: "bg-violet-400/10", borderClass: "border-violet-400/40", textClass: "text-violet-600 dark:text-violet-300",
+    svgFill: "rgba(167,139,250,0.12)", svgStroke: "rgba(167,139,250,0.45)",
+  },
+  pink: {
+    bgClass: "bg-pink-400/10", borderClass: "border-pink-400/40", textClass: "text-pink-600 dark:text-pink-300",
+    svgFill: "rgba(244,114,182,0.12)", svgStroke: "rgba(244,114,182,0.45)",
+  },
+  sky: {
+    bgClass: "bg-sky-400/10", borderClass: "border-sky-400/40", textClass: "text-sky-600 dark:text-sky-300",
+    svgFill: "rgba(56,189,248,0.12)", svgStroke: "rgba(56,189,248,0.45)",
+  },
+  emerald: {
+    bgClass: "bg-emerald-400/10", borderClass: "border-emerald-400/40", textClass: "text-emerald-600 dark:text-emerald-300",
+    svgFill: "rgba(52,211,153,0.12)", svgStroke: "rgba(52,211,153,0.45)",
+  },
+  orange: {
+    bgClass: "bg-orange-400/10", borderClass: "border-orange-400/40", textClass: "text-orange-600 dark:text-orange-300",
+    svgFill: "rgba(251,146,60,0.12)", svgStroke: "rgba(251,146,60,0.45)",
+  },
+};
+
+function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
+  text: string;
+  color?: BubbleColor;
+  isEmpty?: boolean;
+}) {
+  const t = BUBBLE_TOKENS[color];
+  return (
+    <div className="relative w-full">
+      {/* Balon gövdesi */}
+      <div className={`relative w-full rounded-2xl rounded-bl-none border-2 ${t.bgClass} ${t.borderClass} px-2.5 py-2 shadow-md`}>
+        {/* 💭 rozet — sağ üst */}
+        <span className="absolute -top-3 -right-0.5 text-[13px] drop-shadow-sm select-none leading-none">💭</span>
+        <p className={`text-[8px] font-semibold leading-snug line-clamp-3 tracking-tight ${t.textClass} ${isEmpty ? "opacity-50 italic" : ""}`}>
+          {text}
+        </p>
+      </div>
+      {/* Kuyruk — SVG, sol alt */}
+      <svg
+        style={{ position: "absolute", bottom: -9, left: 10 }}
+        width="13" height="10" viewBox="0 0 13 10"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        {/* Dış (kenarlık) kuyruk */}
+        <path d="M13 0 L0 10 L13 10 Z" fill={t.svgStroke} />
+        {/* İç (arka plan) kuyruk — 1px içeride */}
+        <path d="M13 1.5 L1.5 10 L13 10 Z" fill={t.svgFill} />
+      </svg>
+    </div>
+  );
+}
+
 export default function DirectMessages() {
   const { userId } = useParams<{ userId: string }>();
   const [, setLocation] = useLocation();
@@ -89,11 +153,20 @@ export default function DirectMessages() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Düşünce balonu state — localStorage ile kalıcı
+  // Düşünce balonu state — localStorage + server sync
   const [thought, setThought] = useState<string>(() => localStorage.getItem("loop_thought") ?? "");
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [thoughtDraft, setThoughtDraft] = useState("");
   const thoughtInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Server'dan gelen thought ile senkronize et (localStorage yoksa)
+  useEffect(() => {
+    const serverThought = (me as { thought?: string | null } | null)?.thought;
+    if (serverThought && !localStorage.getItem("loop_thought")) {
+      setThought(serverThought);
+      localStorage.setItem("loop_thought", serverThought);
+    }
+  }, [me]);
 
   const openThought = () => {
     setThoughtDraft(thought);
@@ -357,91 +430,76 @@ export default function DirectMessages() {
             <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
 
               {/* ── My own card ── */}
-              <div className="flex-shrink-0 flex flex-col" style={{ width: 72 }}>
-                {/* Bubble slot — fixed height so all cards align */}
-                <div className="h-[52px] flex items-end mb-2">
-                  <button
-                    onClick={openThought}
-                    className="w-full relative bg-gradient-to-br from-primary/10 to-violet-300/15 border border-primary/30 rounded-xl rounded-bl-none px-2 py-1.5 shadow-sm hover:border-primary/50 hover:bg-primary/10 transition-all text-left"
-                  >
-                    <p className="text-[7.5px] font-medium text-foreground/75 leading-snug line-clamp-3">
-                      {thought || "Düşüncelerini Loop diye paylaş :)"}
-                    </p>
-                    <div className="absolute -bottom-[5px] left-2.5 w-2.5 h-2.5 bg-card border-b border-r border-primary/30 rotate-45" />
+              <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
+                {/* Bubble slot — sabit yükseklik, tüm kartlar hizalı */}
+                <div className="h-[60px] flex items-end w-full mb-1.5">
+                  <button onClick={openThought} className="w-full group text-left">
+                    <ThoughtBubble
+                      text={thought || "Düşünceni paylaş... ✨"}
+                      isEmpty={!thought}
+                      color="primary"
+                    />
                   </button>
                 </div>
-                {/* Card */}
+                {/* Kart */}
                 <button
                   onClick={openThought}
-                  className="w-full rounded-2xl bg-card border border-primary/30 shadow-sm hover:border-primary/60 hover:shadow-md transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
+                  className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
                 >
                   <div className="relative">
-                    <Avatar className="border-2 border-primary/30 shadow-md" style={{ width: 38, height: 38 }}>
+                    <Avatar className="ring-2 ring-primary/30 ring-offset-1 ring-offset-card" style={{ width: 40, height: 40 }}>
                       <AvatarImage src={me?.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                         {me?.displayName?.charAt(0) ?? "?"}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
+                    <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
                   </div>
-                  <p className="text-[9px] font-bold text-primary leading-tight">Sen</p>
+                  <p className="text-[10px] font-bold text-primary">Sen</p>
                 </button>
               </div>
 
               {conversations.map((c, idx) => {
                 const isOnline = idx < 4;
                 const friendThought = c.user?.thought;
-                const bubbleStyles = [
-                  { bg: "from-violet-400/10 to-purple-400/10", border: "border-violet-300/40", tail: "bg-violet-100 dark:bg-violet-900/30 border-violet-300/40" },
-                  { bg: "from-pink-400/10 to-rose-400/10",   border: "border-pink-300/40",   tail: "bg-pink-100 dark:bg-pink-900/30 border-pink-300/40" },
-                  { bg: "from-blue-400/10 to-indigo-400/10", border: "border-blue-300/40",   tail: "bg-blue-100 dark:bg-blue-900/30 border-blue-300/40" },
-                  { bg: "from-emerald-400/10 to-green-400/10", border: "border-emerald-300/40", tail: "bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300/40" },
-                  { bg: "from-orange-400/10 to-amber-400/10", border: "border-orange-300/40", tail: "bg-orange-100 dark:bg-orange-900/30 border-orange-300/40" },
+                const palettes = [
+                  { border: "border-violet-400/50 hover:border-violet-500/70", ring: "ring-violet-400/40", color: "violet" as const },
+                  { border: "border-pink-400/50 hover:border-pink-500/70",     ring: "ring-pink-400/40",   color: "pink" as const },
+                  { border: "border-sky-400/50 hover:border-sky-500/70",       ring: "ring-sky-400/40",    color: "sky" as const },
+                  { border: "border-emerald-400/50 hover:border-emerald-500/70", ring: "ring-emerald-400/40", color: "emerald" as const },
+                  { border: "border-orange-400/50 hover:border-orange-500/70", ring: "ring-orange-400/40", color: "orange" as const },
                 ];
-                const cardBorderColors = [
-                  "border-violet-300/50 hover:border-violet-400/70",
-                  "border-pink-300/50 hover:border-pink-400/70",
-                  "border-blue-300/50 hover:border-blue-400/70",
-                  "border-emerald-300/50 hover:border-emerald-400/70",
-                  "border-orange-300/50 hover:border-orange-400/70",
-                ];
-                const bs = bubbleStyles[idx % bubbleStyles.length];
-                const bc = cardBorderColors[idx % cardBorderColors.length];
+                const p = palettes[idx % palettes.length];
                 return (
-                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col" style={{ width: 72 }}>
-                    {/* Bubble slot — same fixed height; empty if no thought */}
-                    <div className="h-[52px] flex items-end mb-2">
+                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
+                    {/* Bubble slot — arkadaşın düşüncesi veya boşluk */}
+                    <div className="h-[60px] flex items-end w-full mb-1.5">
                       {friendThought && (
-                        <div className={`w-full relative bg-gradient-to-br ${bs.bg} border ${bs.border} rounded-xl rounded-bl-none px-2 py-1.5 shadow-sm`}>
-                          <p className="text-[7.5px] font-medium text-foreground/75 leading-snug line-clamp-3">
-                            {friendThought}
-                          </p>
-                          <div className={`absolute -bottom-[5px] left-2.5 w-2.5 h-2.5 ${bs.tail} border-b border-r rotate-45`} />
-                        </div>
+                        <ThoughtBubble text={friendThought} color={p.color} />
                       )}
                     </div>
-                    {/* Card */}
+                    {/* Kart */}
                     <button
                       onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                      className={`w-full rounded-2xl bg-card border shadow-sm hover:shadow-md transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5 ${bc}`}
+                      className={`w-full rounded-2xl bg-card border-2 shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5 ${p.border}`}
                     >
                       <div className="relative">
-                        <Avatar className="border-2 border-white/20 shadow-md" style={{ width: 38, height: 38 }}>
+                        <Avatar className={`ring-2 ring-offset-1 ring-offset-card ${p.ring}`} style={{ width: 40, height: 40 }}>
                           <AvatarImage src={c.user?.avatarUrl || ""} />
                           <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
                             {c.user?.displayName?.charAt(0) ?? "?"}
                           </AvatarFallback>
                         </Avatar>
                         {isOnline && (
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
+                          <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
                         )}
                         {c.unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm">
+                          <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center px-1 shadow-sm">
                             {c.unreadCount > 9 ? "9+" : c.unreadCount}
                           </span>
                         )}
                       </div>
-                      <p className="text-[9px] font-semibold text-foreground/80 truncate text-center leading-tight px-1" style={{ maxWidth: 64 }}>
+                      <p className="text-[10px] font-semibold text-foreground/80 truncate text-center px-1" style={{ maxWidth: 68 }}>
                         {c.user?.displayName?.split(" ")[0] ?? "?"}
                       </p>
                     </button>
