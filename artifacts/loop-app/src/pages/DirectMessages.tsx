@@ -76,13 +76,13 @@ const ACTIVE_USERS = [
 // ── Sevimli Düşünce Balonu ──────────────────────────────────────────
 type BubbleColor = "primary" | "violet" | "pink" | "sky" | "emerald" | "orange";
 
-const BUBBLE_COLORS: Record<BubbleColor, { border: string; text: string; emoji: string }> = {
-  primary: { border: "rgba(124,58,237,0.45)", text: "#7c3aed",   emoji: "💜" },
-  violet:  { border: "rgba(139,92,246,0.45)", text: "#8b5cf6",   emoji: "✨" },
-  pink:    { border: "rgba(236,72,153,0.45)", text: "#ec4899",   emoji: "🌸" },
-  sky:     { border: "rgba(14,165,233,0.45)", text: "#0ea5e9",   emoji: "💙" },
-  emerald: { border: "rgba(16,185,129,0.45)", text: "#10b981",   emoji: "🌿" },
-  orange:  { border: "rgba(249,115,22,0.45)", text: "#f97316",   emoji: "🔥" },
+const BUBBLE_COLORS: Record<BubbleColor, { border: string; text: string }> = {
+  primary: { border: "rgba(124,58,237,0.45)", text: "#7c3aed" },
+  violet:  { border: "rgba(139,92,246,0.45)", text: "#8b5cf6" },
+  pink:    { border: "rgba(236,72,153,0.45)", text: "#ec4899" },
+  sky:     { border: "rgba(14,165,233,0.45)", text: "#0ea5e9" },
+  emerald: { border: "rgba(16,185,129,0.45)", text: "#10b981" },
+  orange:  { border: "rgba(249,115,22,0.45)", text: "#f97316" },
 };
 
 function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
@@ -98,13 +98,6 @@ function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
         className="relative w-full bg-card rounded-2xl rounded-bl-none px-2.5 py-2 shadow-sm"
         style={{ border: `2px solid ${c.border}` }}
       >
-        {/* Emoji rozet — sağ üst köşe */}
-        <span
-          className="absolute select-none leading-none"
-          style={{ top: -10, right: 2, fontSize: 13 }}
-        >
-          {c.emoji}
-        </span>
         <p
           className={`text-[8px] font-semibold leading-snug line-clamp-3 tracking-tight ${isEmpty ? "italic" : ""}`}
           style={{ color: isEmpty ? `${c.text}80` : c.text }}
