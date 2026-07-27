@@ -357,28 +357,32 @@ export default function DirectMessages() {
             <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
 
               {/* ── My own card ── */}
-              <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
-                {/* Thought bubble */}
-                <button onClick={openThought} className="mb-2 group" style={{ width: 80 }}>
-                  <div className="relative bg-gradient-to-br from-primary/10 to-violet-400/10 border border-primary/25 rounded-2xl rounded-bl-sm px-2 py-1.5 shadow-sm hover:border-primary/50 hover:shadow-md transition-all">
-                    <p className="text-[7px] font-medium text-foreground/75 text-center leading-snug line-clamp-3">
+              <div className="flex-shrink-0 flex flex-col" style={{ width: 72 }}>
+                {/* Bubble slot — fixed height so all cards align */}
+                <div className="h-[52px] flex items-end mb-2">
+                  <button
+                    onClick={openThought}
+                    className="w-full relative bg-gradient-to-br from-primary/10 to-violet-300/15 border border-primary/30 rounded-xl rounded-bl-none px-2 py-1.5 shadow-sm hover:border-primary/50 hover:bg-primary/10 transition-all text-left"
+                  >
+                    <p className="text-[7.5px] font-medium text-foreground/75 leading-snug line-clamp-3">
                       {thought || "Düşüncelerini Loop diye paylaş :)"}
                     </p>
-                    {/* bubble tail bottom-left */}
-                    <div className="absolute -bottom-[5px] left-3 w-2.5 h-2.5 bg-gradient-to-br from-primary/10 to-violet-400/10 border-b border-r border-primary/25 rotate-45" />
-                  </div>
-                </button>
-                {/* Avatar */}
-                <button onClick={openThought} className="flex flex-col items-center gap-1 active:scale-95 transition-transform">
+                    <div className="absolute -bottom-[5px] left-2.5 w-2.5 h-2.5 bg-card border-b border-r border-primary/30 rotate-45" />
+                  </button>
+                </div>
+                {/* Card */}
+                <button
+                  onClick={openThought}
+                  className="w-full rounded-2xl bg-card border border-primary/30 shadow-sm hover:border-primary/60 hover:shadow-md transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5"
+                >
                   <div className="relative">
-                    <div className="absolute inset-0 rounded-full bg-primary/20 blur-[5px] scale-125" />
-                    <Avatar className="relative ring-2 ring-primary/40 ring-offset-1 ring-offset-background shadow-md" style={{ width: 40, height: 40 }}>
+                    <Avatar className="border-2 border-primary/30 shadow-md" style={{ width: 38, height: 38 }}>
                       <AvatarImage src={me?.avatarUrl || ""} />
                       <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                         {me?.displayName?.charAt(0) ?? "?"}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background shadow-sm" />
+                    <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
                   </div>
                   <p className="text-[9px] font-bold text-primary leading-tight">Sen</p>
                 </button>
@@ -387,63 +391,57 @@ export default function DirectMessages() {
               {conversations.map((c, idx) => {
                 const isOnline = idx < 4;
                 const friendThought = c.user?.thought;
-                const glowClasses = [
-                  "bg-violet-400/20", "bg-pink-400/20", "bg-blue-400/20",
-                  "bg-emerald-400/20", "bg-orange-400/20",
+                const bubbleStyles = [
+                  { bg: "from-violet-400/10 to-purple-400/10", border: "border-violet-300/40", tail: "bg-violet-100 dark:bg-violet-900/30 border-violet-300/40" },
+                  { bg: "from-pink-400/10 to-rose-400/10",   border: "border-pink-300/40",   tail: "bg-pink-100 dark:bg-pink-900/30 border-pink-300/40" },
+                  { bg: "from-blue-400/10 to-indigo-400/10", border: "border-blue-300/40",   tail: "bg-blue-100 dark:bg-blue-900/30 border-blue-300/40" },
+                  { bg: "from-emerald-400/10 to-green-400/10", border: "border-emerald-300/40", tail: "bg-emerald-100 dark:bg-emerald-900/30 border-emerald-300/40" },
+                  { bg: "from-orange-400/10 to-amber-400/10", border: "border-orange-300/40", tail: "bg-orange-100 dark:bg-orange-900/30 border-orange-300/40" },
                 ];
-                const ringClasses = [
-                  "ring-violet-400/50", "ring-pink-400/50", "ring-blue-400/50",
-                  "ring-emerald-400/50", "ring-orange-400/50",
+                const cardBorderColors = [
+                  "border-violet-300/50 hover:border-violet-400/70",
+                  "border-pink-300/50 hover:border-pink-400/70",
+                  "border-blue-300/50 hover:border-blue-400/70",
+                  "border-emerald-300/50 hover:border-emerald-400/70",
+                  "border-orange-300/50 hover:border-orange-400/70",
                 ];
-                const bubbleBg = [
-                  "from-violet-400/10 to-purple-400/10 border-violet-300/30",
-                  "from-pink-400/10 to-rose-400/10 border-pink-300/30",
-                  "from-blue-400/10 to-indigo-400/10 border-blue-300/30",
-                  "from-emerald-400/10 to-green-400/10 border-emerald-300/30",
-                  "from-orange-400/10 to-amber-400/10 border-orange-300/30",
-                ];
-                const glow = glowClasses[idx % glowClasses.length];
-                const ring = ringClasses[idx % ringClasses.length];
-                const bub = bubbleBg[idx % bubbleBg.length];
+                const bs = bubbleStyles[idx % bubbleStyles.length];
+                const bc = cardBorderColors[idx % cardBorderColors.length];
                 return (
-                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col items-center" style={{ width: 52 }}>
-                    {/* Friend thought bubble — shown only when they have a thought */}
-                    {friendThought ? (
-                      <div className="mb-2" style={{ width: 80 }}>
-                        <div className={`relative bg-gradient-to-br ${bub} border rounded-2xl rounded-bl-sm px-2 py-1.5 shadow-sm`}>
-                          <p className="text-[7px] font-medium text-foreground/75 text-center leading-snug line-clamp-3">
+                  <div key={c.user?.id ?? idx} className="flex-shrink-0 flex flex-col" style={{ width: 72 }}>
+                    {/* Bubble slot — same fixed height; empty if no thought */}
+                    <div className="h-[52px] flex items-end mb-2">
+                      {friendThought && (
+                        <div className={`w-full relative bg-gradient-to-br ${bs.bg} border ${bs.border} rounded-xl rounded-bl-none px-2 py-1.5 shadow-sm`}>
+                          <p className="text-[7.5px] font-medium text-foreground/75 leading-snug line-clamp-3">
                             {friendThought}
                           </p>
-                          <div className={`absolute -bottom-[5px] left-3 w-2.5 h-2.5 bg-gradient-to-br ${bub} border-b border-r rotate-45`} />
+                          <div className={`absolute -bottom-[5px] left-2.5 w-2.5 h-2.5 ${bs.tail} border-b border-r rotate-45`} />
                         </div>
-                      </div>
-                    ) : (
-                      /* spacer so avatar aligns with "Sen" card when no thought */
-                      <div className="mb-2" style={{ height: 0 }} />
-                    )}
-                    {/* Avatar */}
+                      )}
+                    </div>
+                    {/* Card */}
                     <button
                       onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                      className="flex flex-col items-center gap-1 active:scale-95 transition-transform"
+                      className={`w-full rounded-2xl bg-card border shadow-sm hover:shadow-md transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5 ${bc}`}
                     >
                       <div className="relative">
-                        <div className={`absolute inset-0 rounded-full ${glow} blur-[5px] scale-125`} />
-                        <Avatar className={`relative ring-2 ${ring} ring-offset-1 ring-offset-background shadow-md`} style={{ width: 40, height: 40 }}>
+                        <Avatar className="border-2 border-white/20 shadow-md" style={{ width: 38, height: 38 }}>
                           <AvatarImage src={c.user?.avatarUrl || ""} />
                           <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
                             {c.user?.displayName?.charAt(0) ?? "?"}
                           </AvatarFallback>
                         </Avatar>
                         {isOnline && (
-                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background shadow-sm" />
+                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card" />
                         )}
                         {c.unreadCount > 0 && (
-                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-background text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm">
+                          <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full border-2 border-card text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm">
                             {c.unreadCount > 9 ? "9+" : c.unreadCount}
                           </span>
                         )}
                       </div>
-                      <p className="text-[9px] font-semibold text-foreground/80 truncate text-center leading-tight" style={{ maxWidth: 48 }}>
+                      <p className="text-[9px] font-semibold text-foreground/80 truncate text-center leading-tight px-1" style={{ maxWidth: 64 }}>
                         {c.user?.displayName?.split(" ")[0] ?? "?"}
                       </p>
                     </button>
