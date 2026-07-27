@@ -139,6 +139,22 @@ export default function DirectMessages() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const THOUGHT_PROMPTS = [
+    "Bugün ne düşünüyorsun? 🌙",
+    "Nasıl hissediyorsun? 💫",
+    "Aklında ne var? ✨",
+    "Düşüncelerini Loop diye paylaş :)",
+    "Bugün bir şey keşfettin mi? 🔍",
+    "Şu an ne dinliyorsun? 🎵",
+    "Bugün iyi bir şey oldu mu? 🌸",
+    "Neler oluyor hayatında? 💜",
+    "Bugün kendini nasıl tanımlarsın? 🌈",
+    "Loop'a ne söylemek istersin? 🤍",
+  ];
+  const [thoughtPlaceholder] = useState(
+    () => THOUGHT_PROMPTS[Math.floor(Math.random() * THOUGHT_PROMPTS.length)]
+  );
+
   // Düşünce balonu state — localStorage + server sync
   const [thought, setThought] = useState<string>(() => localStorage.getItem("loop_thought") ?? "");
   const [thoughtOpen, setThoughtOpen] = useState(false);
@@ -426,7 +442,7 @@ export default function DirectMessages() {
                 <div className="h-[60px] flex items-end w-full mb-1.5">
                   <button onClick={openThought} className="w-full group text-left">
                     <ThoughtBubble
-                      text={thought || "Düşünceni paylaş... ✨"}
+                      text={thought || thoughtPlaceholder}
                       isEmpty={!thought}
                       color="primary"
                     />
