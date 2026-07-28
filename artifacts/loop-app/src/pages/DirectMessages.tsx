@@ -9,7 +9,8 @@ import {
   Search, SlidersHorizontal, Mic, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
-  Camera, Users,
+  Camera, Users, Phone, Video, Info, Smile, BadgeCheck,
+  AudioWaveform,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
@@ -555,103 +556,229 @@ export default function DirectMessages() {
 
   // ── Chat view ──────────────────────────────────────────────────────────────
   if (userId) {
+    // Mesajları tarihe göre grupla
+    type MsgGroup = { dateLabel: string; messages: DmMessage[] };
+    const grouped: MsgGroup[] = [];
+    messages.forEach(msg => {
+      const d = new Date(msg.createdAt);
+      const label = isToday(d) ? "Bugün" : isYesterday(d) ? "Dün" : format(d, "d MMMM", { locale: tr });
+      const last = grouped[grouped.length - 1];
+      if (last && last.dateLabel === label) last.messages.push(msg);
+      else grouped.push({ dateLabel: label, messages: [msg] });
+    });
+
+    // İlk okunmamış mesajın indexi (karşıdan gelen)
+    const firstUnreadIdx = messages.findIndex(m => m.senderId !== me?.id && !m.isRead);
+
     return (
       <AppLayout>
         <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)]">
-          {/* Header */}
-          <div className="flex items-center gap-3 px-3 py-3 border-b border-border bg-background sticky top-0 z-10">
-            <Button variant="ghost" size="icon" className="rounded-full" onClick={() => setLocation("/dm")}>
+
+          {/* ── Header ── */}
+          <div className="flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
+            {/* Geri */}
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
+              onClick={() => setLocation("/dm")}
+            >
               <ArrowLeft className="w-5 h-5" />
-            </Button>
+            </button>
+
+            {/* Avatar + İsim */}
             {otherUser && (
-              <button className="flex items-center gap-2.5 hover:opacity-80 flex-1 text-left" onClick={() => setLocation(`/profile/${otherUser.id}`)}>
-                <div className="relative">
-                  <Avatar className="w-9 h-9">
+              <button
+                className="flex items-center gap-2.5 flex-1 min-w-0 text-left"
+                onClick={() => setLocation(`/profile/${otherUser.id}`)}
+              >
+                <div className="relative flex-shrink-0">
+                  <Avatar className="w-10 h-10">
                     <AvatarImage src={otherUser.avatarUrl || ""} />
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold text-sm">{otherUser.displayName.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
+                      {otherUser.displayName.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-background" />
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
                 </div>
-                <div>
-                  <p className="text-sm font-bold leading-tight">{otherUser.displayName}</p>
-                  <p className="text-[11px] text-green-500 font-medium">çevrimiçi</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1">
+                    <span className="font-bold text-[15px] leading-tight truncate">{otherUser.displayName}</span>
+                    <BadgeCheck className="w-4 h-4 text-primary flex-shrink-0" />
+                  </div>
+                  <p className="text-[11px] text-green-500 font-semibold leading-tight">Çevrimiçi</p>
                 </div>
               </button>
             )}
+
+            {/* Sağ aksiyonlar */}
+            <div className="flex items-center flex-shrink-0">
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+                <Phone style={{ width: 18, height: 18 }} />
+              </button>
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+                <Video style={{ width: 20, height: 20 }} />
+              </button>
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+                <Info style={{ width: 20, height: 20 }} />
+              </button>
+            </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-secondary/30" ref={scrollRef}>
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <MessageCircle className="w-8 h-8 text-primary/40" />
-                </div>
-                <p className="text-sm font-medium">Henüz mesaj yok</p>
-                <p className="text-xs text-muted-foreground/70">İlk mesajı gönder!</p>
-              </div>
-            )}
-            {messages.map((msg, idx) => {
-              const isMe = msg.senderId === me?.id;
-              const prevMsg = messages[idx - 1];
-              const showAvatar = !prevMsg || prevMsg.senderId !== msg.senderId;
-              return (
-                <div key={msg.id} className={`flex gap-2 ${isMe ? "flex-row-reverse" : "flex-row"}`}>
-                  {!isMe && (
-                    <div className="w-7 flex-shrink-0">
-                      {showAvatar && (
-                        <Avatar className="w-7 h-7">
-                          <AvatarImage src={msg.sender?.avatarUrl || ""} />
-                          <AvatarFallback className="text-xs">{msg.sender?.displayName?.charAt(0)}</AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  )}
-                  <div className={`max-w-[72%] flex flex-col ${isMe ? "items-end" : "items-start"}`}>
-                    {msg.content && (
-                      <div className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
-                        isMe
-                          ? "bg-primary text-primary-foreground rounded-tr-md"
-                          : "bg-card border border-border rounded-tl-md"
-                      }`}>
-                        {msg.content}
-                      </div>
-                    )}
-                    {msg.mediaUrl && (
-                      <div className="rounded-2xl overflow-hidden border border-border max-w-[200px]">
-                        {msg.mediaType === "video"
-                          ? <video src={msg.mediaUrl} controls className="w-full" />
-                          : <img src={msg.mediaUrl} alt="medya" className="w-full h-auto object-cover" />
-                        }
-                      </div>
-                    )}
-                    <span className="text-[10px] text-muted-foreground mt-1">
-                      {formatDistanceToNow(new Date(msg.createdAt), { locale: tr, addSuffix: true })}
-                    </span>
+          {/* ── Mesajlar ── */}
+          <div className="flex-1 overflow-y-auto bg-background" ref={scrollRef}>
+            <div className="px-3 py-2">
+
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <MessageCircle className="w-8 h-8 text-primary/40" />
                   </div>
+                  <p className="text-sm font-medium">Henüz mesaj yok</p>
+                  <p className="text-xs text-muted-foreground/60">İlk mesajı sen gönder ✨</p>
                 </div>
-              );
-            })}
+              )}
+
+              {grouped.map(group => (
+                <div key={group.dateLabel}>
+                  {/* Tarih bölücü */}
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-border/50" />
+                    <span className="text-[11px] text-muted-foreground font-medium">{group.dateLabel}</span>
+                    <div className="flex-1 h-px bg-border/50" />
+                  </div>
+
+                  {group.messages.map((msg, idx) => {
+                    const isMe = msg.senderId === me?.id;
+                    const prevMsg = group.messages[idx - 1];
+                    const nextMsg = group.messages[idx + 1];
+                    const isFirstInRun = !prevMsg || prevMsg.senderId !== msg.senderId;
+                    const isLastInRun  = !nextMsg || nextMsg.senderId !== msg.senderId;
+                    const msgTime = format(new Date(msg.createdAt), "HH:mm");
+                    const globalIdx = messages.indexOf(msg);
+                    const showUnread = firstUnreadIdx !== -1 && globalIdx === firstUnreadIdx;
+
+                    // Balon köşe radiusu — WhatsApp/Instagram stilinde
+                    const myBubbleRadius   = `${isFirstInRun ? "22px" : "22px"} 6px ${isLastInRun ? "6px" : "22px"} 22px`;
+                    const herBubbleRadius  = `6px ${isFirstInRun ? "22px" : "22px"} 22px ${isLastInRun ? "22px" : "6px"}`;
+
+                    return (
+                      <div key={msg.id}>
+                        {showUnread && (
+                          <div className="flex items-center gap-2 my-3">
+                            <div className="flex-1 h-px bg-primary/25" />
+                            <span className="text-[11px] text-primary font-semibold">
+                              {messages.filter(m => m.senderId !== me?.id && !m.isRead).length} okunmamış mesaj
+                            </span>
+                            <div className="flex-1 h-px bg-primary/25" />
+                          </div>
+                        )}
+
+                        <div className={`flex items-end gap-1.5 ${isLastInRun ? "mb-2" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+
+                          {/* Avatar — karşı taraf, serinin son mesajı */}
+                          <div className="w-7 flex-shrink-0">
+                            {!isMe && isLastInRun ? (
+                              <Avatar className="w-7 h-7">
+                                <AvatarImage src={msg.sender?.avatarUrl || ""} />
+                                <AvatarFallback className="text-[10px] font-bold bg-muted">
+                                  {msg.sender?.displayName?.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                            ) : (
+                              <div className="w-7" />
+                            )}
+                          </div>
+
+                          {/* Balon + zaman */}
+                          <div className={`flex flex-col max-w-[72%] ${isMe ? "items-end" : "items-start"}`}>
+                            {msg.content && (
+                              <div
+                                className={`px-4 py-2.5 text-[14px] leading-[1.45] ${
+                                  isMe
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-border/30"
+                                }`}
+                                style={{ borderRadius: isMe ? myBubbleRadius : herBubbleRadius }}
+                              >
+                                {msg.content}
+                              </div>
+                            )}
+                            {msg.mediaUrl && (
+                              <div
+                                className="overflow-hidden max-w-[220px] shadow-sm"
+                                style={{ borderRadius: isMe ? myBubbleRadius : herBubbleRadius }}
+                              >
+                                {msg.mediaType === "video"
+                                  ? <video src={msg.mediaUrl} controls className="w-full block" />
+                                  : <img src={`/api${msg.mediaUrl}`} alt="medya" className="w-full h-auto block" />
+                                }
+                              </div>
+                            )}
+                            {isLastInRun && (
+                              <div className={`flex items-center gap-1 mt-1 ${isMe ? "flex-row-reverse" : ""}`}>
+                                <span className="text-[11px] text-muted-foreground">{msgTime}</span>
+                                {isMe && <span className="text-[11px] text-primary/60">✓✓</span>}
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+
+            </div>
           </div>
 
-          {/* Input bar */}
-          <div className="p-3 bg-background border-t border-border flex items-center gap-2">
+          {/* ── Input Bar ── */}
+          <div className="flex items-center gap-2 px-3 py-2.5 bg-background border-t border-border/40">
             <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
               onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
-            <Button variant="ghost" size="icon" className="text-muted-foreground rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
-              <ImagePlus className="w-5 h-5" />
-            </Button>
-            <Input
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleSend()}
-              placeholder="Mesaj yaz..."
-              className="flex-1 rounded-full bg-secondary/50 border-transparent focus-visible:ring-primary/30"
-            />
-            <Button size="icon" className="rounded-full flex-shrink-0" onClick={handleSend} disabled={!content.trim() || sending}>
-              <Send className="w-4 h-4" />
-            </Button>
+
+            {/* + butonu */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+            >
+              <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
+            </button>
+
+            {/* Yazı alanı */}
+            <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
+              <input
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleSend()}
+                placeholder="Mesaj yaz..."
+                className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+              />
+            </div>
+
+            {/* Sağ butonlar */}
+            {content.trim() ? (
+              <button
+                onClick={handleSend}
+                disabled={sending}
+                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+              >
+                <Send className="w-4 h-4 text-primary-foreground" />
+              </button>
+            ) : (
+              <div className="flex items-center gap-0.5 flex-shrink-0">
+                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                  <Smile className="w-5 h-5" />
+                </button>
+                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                  <Mic className="w-5 h-5" />
+                </button>
+                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                  <AudioWaveform className="w-5 h-5" />
+                </button>
+              </div>
+            )}
           </div>
+
         </div>
       </AppLayout>
     );
