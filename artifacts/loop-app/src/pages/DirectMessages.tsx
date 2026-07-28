@@ -137,6 +137,7 @@ export default function DirectMessages() {
   const [otherUser, setOtherUser] = useState<DmUser | null>(null);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -611,13 +612,13 @@ export default function DirectMessages() {
 
             {/* Sağ aksiyonlar */}
             <div className="flex items-center flex-shrink-0">
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
                 <Phone style={{ width: 18, height: 18 }} />
               </button>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
                 <Video style={{ width: 20, height: 20 }} />
               </button>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors text-foreground/70">
+              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
                 <Info style={{ width: 20, height: 20 }} />
               </button>
             </div>
@@ -732,51 +733,88 @@ export default function DirectMessages() {
           </div>
 
           {/* ── Input Bar ── */}
-          <div className="flex items-center gap-2 px-3 py-2.5 bg-background border-t border-border/40">
-            <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
-
-            {/* + butonu */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
-            >
-              <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
-            </button>
-
-            {/* Yazı alanı */}
-            <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
-              <input
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && handleSend()}
-                placeholder="Mesaj yaz..."
-                className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-              />
-            </div>
-
-            {/* Sağ butonlar */}
-            {content.trim() ? (
-              <button
-                onClick={handleSend}
-                disabled={sending}
-                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
-              >
-                <Send className="w-4 h-4 text-primary-foreground" />
-              </button>
-            ) : (
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                  <Smile className="w-5 h-5" />
-                </button>
-                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                  <Mic className="w-5 h-5" />
-                </button>
-                <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                  <AudioWaveform className="w-5 h-5" />
-                </button>
-              </div>
+          <div className="relative">
+            {/* + popup menü */}
+            {showPlusMenu && (
+              <>
+                <div className="absolute inset-x-0 bottom-full z-20" onClick={() => setShowPlusMenu(false)} />
+                <div className="absolute bottom-[calc(100%+8px)] left-3 z-30 bg-card border border-border/50 rounded-2xl shadow-xl overflow-hidden w-44 animate-in slide-in-from-bottom-2">
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={() => { setShowPlusMenu(false); fileInputRef.current?.click(); }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <ImagePlus className="w-4 h-4 text-primary" />
+                    </div>
+                    Görüntü
+                  </button>
+                  <div className="h-px bg-border/40 mx-3" />
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={() => { setShowPlusMenu(false); toast({ title: "GIF yakında geliyor ✨" }); }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center">
+                      <span className="text-pink-500 text-[11px] font-black tracking-tight">GIF</span>
+                    </div>
+                    GIF
+                  </button>
+                  <div className="h-px bg-border/40 mx-3" />
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={() => { setShowPlusMenu(false); toast({ title: "Sticker yakında geliyor 🎨" }); }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center">
+                      <span className="text-lg">😊</span>
+                    </div>
+                    Sticker
+                  </button>
+                </div>
+              </>
             )}
+
+            <div className="flex items-center gap-2 px-3 py-2.5 bg-background border-t border-border/40">
+              <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
+
+              {/* + butonu */}
+              <button
+                onClick={() => setShowPlusMenu(v => !v)}
+                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+              >
+                <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
+              </button>
+
+              {/* Yazı alanı */}
+              <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
+                <input
+                  value={content}
+                  onChange={e => { setContent(e.target.value); if (showPlusMenu) setShowPlusMenu(false); }}
+                  onKeyDown={e => e.key === "Enter" && handleSend()}
+                  placeholder="Mesaj yaz..."
+                  className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+              </div>
+
+              {/* Sağ butonlar */}
+              {content.trim() ? (
+                <button
+                  onClick={handleSend}
+                  disabled={sending}
+                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4 text-primary-foreground" />
+                </button>
+              ) : (
+                <div className="flex items-center gap-0.5 flex-shrink-0">
+                  <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                    <Smile className="w-5 h-5" />
+                  </button>
+                  <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                    <Mic className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
