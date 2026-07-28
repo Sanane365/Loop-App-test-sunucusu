@@ -536,10 +536,20 @@ export default function DirectMessages() {
     return undefined;
   }, [callState?.status]);
 
-  const startCall = (type: "voice" | "video") => {
+  const startCall = async (type: "voice" | "video") => {
     setCallState({ type, status: "calling" });
     setMicMuted(false);
     setCamOff(false);
+    // Karşı tarafa arama mesajı gönder
+    if (userId) {
+      const marker = type === "voice" ? "__LOOP_CALL_VOICE__" : "__LOOP_CALL_VIDEO__";
+      await fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: marker }),
+      }).catch(() => {});
+      fetchMessages(parseInt(userId));
+    }
     // 3 saniye sonra "bağlandı" simülasyonu
     setTimeout(() => setCallState({ type, status: "connected" }), 3000);
   };
@@ -729,18 +739,61 @@ export default function DirectMessages() {
 
                           {/* Balon + saat-tik altında */}
                           <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
-                            {msg.content && (
-                              <div
-                                className={`px-4 py-2.5 text-[14px] leading-[1.5] ${
-                                  isMe
-                                    ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
-                                    : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
-                                }`}
-                                style={{ borderRadius: "18px" }}
-                              >
-                                {msg.content}
-                              </div>
-                            )}
+                            {msg.content && (() => {
+                              const isVoiceCall = msg.content === "__LOOP_CALL_VOICE__";
+                              const isVideoCall = msg.content === "__LOOP_CALL_VIDEO__";
+                              const isCallMsg   = isVoiceCall || isVideoCall;
+
+                              if (isCallMsg) {
+                                const callType = isVoiceCall ? "voice" : "video";
+                                const callIcon = isVoiceCall ? <Phone className="w-5 h-5" /> : <Video className="w-5 h-5" />;
+                                const callLabel = isVoiceCall ? "Sesli Arama" : "Görüntülü Arama";
+                                return (
+                                  <div
+                                    className={`flex items-center gap-3 px-4 py-3 min-w-[200px] ${
+                                      isMe
+                                        ? "bg-[#EAE4FF] dark:bg-violet-900/40"
+                                        : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+                                    }`}
+                                    style={{ borderRadius: "18px" }}
+                                  >
+                                    {/* İkon */}
+                                    <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 text-primary">
+                                      {callIcon}
+                                    </div>
+                                    {/* Metin */}
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-[13px] font-semibold text-foreground leading-tight">{callLabel}</p>
+                                      <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                                        {isMe ? "Başlattın" : "Seni arıyor"}
+                                      </p>
+                                    </div>
+                                    {/* Katıl butonu — sadece karşı tarafın aramasında */}
+                                    {!isMe && (
+                                      <button
+                                        onClick={() => startCall(callType)}
+                                        className="flex-shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[12px] font-bold hover:bg-primary/90 active:scale-95 transition-all"
+                                      >
+                                        Katıl
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              return (
+                                <div
+                                  className={`px-4 py-2.5 text-[14px] leading-[1.5] ${
+                                    isMe
+                                      ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
+                                      : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+                                  }`}
+                                  style={{ borderRadius: "18px" }}
+                                >
+                                  {msg.content}
+                                </div>
+                              );
+                            })()}
                             {msg.mediaUrl && (
                               <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
                                 {msg.mediaType === "video"
