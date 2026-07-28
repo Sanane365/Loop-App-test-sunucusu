@@ -12,6 +12,7 @@ import exploreRouter from "./explore";
 import adminRouter from "./admin";
 import dmRouter from "./dm";
 import loopRouter from "./loop";
+import callsRouter from "./calls";
 
 const router: IRouter = Router();
 
@@ -27,6 +28,7 @@ router.use(exploreRouter);
 router.use("/admin", adminRouter);
 router.use(dmRouter);
 router.use(loopRouter);
+router.use(callsRouter);
 
 // ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
 // Bu dosya sadece API'yi yönetmeli.

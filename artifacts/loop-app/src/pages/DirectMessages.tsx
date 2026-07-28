@@ -142,7 +142,18 @@ export default function DirectMessages() {
   const [callDuration, setCallDuration] = useState(0);
   const [micMuted, setMicMuted] = useState(false);
   const [camOff, setCamOff] = useState(false);
-  const activeTab_ref = useRef<FilterTab>("tumu");
+
+  // WebRTC refs
+  const pcRef           = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef  = useRef<MediaStream | null>(null);
+  const remoteAudioRef  = useRef<HTMLAudioElement | null>(null);
+  const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
+  const localVideoRef   = useRef<HTMLVideoElement | null>(null);
+  const callIdRef       = useRef<string>("");
+  const callRoleRef     = useRef<"caller" | "callee">("caller");
+  const icePollerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const seenIceRef      = useRef<Set<string>>(new Set());
+
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -536,30 +547,235 @@ export default function DirectMessages() {
     return undefined;
   }, [callState?.status]);
 
+  const fmtDuration = (s: number) =>
+    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
+  // STUN sunucuları
+  const RTC_CONFIG: RTCConfiguration = {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+    ],
+  };
+
+  // Uzak akış bağlandığında ses/video elemanlarına ata
+  const attachRemoteStream = (stream: MediaStream, callType: "voice" | "video") => {
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.play().catch(() => {});
+    }
+    if (callType === "video" && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+  };
+
+  // ICE adaylarını uzak tarafa polling ile ilet
+  const startIcePolling = (callId: string, role: "caller" | "callee") => {
+    if (icePollerRef.current) clearInterval(icePollerRef.current);
+    seenIceRef.current = new Set();
+    icePollerRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ended) { endCall(); return; }
+        // Karşı tarafın ICE adaylarını ekle
+        const candidates: RTCIceCandidateInit[] =
+          role === "caller" ? data.calleeIce : data.callerIce;
+        for (const cand of candidates) {
+          const key = JSON.stringify(cand);
+          if (seenIceRef.current.has(key)) continue;
+          seenIceRef.current.add(key);
+          await pcRef.current?.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        }
+        // Arayan: cevap gelince setRemoteDescription
+        if (role === "caller" && data.answer && pcRef.current?.remoteDescription === null) {
+          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
+          setCallState({ type: data.callType, status: "connected" });
+        }
+      } catch { /* sessiz */ }
+    }, 1000);
+  };
+
+  const cleanupCall = () => {
+    if (icePollerRef.current) { clearInterval(icePollerRef.current); icePollerRef.current = null; }
+    localStreamRef.current?.getTracks().forEach(t => t.stop());
+    localStreamRef.current = null;
+    pcRef.current?.close();
+    pcRef.current = null;
+    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
+    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    if (localVideoRef.current)  localVideoRef.current.srcObject  = null;
+    seenIceRef.current = new Set();
+  };
+
+  // ── ARAYAN — sesli/görüntülü arama başlat ──────────────────────────────
   const startCall = async (type: "voice" | "video") => {
-    setCallState({ type, status: "calling" });
     setMicMuted(false);
     setCamOff(false);
-    // Karşı tarafa arama mesajı gönder
-    if (userId) {
-      const marker = type === "voice" ? "__LOOP_CALL_VOICE__" : "__LOOP_CALL_VIDEO__";
+    setCallState({ type, status: "calling" });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: type === "video",
+      });
+      localStreamRef.current = stream;
+
+      // Yerel video önizlemesi
+      if (type === "video" && localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      pcRef.current = pc;
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+      const remoteStream = new MediaStream();
+      pc.ontrack = (e) => {
+        e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+        attachRemoteStream(remoteStream, type);
+      };
+
+      // ICE adayı oluştukça sunucuya gönder
+      const callId = crypto.randomUUID();
+      callIdRef.current  = callId;
+      callRoleRef.current = "caller";
+
+      pc.onicecandidate = async ({ candidate }) => {
+        if (!candidate) return;
+        await fetch("/api/calls/ice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callId, candidate, role: "caller" }),
+        }).catch(() => {});
+      };
+
+      // Offer oluştur
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Sunucuya offer gönder
+      await fetch("/api/calls/offer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callId, callType: type, calleeId: parseInt(userId!), sdp: offer }),
+      });
+
+      // DM mesajı gönder (callId gömülü)
+      const marker = type === "voice"
+        ? `__LOOP_CALL_VOICE__:${callId}`
+        : `__LOOP_CALL_VIDEO__:${callId}`;
       await fetch(`/api/dm/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: marker }),
       }).catch(() => {});
-      fetchMessages(parseInt(userId));
+      fetchMessages(parseInt(userId!));
+
+      // Cevap için polling başlat
+      startIcePolling(callId, "caller");
+
+    } catch (err: unknown) {
+      cleanupCall();
+      setCallState(null);
+      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      toast({ title: "Arama başlatılamadı", description: msg, variant: "destructive" });
     }
-    // 3 saniye sonra "bağlandı" simülasyonu
-    setTimeout(() => setCallState({ type, status: "connected" }), 3000);
+  };
+
+  // ── KARŞI TARAF — aramaya katıl ────────────────────────────────────────
+  const joinCall = async (callId: string, type: "voice" | "video") => {
+    setMicMuted(false);
+    setCamOff(false);
+    setCallState({ type, status: "calling" });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: type === "video",
+      });
+      localStreamRef.current = stream;
+
+      if (type === "video" && localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        localVideoRef.current.play().catch(() => {});
+      }
+
+      const pc = new RTCPeerConnection(RTC_CONFIG);
+      pcRef.current = pc;
+      stream.getTracks().forEach(t => pc.addTrack(t, stream));
+
+      const remoteStream = new MediaStream();
+      pc.ontrack = (e) => {
+        e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
+        attachRemoteStream(remoteStream, type);
+        setCallState({ type, status: "connected" });
+      };
+
+      callIdRef.current   = callId;
+      callRoleRef.current = "callee";
+
+      pc.onicecandidate = async ({ candidate }) => {
+        if (!candidate) return;
+        await fetch("/api/calls/ice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ callId, candidate, role: "callee" }),
+        }).catch(() => {});
+      };
+
+      // Offer'ı al
+      const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
+      const data = await res.json();
+
+      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      // Cevabı sunucuya gönder
+      await fetch("/api/calls/answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callId, sdp: answer }),
+      });
+
+      startIcePolling(callId, "callee");
+
+    } catch (err: unknown) {
+      cleanupCall();
+      setCallState(null);
+      const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
+      toast({ title: "Aramaya katılınamadı", description: msg, variant: "destructive" });
+    }
   };
 
   const endCall = () => {
+    if (callIdRef.current) {
+      fetch("/api/calls/end", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ callId: callIdRef.current }),
+      }).catch(() => {});
+    }
+    cleanupCall();
     setCallState(null);
     setCallDuration(0);
   };
 
-  const fmtDuration = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+  // Mikrofon sessize al/aç
+  const toggleMic = () => {
+    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = micMuted; });
+    setMicMuted(v => !v);
+  };
+
+  // Kamera kapat/aç
+  const toggleCam = () => {
+    localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = camOff; });
+    setCamOff(v => !v);
+  };
 
   const handleSend = async () => {
     if (!content.trim() || !userId) return;
@@ -740,14 +956,17 @@ export default function DirectMessages() {
                           {/* Balon + saat-tik altında */}
                           <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
                             {msg.content && (() => {
-                              const isVoiceCall = msg.content === "__LOOP_CALL_VOICE__";
-                              const isVideoCall = msg.content === "__LOOP_CALL_VIDEO__";
-                              const isCallMsg   = isVoiceCall || isVideoCall;
+                              const voiceMatch = msg.content.match(/^__LOOP_CALL_VOICE__(?::(.+))?$/);
+                              const videoMatch = msg.content.match(/^__LOOP_CALL_VIDEO__(?::(.+))?$/);
+                              const isCallMsg  = !!(voiceMatch || videoMatch);
 
                               if (isCallMsg) {
-                                const callType = isVoiceCall ? "voice" : "video";
-                                const callIcon = isVoiceCall ? <Phone className="w-5 h-5" /> : <Video className="w-5 h-5" />;
-                                const callLabel = isVoiceCall ? "Sesli Arama" : "Görüntülü Arama";
+                                const callType  = voiceMatch ? "voice" : "video" as "voice" | "video";
+                                const callId    = (voiceMatch?.[1] ?? videoMatch?.[1]) ?? "";
+                                const callIcon  = callType === "voice"
+                                  ? <Phone className="w-5 h-5" />
+                                  : <Video className="w-5 h-5" />;
+                                const callLabel = callType === "voice" ? "Sesli Arama" : "Görüntülü Arama";
                                 return (
                                   <div
                                     className={`flex items-center gap-3 px-4 py-3 min-w-[200px] ${
@@ -757,21 +976,18 @@ export default function DirectMessages() {
                                     }`}
                                     style={{ borderRadius: "18px" }}
                                   >
-                                    {/* İkon */}
                                     <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 text-primary">
                                       {callIcon}
                                     </div>
-                                    {/* Metin */}
                                     <div className="flex-1 min-w-0">
                                       <p className="text-[13px] font-semibold text-foreground leading-tight">{callLabel}</p>
                                       <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">
                                         {isMe ? "Başlattın" : "Seni arıyor"}
                                       </p>
                                     </div>
-                                    {/* Katıl butonu — sadece karşı tarafın aramasında */}
-                                    {!isMe && (
+                                    {!isMe && callId && (
                                       <button
-                                        onClick={() => startCall(callType)}
+                                        onClick={() => joinCall(callId, callType)}
                                         className="flex-shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[12px] font-bold hover:bg-primary/90 active:scale-95 transition-all"
                                       >
                                         Katıl
@@ -906,84 +1122,100 @@ export default function DirectMessages() {
             </div>
           </div>
 
+          {/* ── Gizli ses/video elemanları ── */}
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+          <audio ref={el => { if (el) remoteAudioRef.current = el; }} autoPlay playsInline className="hidden" />
+
           {/* ── Arama Ekranı Modalı ── */}
           {callState && (
-            <div className="fixed inset-0 z-[70] flex flex-col items-center justify-between bg-gradient-to-b from-violet-900 via-purple-900 to-fuchsia-900 pb-12 pt-20">
-              {/* Üst: durum */}
-              <div className="flex flex-col items-center gap-4">
-                <div className="relative">
-                  <Avatar className="w-24 h-24 ring-4 ring-white/20 shadow-2xl">
-                    <AvatarImage src={otherUser?.avatarUrl || ""} />
-                    <AvatarFallback className="bg-violet-600 text-white text-3xl font-bold">
-                      {otherUser?.displayName?.charAt(0) ?? "?"}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* Nabız animasyonu */}
-                  {callState.status === "calling" && (
-                    <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
-                  )}
-                </div>
+            <div className="fixed inset-0 z-[70] flex flex-col bg-gradient-to-b from-violet-950 via-purple-900 to-fuchsia-900">
+
+              {/* Görüntülü arama: uzak video arka plan */}
+              {callState.type === "video" && (
+                <>
+                  <video
+                    ref={remoteVideoRef}
+                    autoPlay playsInline
+                    className="absolute inset-0 w-full h-full object-cover opacity-80"
+                  />
+                  {/* Yerel video — küçük, sağ üst */}
+                  <div className="absolute top-14 right-4 w-28 aspect-[9/16] rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl z-10 bg-black">
+                    {!camOff ? (
+                      <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-zinc-800">
+                        <Video className="w-6 h-6 text-white/40" />
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Üst: kullanıcı bilgisi */}
+              <div className="relative z-10 flex flex-col items-center pt-20 gap-4">
+                {callState.type === "voice" && (
+                  <div className="relative">
+                    <Avatar className="w-28 h-28 ring-4 ring-white/20 shadow-2xl">
+                      <AvatarImage src={otherUser?.avatarUrl || ""} />
+                      <AvatarFallback className="bg-violet-600 text-white text-4xl font-bold">
+                        {otherUser?.displayName?.charAt(0) ?? "?"}
+                      </AvatarFallback>
+                    </Avatar>
+                    {callState.status === "calling" && (
+                      <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
+                    )}
+                  </div>
+                )}
                 <div className="text-center">
-                  <p className="text-white text-xl font-bold">{otherUser?.displayName}</p>
-                  <p className="text-white/60 text-sm mt-1">
+                  <p className="text-white text-xl font-bold drop-shadow">{otherUser?.displayName}</p>
+                  <p className="text-white/70 text-sm mt-1 drop-shadow">
                     {callState.status === "calling"
-                      ? callState.type === "voice" ? "Sesli aranıyor…" : "Görüntülü aranıyor…"
+                      ? (callState.type === "voice" ? "Sesli aranıyor…" : "Görüntülü aranıyor…")
                       : fmtDuration(callDuration)}
                   </p>
                 </div>
               </div>
 
-              {/* Orta: görüntülü aramada kamera önizlemesi */}
-              {callState.type === "video" && callState.status === "connected" && (
-                <div className="w-full px-6">
-                  <div className="w-full aspect-video rounded-2xl bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10">
-                    {camOff ? (
-                      <div className="flex flex-col items-center gap-2 text-white/50">
-                        <Video className="w-8 h-8" />
-                        <span className="text-xs">Kamera kapalı</span>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center gap-2 text-white/50">
-                        <Video className="w-8 h-8 text-white/70" />
-                        <span className="text-xs text-white/70">Kamera aktif</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Alt: butonlar */}
-              <div className="flex items-center gap-6">
+              {/* Alt: kontrol butonları */}
+              <div className="absolute bottom-14 left-0 right-0 z-10 flex items-center justify-center gap-5">
                 {/* Mikrofon */}
                 <button
-                  onClick={() => setMicMuted(v => !v)}
-                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${micMuted ? "bg-white text-purple-900" : "bg-white/20 text-white"}`}
+                  onClick={toggleMic}
+                  className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${micMuted ? "bg-white" : "bg-white/20"}`}
                 >
-                  <Mic className="w-6 h-6" />
+                  <Mic className={`w-6 h-6 ${micMuted ? "text-purple-900" : "text-white"}`} />
+                  <span className={`text-[9px] font-medium ${micMuted ? "text-purple-700" : "text-white/70"}`}>
+                    {micMuted ? "Sessiz" : "Mikrofon"}
+                  </span>
                 </button>
 
-                {/* Kapat */}
+                {/* Bitir */}
                 <button
                   onClick={endCall}
-                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-xl hover:bg-red-600 active:scale-95 transition-all"
+                  className="w-16 h-16 rounded-full bg-red-500 flex flex-col items-center justify-center gap-0.5 shadow-2xl hover:bg-red-600 active:scale-95 transition-all"
                 >
                   <Phone className="w-7 h-7 text-white rotate-[135deg]" />
+                  <span className="text-[9px] text-white/80 font-medium">Bitir</span>
                 </button>
 
-                {/* Kamera (video aramada) */}
+                {/* Kamera (sadece görüntülü) */}
                 {callState.type === "video" && (
                   <button
-                    onClick={() => setCamOff(v => !v)}
-                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${camOff ? "bg-white text-purple-900" : "bg-white/20 text-white"}`}
+                    onClick={toggleCam}
+                    className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${camOff ? "bg-white" : "bg-white/20"}`}
                   >
-                    <Video className="w-6 h-6" />
+                    <Video className={`w-6 h-6 ${camOff ? "text-purple-900" : "text-white"}`} />
+                    <span className={`text-[9px] font-medium ${camOff ? "text-purple-700" : "text-white/70"}`}>
+                      {camOff ? "Kapalı" : "Kamera"}
+                    </span>
                   </button>
                 )}
 
-                {/* Sesli aramada hoparlör */}
+                {/* Hoparlör (sadece sesli) */}
                 {callState.type === "voice" && (
-                  <button className="w-14 h-14 rounded-full bg-white/20 text-white flex items-center justify-center">
-                    <span className="text-xl">🔊</span>
+                  <button className="w-14 h-14 rounded-full bg-white/20 flex flex-col items-center justify-center gap-0.5">
+                    <span className="text-2xl leading-none">🔊</span>
+                    <span className="text-[9px] text-white/70 font-medium">Hoparlör</span>
                   </button>
                 )}
               </div>
