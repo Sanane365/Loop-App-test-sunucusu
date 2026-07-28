@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, unique, boolean } from "drizzle-orm/pg-core";
 import { usersTable } from "./users";
 
 // Anlık paylaşılan fotoğraflar
@@ -42,6 +42,20 @@ export const thoughtLikesTable = pgTable("thought_likes", {
   likerId: integer("liker_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [unique().on(t.thoughtOwnerId, t.likerId)]);
+
+// WebRTC arama sinyalleri (offer/answer/ICE — restart'a dayanıklı)
+export const callSignalsTable = pgTable("call_signals", {
+  id:        text("id").primaryKey(),          // UUID — callId
+  callType:  text("call_type").notNull(),       // "voice" | "video"
+  callerId:  integer("caller_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  calleeId:  integer("callee_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  offerSdp:  text("offer_sdp"),                // JSON string
+  answerSdp: text("answer_sdp"),               // JSON string
+  callerIce: text("caller_ice").notNull().default("[]"), // JSON array string
+  calleeIce: text("callee_ice").notNull().default("[]"), // JSON array string
+  ended:     boolean("ended").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 export type LoopPhoto = typeof loopPhotosTable.$inferSelect;
 export type ThoughtLike = typeof thoughtLikesTable.$inferSelect;
