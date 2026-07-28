@@ -34,6 +34,8 @@ interface DmMessage {
   content: string | null;
   mediaUrl: string | null;
   mediaType: string | null;
+  voiceUrl: string | null;
+  voiceDuration: number | null;
   isRead: boolean;
   sender: DmUser | null;
   createdAt: string;
@@ -57,6 +59,7 @@ function formatMsgTime(dateStr: string) {
 }
 
 function lastMsgPreview(msg: DmMessage) {
+  if (msg.voiceUrl) return "🎤 sesli mesaj gönderdi";
   if (msg.content) return msg.content;
   if (msg.mediaUrl) {
     if (msg.mediaType === "video") return "video gönderdi";
@@ -67,7 +70,7 @@ function lastMsgPreview(msg: DmMessage) {
 }
 
 function isSpecialPreview(msg: DmMessage) {
-  return !msg.content && !!msg.mediaUrl;
+  return !msg.content && (!!msg.mediaUrl || !!msg.voiceUrl);
 }
 
 // Mock active users (decorative)
@@ -166,6 +169,10 @@ export default function DirectMessages() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Voice playback state (DM)
+  const [playingVoiceId, setPlayingVoiceId] = useState<number | null>(null);
+  const dmAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // GIF picker state
   const [gifOpen, setGifOpen] = useState(false);
@@ -722,6 +729,20 @@ export default function DirectMessages() {
     }
   };
 
+  const handlePlayDmVoice = (msgId: number, voiceUrl: string) => {
+    if (playingVoiceId === msgId) {
+      dmAudioRef.current?.pause();
+      setPlayingVoiceId(null);
+      return;
+    }
+    if (dmAudioRef.current) dmAudioRef.current.pause();
+    const audio = new Audio(voiceUrl);
+    dmAudioRef.current = audio;
+    audio.play();
+    setPlayingVoiceId(msgId);
+    audio.onended = () => setPlayingVoiceId(null);
+  };
+
   const stopRecording = async () => {
     if (!mediaRecorderRef.current || !userId) return;
     setIsRecording(false);
@@ -1126,6 +1147,40 @@ export default function DirectMessages() {
                                   : <img src={msg.mediaUrl} alt="medya" className="w-full h-auto block" />
                                 }
                               </div>
+                            )}
+                            {/* Sesli mesaj balonu */}
+                            {msg.voiceUrl && (
+                              <button
+                                onClick={() => handlePlayDmVoice(msg.id, msg.voiceUrl!)}
+                                className={`flex items-center gap-3 px-4 py-3 rounded-[18px] shadow-sm transition-colors ${
+                                  isMe
+                                    ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground rounded-br-md hover:bg-violet-100 dark:hover:bg-violet-900/60"
+                                    : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)] rounded-bl-md hover:bg-muted/60"
+                                }`}
+                                style={{ minWidth: 180 }}
+                              >
+                                {playingVoiceId === msg.id ? (
+                                  <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-3 h-3 rounded-sm bg-primary" />
+                                  </div>
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                                    <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-primary border-b-[6px] border-b-transparent ml-0.5" />
+                                  </div>
+                                )}
+                                <div className="flex gap-0.5 items-center h-5 flex-1">
+                                  {Array(16).fill(0).map((_, i) => (
+                                    <div
+                                      key={i}
+                                      className={`w-0.5 rounded-full transition-all ${playingVoiceId === msg.id ? "bg-primary animate-pulse" : "bg-primary/50"}`}
+                                      style={{ height: `${22 + Math.sin(i * 0.9 + 1) * 65}%` }}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
+                                  {msg.voiceDuration ? `${msg.voiceDuration}s` : "🎤"}
+                                </span>
+                              </button>
                             )}
                             {/* Saat + tik — balonun altında */}
                             {isLastInRun && (
