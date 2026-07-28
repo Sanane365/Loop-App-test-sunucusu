@@ -290,7 +290,16 @@ function CommentBottomSheet({
   );
 }
 
-export function PostCard({ post }: { post: Post }) {
+// Poll fields are returned by the API but not in the generated schema
+type PostWithPoll = Post & {
+  postType?: string | null;
+  pollOptions?: string[] | null;
+  pollVoteCounts?: number[] | null;
+  myPollVote?: number | null;
+};
+
+export function PostCard({ post: postRaw }: { post: Post }) {
+  const post = postRaw as PostWithPoll;
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -298,6 +307,42 @@ export function PostCard({ post }: { post: Post }) {
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+
+  // Poll state
+  const [myPollVote, setMyPollVote] = useState<number | null>(post.myPollVote ?? null);
+  const [pollVoteCounts, setPollVoteCounts] = useState<number[]>(post.pollVoteCounts ?? []);
+  const [isVoting, setIsVoting] = useState(false);
+
+  const handlePollVote = async (optionIndex: number) => {
+    if (myPollVote !== null || isVoting) return;
+    setIsVoting(true);
+    // Optimistic update
+    const prev = { myPollVote, pollVoteCounts: [...pollVoteCounts] };
+    const newCounts = [...pollVoteCounts];
+    newCounts[optionIndex] = (newCounts[optionIndex] ?? 0) + 1;
+    setMyPollVote(optionIndex);
+    setPollVoteCounts(newCounts);
+    try {
+      const res = await fetch(`/api/posts/${post.id}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionIndex }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Vote failed");
+      const updated = await res.json() as PostWithPoll;
+      setMyPollVote(updated.myPollVote ?? optionIndex);
+      setPollVoteCounts(updated.pollVoteCounts ?? newCounts);
+      queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
+    } catch {
+      // Rollback
+      setMyPollVote(prev.myPollVote);
+      setPollVoteCounts(prev.pollVoteCounts);
+      toast({ title: "Oy gönderilemedi", variant: "destructive" });
+    } finally {
+      setIsVoting(false);
+    }
+  };
 
   const likeMutation = useLikePost();
   const unlikeMutation = useUnlikePost();
@@ -493,6 +538,53 @@ export function PostCard({ post }: { post: Post }) {
 
         {/* Content */}
         <p className="text-sm text-foreground whitespace-pre-wrap break-words mb-3">{post.content}</p>
+
+        {/* Poll options */}
+        {post.postType === "poll" && post.pollOptions && post.pollOptions.length > 0 && (() => {
+          const totalVotes = pollVoteCounts.reduce((s, c) => s + (c ?? 0), 0);
+          const hasVoted = myPollVote !== null;
+          return (
+            <div className="flex flex-col gap-2 mb-3">
+              {post.pollOptions.map((option, i) => {
+                const count = pollVoteCounts[i] ?? 0;
+                const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                const isSelected = myPollVote === i;
+                return (
+                  <button
+                    key={i}
+                    disabled={hasVoted || isVoting}
+                    onClick={() => handlePollVote(i)}
+                    className={`relative w-full text-left rounded-xl border px-4 py-2.5 overflow-hidden transition-colors text-sm font-medium
+                      ${isSelected
+                        ? "border-primary text-primary"
+                        : hasVoted
+                          ? "border-border/60 text-muted-foreground"
+                          : "border-border hover:border-primary hover:text-primary"
+                      }
+                      disabled:cursor-default`}
+                  >
+                    {/* Progress fill */}
+                    {hasVoted && (
+                      <span
+                        className={`absolute inset-0 rounded-xl transition-all duration-500 ${isSelected ? "bg-primary/15" : "bg-muted/60"}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    )}
+                    <span className="relative flex items-center justify-between gap-2">
+                      <span className="truncate">{option}</span>
+                      {hasVoted && (
+                        <span className={`text-xs font-semibold flex-shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`}>
+                          %{pct}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+              <p className="text-xs text-muted-foreground pl-1">{totalVotes} oy</p>
+            </div>
+          );
+        })()}
 
         {/* Actions */}
         <div className="flex items-center gap-5 text-muted-foreground border-t border-border/50 pt-2.5">
