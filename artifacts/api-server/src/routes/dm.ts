@@ -244,4 +244,23 @@ router.post("/dm/groups/:groupId/messages", requireAuth, async (req, res) => {
   }
 });
 
+// POST /dm/groups/:groupId/media
+router.post("/dm/groups/:groupId/media", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
+
+    const mediaUrl = `/api/uploads/${req.file.filename}`;
+    const mediaType = req.file.mimetype.startsWith("video") ? "video" : "image";
+
+    const [msg] = await db.insert(dmGroupMessagesTable).values({ groupId, senderId: req.user!.id, mediaUrl, mediaType }).returning();
+    const [sender] = await db.select({ id: usersTable.id, displayName: usersTable.displayName, avatarUrl: usersTable.avatarUrl, username: usersTable.username })
+      .from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
+    res.status(201).json({ ...msg, sender, createdAt: msg.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

@@ -146,6 +146,8 @@ interface DmGroupMessage {
   groupId: number;
   senderId: number;
   content: string | null;
+  mediaUrl: string | null;
+  mediaType: string | null;
   createdAt: string;
   sender: { id: number; displayName: string; avatarUrl: string | null; username: string } | null;
 }
@@ -186,6 +188,14 @@ export default function DirectMessages() {
   const [groupContent, setGroupContent] = useState("");
   const [groupSending, setGroupSending] = useState(false);
   const groupScrollRef = useRef<HTMLDivElement>(null);
+
+  // Group media state
+  const [groupShowPlusMenu, setGroupShowPlusMenu] = useState(false);
+  const [groupGifOpen, setGroupGifOpen] = useState(false);
+  const [groupGifSearch, setGroupGifSearch] = useState("");
+  const [groupGifs, setGroupGifs] = useState<{ url: string; preview: string }[]>([]);
+  const [groupGifLoading, setGroupGifLoading] = useState(false);
+  const groupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Group creation dialog
   const [newGroupOpen, setNewGroupOpen] = useState(false);
@@ -580,6 +590,54 @@ export default function DirectMessages() {
     }
   };
 
+  const handleGroupFileUpload = async (file: File) => {
+    if (!groupId) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const res = await fetch(`/api/dm/groups/${groupId}/media`, { method: "POST", body: formData });
+      if (res.ok) {
+        fetchGroupMessages(parseInt(groupId));
+        fetchGroups();
+      } else {
+        toast({ title: "Hata", description: "Dosya gönderilemedi.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Hata", description: "Dosya gönderilemedi.", variant: "destructive" });
+    }
+  };
+
+  const searchGroupGifs = async () => {
+    setGroupGifLoading(true);
+    try {
+      const q = groupGifSearch.trim() || "trending";
+      const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=16&media_filter=gif`;
+      const r = await fetch(url);
+      const data = await r.json();
+      setGroupGifs((data.results ?? []).map((item: { media_formats: { tinygif?: { url: string }; gif?: { url: string } } }) => ({
+        url: item.media_formats?.gif?.url ?? "",
+        preview: item.media_formats?.tinygif?.url ?? "",
+      })));
+    } catch { /* sessiz */ }
+    setGroupGifLoading(false);
+  };
+
+  const handleGroupSendGif = async (url: string) => {
+    if (!groupId) return;
+    setGroupGifOpen(false);
+    try {
+      const res = await fetch(`/api/dm/groups/${groupId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `__LOOP_GIF__:${url}` }),
+      });
+      if (res.ok) {
+        fetchGroupMessages(parseInt(groupId));
+        fetchGroups();
+      }
+    } catch { /* sessiz */ }
+  };
+
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || newGroupMemberIds.size === 0) return;
     setCreatingGroup(true);
@@ -886,7 +944,12 @@ export default function DirectMessages() {
                         {msg.sender?.displayName}
                       </span>
                     )}
-                    {msg.content && (
+                    {/* GIF */}
+                    {msg.content?.startsWith("__LOOP_GIF__:") ? (
+                      <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
+                        <img src={msg.content.slice("__LOOP_GIF__:".length)} alt="GIF" className="w-full h-auto block" loading="lazy" />
+                      </div>
+                    ) : msg.content ? (
                       <div
                         className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${
                           isMe
@@ -896,6 +959,15 @@ export default function DirectMessages() {
                         style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
                       >
                         {msg.content}
+                      </div>
+                    ) : null}
+                    {/* Image / Video */}
+                    {msg.mediaUrl && (
+                      <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
+                        {msg.mediaType === "video"
+                          ? <video src={msg.mediaUrl} controls className="w-full block" />
+                          : <img src={msg.mediaUrl} alt="medya" className="w-full h-auto block" />
+                        }
                       </div>
                     )}
                     {isLastInRun && (
@@ -908,22 +980,110 @@ export default function DirectMessages() {
           </div>
 
           {/* Input */}
-          <div className="border-t border-border/40 bg-background/95 backdrop-blur-sm px-3 py-2.5">
-            <div className="flex items-center gap-2">
-              <input
-                value={groupContent}
-                onChange={e => setGroupContent(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); } }}
-                placeholder="Mesaj yaz…"
-                className="flex-1 px-4 py-2.5 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm placeholder:text-muted-foreground"
-              />
-              <button
-                onClick={sendGroupMessage}
-                disabled={!groupContent.trim() || groupSending}
-                className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
-              >
-                <Send className="w-4 h-4 text-white" />
-              </button>
+          <div className="relative">
+            {/* GIF picker panel */}
+            {groupGifOpen && (
+              <div className="border-t border-border bg-background px-3 pt-3 pb-2">
+                <div className="flex gap-2 mb-2 items-center">
+                  <input
+                    value={groupGifSearch}
+                    onChange={e => setGroupGifSearch(e.target.value)}
+                    placeholder="GIF ara… (Tenor)"
+                    onKeyDown={e => e.key === "Enter" && searchGroupGifs()}
+                    className="flex-1 h-8 rounded-full px-3 text-sm bg-muted/60 border border-border/40 focus:outline-none focus:ring-1 focus:ring-primary/30 text-foreground placeholder:text-muted-foreground"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => searchGroupGifs()}
+                    className="h-8 px-3 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors flex items-center gap-1"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setGroupGifOpen(false)}
+                    className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto">
+                  {groupGifLoading
+                    ? Array(8).fill(0).map((_, i) => (
+                        <div key={i} className="aspect-square bg-muted rounded-xl animate-pulse" />
+                      ))
+                    : groupGifs.length === 0
+                      ? <p className="col-span-4 text-center text-xs text-muted-foreground py-4">Sonuç bulunamadı</p>
+                      : groupGifs.map((gif, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleGroupSendGif(gif.url)}
+                            className="aspect-square rounded-xl overflow-hidden hover:opacity-80 bg-muted active:scale-95 transition-all"
+                          >
+                            <img src={gif.preview} alt="GIF" className="w-full h-full object-cover" loading="lazy" />
+                          </button>
+                        ))
+                  }
+                </div>
+                <p className="text-[10px] text-muted-foreground text-right mt-1.5">Tenor tarafından desteklenmektedir</p>
+              </div>
+            )}
+
+            {/* + popup menü */}
+            {groupShowPlusMenu && (
+              <>
+                <div className="absolute inset-x-0 bottom-full z-20" onClick={() => setGroupShowPlusMenu(false)} />
+                <div className="absolute bottom-[calc(100%+8px)] left-3 z-30 bg-card border border-border/50 rounded-2xl shadow-xl overflow-hidden w-44 animate-in slide-in-from-bottom-2">
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={() => { setGroupShowPlusMenu(false); groupFileInputRef.current?.click(); }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <ImagePlus className="w-4 h-4 text-primary" />
+                    </div>
+                    Görüntü
+                  </button>
+                  <div className="h-px bg-border/40 mx-3" />
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={() => { setGroupShowPlusMenu(false); setGroupGifOpen(true); searchGroupGifs(); }}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center">
+                      <span className="text-pink-500 text-[11px] font-black tracking-tight">GIF</span>
+                    </div>
+                    GIF
+                  </button>
+                </div>
+              </>
+            )}
+
+            <div className="border-t border-border/40 bg-background/95 backdrop-blur-sm px-3 py-2.5">
+              <input ref={groupFileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleGroupFileUpload(f); e.target.value = ""; }} />
+              <div className="flex items-center gap-2">
+                {/* + butonu */}
+                <button
+                  onClick={() => { setGroupShowPlusMenu(v => !v); setGroupGifOpen(false); }}
+                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+                >
+                  <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
+                </button>
+                <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
+                  <input
+                    value={groupContent}
+                    onChange={e => { setGroupContent(e.target.value); if (groupShowPlusMenu) setGroupShowPlusMenu(false); }}
+                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); } }}
+                    placeholder="Mesaj yaz…"
+                    className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={sendGroupMessage}
+                  disabled={!groupContent.trim() || groupSending}
+                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
+                >
+                  <Send className="w-4 h-4 text-white" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
