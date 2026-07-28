@@ -479,11 +479,12 @@ export default function Chat() {
                     {msg.type === "text" && (
                       <>
                         <div
-                          className={`px-4 py-2.5 text-sm whitespace-pre-wrap break-words shadow-sm ${
+                          className={`px-4 py-2.5 text-sm whitespace-pre-wrap shadow-sm overflow-hidden ${
                             isMe
                               ? "bg-primary/10 dark:bg-primary/20 text-foreground rounded-3xl rounded-br-md"
                               : "bg-card border border-border text-foreground rounded-3xl rounded-bl-md"
                           }`}
+                          style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
                         >
                           {renderMessage(msg.content ?? "")}
                         </div>

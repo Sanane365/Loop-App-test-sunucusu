@@ -108,7 +108,7 @@ export default function Admin() {
   console.log("Giriş yapan kullanıcının verisi:", user);
 
   // Kullanıcının e-postası listede varsa veya rolü zaten adminse yetkiyi veriyoruz
-  const isAdmin = !!(user && user.username === "mami");
+  const isAdmin = !!(user && (user.role === "admin"));
 
   const isMod =
     isAdmin ||

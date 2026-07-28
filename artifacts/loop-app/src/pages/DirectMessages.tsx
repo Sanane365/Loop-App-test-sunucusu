@@ -11,6 +11,8 @@ import {
   BellOff, Heart, Trash2, CheckCircle2, Circle,
   Camera, Users, Phone, Video, Info, Smile, BadgeCheck,
 } from "lucide-react";
+
+const TENOR_KEY = "LIVDSRZULELA";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -138,6 +140,12 @@ export default function DirectMessages() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+
+  // GIF picker state
+  const [gifOpen, setGifOpen] = useState(false);
+  const [gifSearch, setGifSearch] = useState("");
+  const [gifs, setGifs] = useState<{ url: string; preview: string }[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
 
   // Arama işlemleri global context'ten
   const call = useCall();
@@ -557,6 +565,46 @@ export default function DirectMessages() {
     }
   };
 
+  // ── GIF fonksiyonları ─────────────────────────────────────────────────
+  const searchGifs = async (q?: string) => {
+    setGifLoading(true);
+    try {
+      const query = q ?? gifSearch;
+      const endpoint = !query
+        ? `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=20&media_filter=minimal`
+        : `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=20&media_filter=minimal`;
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      setGifs(
+        (data.results ?? []).map((r: any) => ({
+          url: r.media[0]?.gif?.url ?? r.media[0]?.tinygif?.url ?? "",
+          preview: r.media[0]?.tinygif?.url ?? r.media[0]?.gif?.url ?? "",
+        })).filter((g: { url: string }) => g.url)
+      );
+    } catch { setGifs([]); }
+    finally { setGifLoading(false); }
+  };
+
+  const openGifPicker = () => {
+    setShowPlusMenu(false);
+    setGifOpen(true);
+    if (gifs.length === 0) searchGifs("");
+  };
+
+  const handleSendGif = async (url: string) => {
+    if (!userId) return;
+    setGifOpen(false);
+    try {
+      await fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: `__LOOP_GIF__:${url}` }),
+      });
+      fetchMessages(parseInt(userId));
+      fetchConversations();
+    } catch { /* sessiz */ }
+  };
+
   const handleSend = async () => {
     if (!content.trim() || !userId) return;
     setSending(true);
@@ -777,14 +825,24 @@ export default function DirectMessages() {
                                 );
                               }
 
+                              // GIF mesajı
+                              if (msg.content?.startsWith("__LOOP_GIF__:")) {
+                                const gifUrl = msg.content.slice("__LOOP_GIF__:".length);
+                                return (
+                                  <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
+                                    <img src={gifUrl} alt="GIF" className="w-full h-auto block" loading="lazy" />
+                                  </div>
+                                );
+                              }
+
                               return (
                                 <div
-                                  className={`px-4 py-2.5 text-[14px] leading-[1.5] ${
+                                  className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${
                                     isMe
                                       ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
                                       : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
                                   }`}
-                                  style={{ borderRadius: "18px" }}
+                                  style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
                                 >
                                   {msg.content}
                                 </div>
@@ -819,6 +877,53 @@ export default function DirectMessages() {
 
           {/* ── Input Bar ── */}
           <div className="relative">
+            {/* GIF picker panel */}
+            {gifOpen && (
+              <div className="border-t border-border bg-background px-3 pt-3 pb-2">
+                <div className="flex gap-2 mb-2 items-center">
+                  <input
+                    value={gifSearch}
+                    onChange={e => setGifSearch(e.target.value)}
+                    placeholder="GIF ara… (Tenor)"
+                    onKeyDown={e => e.key === "Enter" && searchGifs()}
+                    className="flex-1 h-8 rounded-full px-3 text-sm bg-muted/60 border border-border/40 focus:outline-none focus:ring-1 focus:ring-primary/30 text-foreground placeholder:text-muted-foreground"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => searchGifs()}
+                    className="h-8 px-3 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors flex items-center gap-1"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => setGifOpen(false)}
+                    className="h-8 w-8 rounded-full bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto">
+                  {gifLoading
+                    ? Array(8).fill(0).map((_, i) => (
+                        <div key={i} className="aspect-square bg-muted rounded-xl animate-pulse" />
+                      ))
+                    : gifs.length === 0
+                      ? <p className="col-span-4 text-center text-xs text-muted-foreground py-4">Sonuç bulunamadı</p>
+                      : gifs.map((gif, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSendGif(gif.url)}
+                            className="aspect-square rounded-xl overflow-hidden hover:opacity-80 bg-muted active:scale-95 transition-all"
+                          >
+                            <img src={gif.preview} alt="GIF" className="w-full h-full object-cover" loading="lazy" />
+                          </button>
+                        ))
+                  }
+                </div>
+                <p className="text-[10px] text-muted-foreground text-right mt-1.5">Tenor tarafından desteklenmektedir</p>
+              </div>
+            )}
+
             {/* + popup menü */}
             {showPlusMenu && (
               <>
@@ -836,7 +941,7 @@ export default function DirectMessages() {
                   <div className="h-px bg-border/40 mx-3" />
                   <button
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
-                    onClick={() => { setShowPlusMenu(false); toast({ title: "GIF yakında geliyor ✨" }); }}
+                    onClick={openGifPicker}
                   >
                     <div className="w-8 h-8 rounded-xl bg-pink-500/10 flex items-center justify-center">
                       <span className="text-pink-500 text-[11px] font-black tracking-tight">GIF</span>

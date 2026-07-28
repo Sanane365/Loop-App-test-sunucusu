@@ -2,7 +2,7 @@ import {
   createContext, useContext, useRef, useState, useEffect,
   useCallback, ReactNode,
 } from "react";
-import { Phone, Video, Mic, ArrowLeft } from "lucide-react";
+import { Phone, Video, Mic, ChevronDown } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -47,6 +47,7 @@ const RTC_CONFIG: RTCConfiguration = {
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
   ],
 };
 
@@ -62,7 +63,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [micMuted, setMicMuted]           = useState(false);
   const [camOff, setCamOff]               = useState(false);
 
-  // Media element refs — always in DOM so they're always valid
+  // Media element refs — always in DOM
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const localVideoRef  = useRef<HTMLVideoElement | null>(null);
@@ -83,37 +84,54 @@ export function CallProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(t);
   }, [callState?.status]);
 
-  // ── Attach remote stream to elements ──────────────────────────────────────
+  // Re-attach streams to video elements whenever overlay becomes visible
+  useEffect(() => {
+    if (!callState || callMinimized) return;
+    if (remoteStreamRef.current && remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = remoteStreamRef.current;
+      remoteVideoRef.current.play().catch(() => {});
+    }
+    if (localStreamRef.current && localVideoRef.current) {
+      localVideoRef.current.srcObject = localStreamRef.current;
+      localVideoRef.current.play().catch(() => {});
+    }
+  }, [callState, callMinimized]);
+
+  // ── Attach remote stream ──────────────────────────────────────────────────
   const attachRemoteStream = useCallback((stream: MediaStream) => {
     remoteStreamRef.current = stream;
 
-    // Audio — always attach (voice + video calls)
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = stream;
+      remoteAudioRef.current.muted = false;
+      remoteAudioRef.current.volume = 1;
       remoteAudioRef.current.play().catch(() => {});
     }
-    // Video — always attach; element is always in DOM
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = stream;
       remoteVideoRef.current.play().catch(() => {});
     }
   }, []);
 
-  // Re-attach if elements re-mount
-  useEffect(() => {
-    const stream = remoteStreamRef.current;
-    if (!stream) return;
-    if (remoteAudioRef.current && !remoteAudioRef.current.srcObject) {
-      remoteAudioRef.current.srcObject = stream;
-      remoteAudioRef.current.play().catch(() => {});
+  // ── Stable ref callbacks — prevent re-render flickering ──────────────────
+  // These are created once; React calls them only when element mounts/unmounts.
+  const remoteVideoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
+    remoteVideoRef.current = el;
+    if (el && remoteStreamRef.current) {
+      el.srcObject = remoteStreamRef.current;
+      el.play().catch(() => {});
     }
-    if (remoteVideoRef.current && !remoteVideoRef.current.srcObject) {
-      remoteVideoRef.current.srcObject = stream;
-      remoteVideoRef.current.play().catch(() => {});
-    }
-  });
+  }, []);
 
-  // ── ICE polling ────────────────────────────────────────────────────────────
+  const localVideoCallbackRef = useCallback((el: HTMLVideoElement | null) => {
+    localVideoRef.current = el;
+    if (el && localStreamRef.current) {
+      el.srcObject = localStreamRef.current;
+      el.play().catch(() => {});
+    }
+  }, []);
+
+  // ── endCall ────────────────────────────────────────────────────────────────
   const endCall = useCallback(() => {
     if (callIdRef.current) {
       fetch("/api/calls/end", {
@@ -141,6 +159,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     setCamOff(false);
   }, []);
 
+  // ── ICE polling ────────────────────────────────────────────────────────────
   const startIcePolling = useCallback((callId: string, role: "caller" | "callee") => {
     if (icePollerRef.current) clearInterval(icePollerRef.current);
     seenIceRef.current = new Set();
@@ -160,7 +179,6 @@ export function CallProvider({ children }: { children: ReactNode }) {
           await pcRef.current?.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
         }
 
-        // Arayan: answer gelince remote description ayarla
         if (role === "caller" && data.answer && pcRef.current?.remoteDescription === null) {
           await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
           setCallState(prev => prev ? { ...prev, status: "connected" } : null);
@@ -169,7 +187,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }, 1000);
   }, [endCall]);
 
-  // ── startCall — caller tarafı ──────────────────────────────────────────────
+  // ── startCall — caller ────────────────────────────────────────────────────
   const startCall = useCallback(async (
     type: "voice" | "video",
     targetUserId: number,
@@ -184,12 +202,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: type === "video",
+        video: type === "video" ? { facingMode: "user" } : false,
       });
       localStreamRef.current = stream;
 
-      // Yerel video önizlemesi
-      if (localVideoRef.current) {
+      if (type === "video" && localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(() => {});
       }
@@ -199,15 +216,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
       pc.ontrack = (e) => {
-        // e.streams[0] tüm track'leri içerir
-        if (e.streams[0]) {
-          attachRemoteStream(e.streams[0]);
-        } else {
-          // Bazı tarayıcılarda streams boş gelir, track'leri yeni stream'e ekle
+        const incomingStream = e.streams[0] ?? (() => {
           if (!remoteStreamRef.current) remoteStreamRef.current = new MediaStream();
           remoteStreamRef.current.addTrack(e.track);
-          attachRemoteStream(remoteStreamRef.current);
-        }
+          return remoteStreamRef.current;
+        })();
+        attachRemoteStream(incomingStream);
         setCallState(prev => prev ? { ...prev, status: "connected" } : null);
       };
 
@@ -240,7 +254,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [attachRemoteStream, startIcePolling, endCall]);
 
-  // ── joinCall — callee tarafı ───────────────────────────────────────────────
+  // ── joinCall — callee ─────────────────────────────────────────────────────
   const joinCall = useCallback(async (
     callId: string,
     type: "voice" | "video",
@@ -255,11 +269,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
-        video: type === "video",
+        video: type === "video" ? { facingMode: "user" } : false,
       });
       localStreamRef.current = stream;
 
-      if (localVideoRef.current) {
+      if (type === "video" && localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
         localVideoRef.current.play().catch(() => {});
       }
@@ -269,13 +283,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
       stream.getTracks().forEach(t => pc.addTrack(t, stream));
 
       pc.ontrack = (e) => {
-        if (e.streams[0]) {
-          attachRemoteStream(e.streams[0]);
-        } else {
+        const incomingStream = e.streams[0] ?? (() => {
           if (!remoteStreamRef.current) remoteStreamRef.current = new MediaStream();
           remoteStreamRef.current.addTrack(e.track);
-          attachRemoteStream(remoteStreamRef.current);
-        }
+          return remoteStreamRef.current;
+        })();
+        attachRemoteStream(incomingStream);
         setCallState({ type, status: "connected" });
       };
 
@@ -291,7 +304,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       };
 
       const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Arama bilgisi alınamadı (sunucu hatası)");
+      if (!res.ok) throw new Error("Arama bilgisi alınamadı");
       const data = await res.json();
       if (!data.offer) throw new Error("Offer henüz hazır değil, biraz bekleyin");
 
@@ -334,19 +347,13 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }}>
       {children}
 
-      {/* ── Her zaman DOM'da bulunan medya elemanları ── */}
-      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-      {/* Uzak video — görüntülü aramada callState.type==="video" olduğunda overlay'de gösterilir */}
-      <video
-        ref={remoteVideoRef}
-        autoPlay playsInline
-        className={callState?.type === "video" && !callMinimized ? "hidden" : "hidden"}
-      />
-      {/* Yerel video — görüntülü aramada overlay'de gösterilir */}
-      <video
-        ref={localVideoRef}
-        autoPlay playsInline muted
-        className={callState?.type === "video" && !callMinimized ? "hidden" : "hidden"}
+      {/* ── Her zaman DOM'da bulunan ses elemanı ── */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        muted={false}
+        className="hidden"
       />
 
       {/* ── Global floating call indicator (arka planda) ── */}
@@ -354,15 +361,18 @@ export function CallProvider({ children }: { children: ReactNode }) {
         <>
           <style>{`
             @keyframes callFloat {
-              0%,100% { transform:scale(1); box-shadow:0 0 0 0 rgba(139,92,246,.5); }
-              50%      { transform:scale(1.04); box-shadow:0 0 0 10px rgba(139,92,246,0); }
+              0%,100% { transform:scale(1); box-shadow:0 4px 24px rgba(139,92,246,.45); }
+              50%      { transform:scale(1.03); box-shadow:0 8px 32px rgba(139,92,246,.7); }
             }
           `}</style>
           <button
             onClick={() => setCallMinimized(false)}
             className="fixed top-4 right-4 z-[200] flex items-center gap-2 pl-3 pr-4 py-2.5 rounded-full shadow-2xl text-white text-[13px] font-semibold select-none"
             aria-label="Aramaya dön"
-            style={{ background: "linear-gradient(135deg, #10b981 0%, #7c3aed 100%)", animation: "callFloat 2s ease-in-out infinite" }}
+            style={{
+              background: "linear-gradient(135deg, #10b981 0%, #7c3aed 100%)",
+              animation: "callFloat 2s ease-in-out infinite",
+            }}
           >
             <span className="relative flex-shrink-0">
               {callState.type === "voice"
@@ -383,45 +393,22 @@ export function CallProvider({ children }: { children: ReactNode }) {
       {callState && !callMinimized && (
         <div className="fixed inset-0 z-[150] flex flex-col bg-gradient-to-b from-violet-950 via-purple-900 to-fuchsia-900">
 
-          {/* Küçült / geri butonu — sol üst */}
-          <button
-            onClick={() => setCallMinimized(true)}
-            className="absolute top-4 left-4 z-10 w-10 h-10 rounded-full bg-white/15 flex items-center justify-center text-white hover:bg-white/25 transition-colors"
-            aria-label="Arka plana al"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-
           {/* Görüntülü arama: uzak video tam ekran arka plan */}
           {callState.type === "video" && (
             <>
+              {/* Remote video — stable ref callback, no flicker */}
               <video
-                ref={el => {
-                  if (el) {
-                    remoteVideoRef.current = el;
-                    if (remoteStreamRef.current) {
-                      el.srcObject = remoteStreamRef.current;
-                      el.play().catch(() => {});
-                    }
-                  }
-                }}
-                autoPlay playsInline
+                ref={remoteVideoCallbackRef}
+                autoPlay
+                playsInline
                 className="absolute inset-0 w-full h-full object-cover"
-                style={{ opacity: callState.status === "connected" ? 0.85 : 0 }}
+                style={{ opacity: callState.status === "connected" ? 1 : 0, transition: "opacity 0.5s" }}
               />
               {/* Yerel video — küçük, sağ üst */}
               <div className="absolute top-14 right-4 w-28 aspect-[9/16] rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl z-10 bg-black/60">
                 {!camOff
                   ? <video
-                      ref={el => {
-                        if (el) {
-                          localVideoRef.current = el;
-                          if (localStreamRef.current) {
-                            el.srcObject = localStreamRef.current;
-                            el.play().catch(() => {});
-                          }
-                        }
-                      }}
+                      ref={localVideoCallbackRef}
                       autoPlay playsInline muted
                       className="w-full h-full object-cover"
                     />
@@ -459,11 +446,21 @@ export function CallProvider({ children }: { children: ReactNode }) {
           </div>
 
           {/* Alt: kontrol butonları */}
-          <div className="absolute bottom-14 left-0 right-0 z-10 flex items-center justify-center gap-5">
+          <div className="absolute bottom-14 left-0 right-0 z-10 flex items-center justify-center gap-4">
+            {/* Küçült — Instagram gibi alta taşındı */}
+            <button
+              onClick={() => setCallMinimized(true)}
+              className="w-14 h-14 rounded-full bg-white/20 flex flex-col items-center justify-center gap-0.5 transition-all hover:bg-white/30 active:scale-95"
+              aria-label="Arka plana al"
+            >
+              <ChevronDown className="w-6 h-6 text-white" />
+              <span className="text-[9px] text-white/70 font-medium">Küçült</span>
+            </button>
+
             {/* Mikrofon */}
             <button
               onClick={toggleMic}
-              className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${micMuted ? "bg-white" : "bg-white/20"}`}
+              className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${micMuted ? "bg-white" : "bg-white/20"}`}
             >
               <Mic className={`w-6 h-6 ${micMuted ? "text-purple-900" : "text-white"}`} />
               <span className={`text-[9px] font-medium ${micMuted ? "text-purple-700" : "text-white/70"}`}>
@@ -484,7 +481,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
             {callState.type === "video" && (
               <button
                 onClick={toggleCam}
-                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${camOff ? "bg-white" : "bg-white/20"}`}
+                className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${camOff ? "bg-white" : "bg-white/20"}`}
               >
                 <Video className={`w-6 h-6 ${camOff ? "text-purple-900" : "text-white"}`} />
                 <span className={`text-[9px] font-medium ${camOff ? "text-purple-700" : "text-white/70"}`}>
@@ -495,7 +492,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
             {/* Hoparlör (sesli) */}
             {callState.type === "voice" && (
-              <button className="w-14 h-14 rounded-full bg-white/20 flex flex-col items-center justify-center gap-0.5">
+              <button className="w-14 h-14 rounded-full bg-white/20 flex flex-col items-center justify-center gap-0.5 active:scale-95">
                 <span className="text-2xl leading-none">🔊</span>
                 <span className="text-[9px] text-white/70 font-medium">Hoparlör</span>
               </button>
