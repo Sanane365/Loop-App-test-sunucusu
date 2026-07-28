@@ -10,12 +10,12 @@ import {
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
   Camera, Users, Phone, Video, Info, Smile, BadgeCheck,
-  AudioWaveform,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
+import { useCall } from "@/lib/callContext";
 
 interface DmUser {
   id: number;
@@ -138,21 +138,9 @@ export default function DirectMessages() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
-  const [callState, setCallState] = useState<null | { type: "voice" | "video"; status: "calling" | "connected" }>(null);
-  const [callDuration, setCallDuration] = useState(0);
-  const [micMuted, setMicMuted] = useState(false);
-  const [camOff, setCamOff] = useState(false);
 
-  // WebRTC refs
-  const pcRef           = useRef<RTCPeerConnection | null>(null);
-  const localStreamRef  = useRef<MediaStream | null>(null);
-  const remoteAudioRef  = useRef<HTMLAudioElement | null>(null);
-  const remoteVideoRef  = useRef<HTMLVideoElement | null>(null);
-  const localVideoRef   = useRef<HTMLVideoElement | null>(null);
-  const callIdRef       = useRef<string>("");
-  const callRoleRef     = useRef<"caller" | "callee">("caller");
-  const icePollerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
-  const seenIceRef      = useRef<Set<string>>(new Set());
+  // Arama işlemleri global context'ten
+  const call = useCall();
 
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
@@ -537,134 +525,12 @@ export default function DirectMessages() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
-  // Arama süresi sayacı
-  useEffect(() => {
-    if (callState?.status === "connected") {
-      setCallDuration(0);
-      const t = setInterval(() => setCallDuration(s => s + 1), 1000);
-      return () => clearInterval(t);
-    }
-    return undefined;
-  }, [callState?.status]);
-
-  const fmtDuration = (s: number) =>
-    `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
-
-  // STUN sunucuları
-  const RTC_CONFIG: RTCConfiguration = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-    ],
-  };
-
-  // Uzak akış bağlandığında ses/video elemanlarına ata
-  const attachRemoteStream = (stream: MediaStream, callType: "voice" | "video") => {
-    if (remoteAudioRef.current) {
-      remoteAudioRef.current.srcObject = stream;
-      remoteAudioRef.current.play().catch(() => {});
-    }
-    if (callType === "video" && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = stream;
-      remoteVideoRef.current.play().catch(() => {});
-    }
-  };
-
-  // ICE adaylarını uzak tarafa polling ile ilet
-  const startIcePolling = (callId: string, role: "caller" | "callee") => {
-    if (icePollerRef.current) clearInterval(icePollerRef.current);
-    seenIceRef.current = new Set();
-    icePollerRef.current = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.ended) { endCall(); return; }
-        // Karşı tarafın ICE adaylarını ekle
-        const candidates: RTCIceCandidateInit[] =
-          role === "caller" ? data.calleeIce : data.callerIce;
-        for (const cand of candidates) {
-          const key = JSON.stringify(cand);
-          if (seenIceRef.current.has(key)) continue;
-          seenIceRef.current.add(key);
-          await pcRef.current?.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
-        }
-        // Arayan: cevap gelince setRemoteDescription
-        if (role === "caller" && data.answer && pcRef.current?.remoteDescription === null) {
-          await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.answer));
-          setCallState({ type: data.callType, status: "connected" });
-        }
-      } catch { /* sessiz */ }
-    }, 1000);
-  };
-
-  const cleanupCall = () => {
-    if (icePollerRef.current) { clearInterval(icePollerRef.current); icePollerRef.current = null; }
-    localStreamRef.current?.getTracks().forEach(t => t.stop());
-    localStreamRef.current = null;
-    pcRef.current?.close();
-    pcRef.current = null;
-    if (remoteAudioRef.current) remoteAudioRef.current.srcObject = null;
-    if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
-    if (localVideoRef.current)  localVideoRef.current.srcObject  = null;
-    seenIceRef.current = new Set();
-  };
-
-  // ── ARAYAN — sesli/görüntülü arama başlat ──────────────────────────────
-  const startCall = async (type: "voice" | "video") => {
-    setMicMuted(false);
-    setCamOff(false);
-    setCallState({ type, status: "calling" });
-
+  // ── Arama başlat (header'daki telefon/video butonları) ──────────────────
+  const handleStartCall = async (type: "voice" | "video") => {
+    if (!userId || !otherUser) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: type === "video",
-      });
-      localStreamRef.current = stream;
-
-      // Yerel video önizlemesi
-      if (type === "video" && localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(() => {});
-      }
-
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      pcRef.current = pc;
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-      const remoteStream = new MediaStream();
-      pc.ontrack = (e) => {
-        e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
-        attachRemoteStream(remoteStream, type);
-      };
-
-      // ICE adayı oluştukça sunucuya gönder
-      const callId = crypto.randomUUID();
-      callIdRef.current  = callId;
-      callRoleRef.current = "caller";
-
-      pc.onicecandidate = async ({ candidate }) => {
-        if (!candidate) return;
-        await fetch("/api/calls/ice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ callId, candidate, role: "caller" }),
-        }).catch(() => {});
-      };
-
-      // Offer oluştur
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      // Sunucuya offer gönder
-      await fetch("/api/calls/offer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId, callType: type, calleeId: parseInt(userId!), sdp: offer }),
-      });
-
-      // DM mesajı gönder (callId gömülü)
+      const callId = await call.startCall(type, parseInt(userId), otherUser);
+      if (!callId) return;
       const marker = type === "voice"
         ? `__LOOP_CALL_VOICE__:${callId}`
         : `__LOOP_CALL_VIDEO__:${callId}`;
@@ -673,108 +539,22 @@ export default function DirectMessages() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: marker }),
       }).catch(() => {});
-      fetchMessages(parseInt(userId!));
-
-      // Cevap için polling başlat
-      startIcePolling(callId, "caller");
-
-    } catch (err: unknown) {
-      cleanupCall();
-      setCallState(null);
+      fetchMessages(parseInt(userId));
+    } catch (err) {
       const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
       toast({ title: "Arama başlatılamadı", description: msg, variant: "destructive" });
     }
   };
 
-  // ── KARŞI TARAF — aramaya katıl ────────────────────────────────────────
-  const joinCall = async (callId: string, type: "voice" | "video") => {
-    setMicMuted(false);
-    setCamOff(false);
-    setCallState({ type, status: "calling" });
-
+  // ── Aramaya katıl (sohbet balonundaki Katıl butonu) ───────────────────
+  const handleJoinCall = async (callId: string, type: "voice" | "video") => {
+    if (!otherUser) return;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: type === "video",
-      });
-      localStreamRef.current = stream;
-
-      if (type === "video" && localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-        localVideoRef.current.play().catch(() => {});
-      }
-
-      const pc = new RTCPeerConnection(RTC_CONFIG);
-      pcRef.current = pc;
-      stream.getTracks().forEach(t => pc.addTrack(t, stream));
-
-      const remoteStream = new MediaStream();
-      pc.ontrack = (e) => {
-        e.streams[0].getTracks().forEach(t => remoteStream.addTrack(t));
-        attachRemoteStream(remoteStream, type);
-        setCallState({ type, status: "connected" });
-      };
-
-      callIdRef.current   = callId;
-      callRoleRef.current = "callee";
-
-      pc.onicecandidate = async ({ candidate }) => {
-        if (!candidate) return;
-        await fetch("/api/calls/ice", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ callId, candidate, role: "callee" }),
-        }).catch(() => {});
-      };
-
-      // Offer'ı al
-      const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
-      const data = await res.json();
-
-      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      // Cevabı sunucuya gönder
-      await fetch("/api/calls/answer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId, sdp: answer }),
-      });
-
-      startIcePolling(callId, "callee");
-
-    } catch (err: unknown) {
-      cleanupCall();
-      setCallState(null);
+      await call.joinCall(callId, type, otherUser);
+    } catch (err) {
       const msg = err instanceof Error ? err.message : "Bilinmeyen hata";
       toast({ title: "Aramaya katılınamadı", description: msg, variant: "destructive" });
     }
-  };
-
-  const endCall = () => {
-    if (callIdRef.current) {
-      fetch("/api/calls/end", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callId: callIdRef.current }),
-      }).catch(() => {});
-    }
-    cleanupCall();
-    setCallState(null);
-    setCallDuration(0);
-  };
-
-  // Mikrofon sessize al/aç
-  const toggleMic = () => {
-    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = micMuted; });
-    setMicMuted(v => !v);
-  };
-
-  // Kamera kapat/aç
-  const toggleCam = () => {
-    localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = camOff; });
-    setCamOff(v => !v);
   };
 
   const handleSend = async () => {
@@ -869,13 +649,13 @@ export default function DirectMessages() {
             {/* Sağ aksiyonlar */}
             <div className="flex items-center flex-shrink-0">
               <button
-                onClick={() => startCall("voice")}
+                onClick={() => handleStartCall("voice")}
                 className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary"
               >
                 <Phone style={{ width: 18, height: 18 }} />
               </button>
               <button
-                onClick={() => startCall("video")}
+                onClick={() => handleStartCall("video")}
                 className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary"
               >
                 <Video style={{ width: 20, height: 20 }} />
@@ -987,7 +767,7 @@ export default function DirectMessages() {
                                     </div>
                                     {!isMe && callId && (
                                       <button
-                                        onClick={() => joinCall(callId, callType)}
+                                        onClick={() => handleJoinCall(callId, callType)}
                                         className="flex-shrink-0 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[12px] font-bold hover:bg-primary/90 active:scale-95 transition-all"
                                       >
                                         Katıl
@@ -1121,106 +901,6 @@ export default function DirectMessages() {
               )}
             </div>
           </div>
-
-          {/* ── Gizli ses/video elemanları ── */}
-          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-          <audio ref={el => { if (el) remoteAudioRef.current = el; }} autoPlay playsInline className="hidden" />
-
-          {/* ── Arama Ekranı Modalı ── */}
-          {callState && (
-            <div className="fixed inset-0 z-[70] flex flex-col bg-gradient-to-b from-violet-950 via-purple-900 to-fuchsia-900">
-
-              {/* Görüntülü arama: uzak video arka plan */}
-              {callState.type === "video" && (
-                <>
-                  <video
-                    ref={remoteVideoRef}
-                    autoPlay playsInline
-                    className="absolute inset-0 w-full h-full object-cover opacity-80"
-                  />
-                  {/* Yerel video — küçük, sağ üst */}
-                  <div className="absolute top-14 right-4 w-28 aspect-[9/16] rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl z-10 bg-black">
-                    {!camOff ? (
-                      <video ref={localVideoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-zinc-800">
-                        <Video className="w-6 h-6 text-white/40" />
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-
-              {/* Üst: kullanıcı bilgisi */}
-              <div className="relative z-10 flex flex-col items-center pt-20 gap-4">
-                {callState.type === "voice" && (
-                  <div className="relative">
-                    <Avatar className="w-28 h-28 ring-4 ring-white/20 shadow-2xl">
-                      <AvatarImage src={otherUser?.avatarUrl || ""} />
-                      <AvatarFallback className="bg-violet-600 text-white text-4xl font-bold">
-                        {otherUser?.displayName?.charAt(0) ?? "?"}
-                      </AvatarFallback>
-                    </Avatar>
-                    {callState.status === "calling" && (
-                      <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
-                    )}
-                  </div>
-                )}
-                <div className="text-center">
-                  <p className="text-white text-xl font-bold drop-shadow">{otherUser?.displayName}</p>
-                  <p className="text-white/70 text-sm mt-1 drop-shadow">
-                    {callState.status === "calling"
-                      ? (callState.type === "voice" ? "Sesli aranıyor…" : "Görüntülü aranıyor…")
-                      : fmtDuration(callDuration)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Alt: kontrol butonları */}
-              <div className="absolute bottom-14 left-0 right-0 z-10 flex items-center justify-center gap-5">
-                {/* Mikrofon */}
-                <button
-                  onClick={toggleMic}
-                  className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${micMuted ? "bg-white" : "bg-white/20"}`}
-                >
-                  <Mic className={`w-6 h-6 ${micMuted ? "text-purple-900" : "text-white"}`} />
-                  <span className={`text-[9px] font-medium ${micMuted ? "text-purple-700" : "text-white/70"}`}>
-                    {micMuted ? "Sessiz" : "Mikrofon"}
-                  </span>
-                </button>
-
-                {/* Bitir */}
-                <button
-                  onClick={endCall}
-                  className="w-16 h-16 rounded-full bg-red-500 flex flex-col items-center justify-center gap-0.5 shadow-2xl hover:bg-red-600 active:scale-95 transition-all"
-                >
-                  <Phone className="w-7 h-7 text-white rotate-[135deg]" />
-                  <span className="text-[9px] text-white/80 font-medium">Bitir</span>
-                </button>
-
-                {/* Kamera (sadece görüntülü) */}
-                {callState.type === "video" && (
-                  <button
-                    onClick={toggleCam}
-                    className={`w-14 h-14 rounded-full flex flex-col items-center justify-center gap-0.5 transition-all ${camOff ? "bg-white" : "bg-white/20"}`}
-                  >
-                    <Video className={`w-6 h-6 ${camOff ? "text-purple-900" : "text-white"}`} />
-                    <span className={`text-[9px] font-medium ${camOff ? "text-purple-700" : "text-white/70"}`}>
-                      {camOff ? "Kapalı" : "Kamera"}
-                    </span>
-                  </button>
-                )}
-
-                {/* Hoparlör (sadece sesli) */}
-                {callState.type === "voice" && (
-                  <button className="w-14 h-14 rounded-full bg-white/20 flex flex-col items-center justify-center gap-0.5">
-                    <span className="text-2xl leading-none">🔊</span>
-                    <span className="text-[9px] text-white/70 font-medium">Hoparlör</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
         </div>
       </AppLayout>
