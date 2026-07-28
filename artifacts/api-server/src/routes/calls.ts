@@ -6,8 +6,8 @@ import { requireAuth } from "../lib/auth";
 
 const router = Router();
 
-// ── POST /api/calls/offer ──────────────────────────────────────────────────
-router.post("/api/calls/offer", requireAuth, async (req, res) => {
+// ── POST /calls/offer ──────────────────────────────────────────────────────
+router.post("/calls/offer", requireAuth, async (req, res) => {
   const { callId, callType, calleeId, sdp } = req.body as {
     callId: string; callType: string; calleeId: number;
     sdp: object;
@@ -25,8 +25,8 @@ router.post("/api/calls/offer", requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-// ── GET /api/calls/:callId ─────────────────────────────────────────────────
-router.get("/api/calls/:callId", requireAuth, async (req, res) => {
+// ── GET /calls/:callId ─────────────────────────────────────────────────────
+router.get("/calls/:callId", requireAuth, async (req, res) => {
   const rows = await db
     .select()
     .from(callSignalsTable)
@@ -49,8 +49,8 @@ router.get("/api/calls/:callId", requireAuth, async (req, res) => {
   });
 });
 
-// ── POST /api/calls/answer ────────────────────────────────────────────────
-router.post("/api/calls/answer", requireAuth, async (req, res) => {
+// ── POST /calls/answer ────────────────────────────────────────────────────
+router.post("/calls/answer", requireAuth, async (req, res) => {
   const { callId, sdp } = req.body as { callId: string; sdp: object };
   if (!callId || !sdp) return res.status(400).json({ error: "missing fields" });
 
@@ -70,8 +70,8 @@ router.post("/api/calls/answer", requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-// ── POST /api/calls/ice ───────────────────────────────────────────────────
-router.post("/api/calls/ice", requireAuth, async (req, res) => {
+// ── POST /calls/ice ───────────────────────────────────────────────────────
+router.post("/calls/ice", requireAuth, async (req, res) => {
   const { callId, candidate, role } = req.body as {
     callId: string; candidate: object; role: "caller" | "callee";
   };
@@ -106,8 +106,8 @@ router.post("/api/calls/ice", requireAuth, async (req, res) => {
   return res.json({ ok: true });
 });
 
-// ── POST /api/calls/end ───────────────────────────────────────────────────
-router.post("/api/calls/end", requireAuth, async (req, res) => {
+// ── POST /calls/end ───────────────────────────────────────────────────────
+router.post("/calls/end", requireAuth, async (req, res) => {
   const { callId } = req.body as { callId: string };
   if (callId) {
     await db
