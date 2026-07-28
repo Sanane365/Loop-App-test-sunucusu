@@ -124,13 +124,14 @@ export default function Admin() {
   }, [user]); // user değiştiğinde tetiklenir
 
   const fetchAll = async () => {
-    console.log("fetchAll tetiklendi!"); // Bunu ekle
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/users");
-      if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
-      const data = await res.json();
-      setUsers(data.data ?? data);
+      const [usersRes, bansRes] = await Promise.all([
+        fetch("/api/admin/users"),
+        fetch("/api/admin/bans"),
+      ]);
+      if (usersRes.ok) setUsers(await usersRes.json());
+      if (bansRes.ok) setBans(await bansRes.json());
     } catch (error) {
       console.error("Veri çekme hatası:", error);
     } finally {
@@ -194,18 +195,22 @@ export default function Admin() {
   };
 
   const handleChangeRole = async (userId: number, role: string) => {
-    setUsers((prevUsers) => {
-      const updated = prevUsers.map((u) =>
-        u.id === userId ? { ...u, role: role } : u,
-      );
-      localStorage.setItem("loop_test_users", JSON.stringify(updated));
-      return updated;
-    });
-
-    toast({
-      title: "Rol güncellendi",
-      description: `Kullanıcı rolü local hafızada '${role}' yapıldı ve kaydedildi.`,
-    });
+    try {
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ title: "Hata", description: err.error ?? "Rol değiştirilemedi", variant: "destructive" });
+        return;
+      }
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u));
+      toast({ title: "Rol güncellendi", description: `Kullanıcı rolü '${role}' yapıldı.` });
+    } catch {
+      toast({ title: "Bağlantı hatası", variant: "destructive" });
+    }
   };
 
   const handleIpBan = async () => {

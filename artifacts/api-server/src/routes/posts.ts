@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import {
-  postsTable, likesTable, repostsTable, bookmarksTable, commentsTable, followsTable, notificationsTable,
+  postsTable, likesTable, repostsTable, bookmarksTable, commentsTable,
+  commentLikesTable, pollVotesTable, followsTable, notificationsTable,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -31,21 +32,23 @@ router.get("/posts", async (req, res) => {
     const userId = req.query["userId"] ? parseInt(req.query["userId"] as string) : undefined;
     const bookmarked = req.query["bookmarked"] === "true";
     const liked = req.query["liked"] === "true";
+    const reposted = req.query["reposted"] === "true";
+    const saved = req.query["saved"] === "true";
     const mediaOnly = req.query["mediaOnly"] === "true";
+    const postType = req.query["postType"] as string | undefined;
     const page = req.query["page"] ? parseInt(req.query["page"] as string) : 1;
     const limit = 20;
     const offset = (page - 1) * limit;
 
     let posts;
 
-    if (bookmarked && viewerId) {
+    if ((saved || bookmarked) && viewerId) {
       const bms = await db
         .select({ postId: bookmarksTable.postId })
         .from(bookmarksTable)
         .where(eq(bookmarksTable.userId, viewerId))
         .orderBy(desc(bookmarksTable.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .limit(limit).offset(offset);
       const ids = bms.map((b) => b.postId);
       posts = ids.length > 0 ? await db.select().from(postsTable).where(inArray(postsTable.id, ids)) : [];
     } else if (liked && viewerId) {
@@ -54,21 +57,29 @@ router.get("/posts", async (req, res) => {
         .from(likesTable)
         .where(eq(likesTable.userId, viewerId))
         .orderBy(desc(likesTable.createdAt))
-        .limit(limit)
-        .offset(offset);
+        .limit(limit).offset(offset);
       const ids = lks.map((l) => l.postId);
       posts = ids.length > 0 ? await db.select().from(postsTable).where(inArray(postsTable.id, ids)) : [];
+    } else if (reposted && viewerId) {
+      const rps = await db
+        .select({ postId: repostsTable.postId })
+        .from(repostsTable)
+        .where(eq(repostsTable.userId, viewerId))
+        .orderBy(desc(repostsTable.createdAt))
+        .limit(limit).offset(offset);
+      const ids = rps.map((r) => r.postId);
+      posts = ids.length > 0 ? await db.select().from(postsTable).where(inArray(postsTable.id, ids)) : [];
     } else if (userId) {
-      let q = db.select().from(postsTable).where(eq(postsTable.userId, userId)).$dynamic();
-      if (mediaOnly) q = q.where(and(eq(postsTable.userId, userId), sql`${postsTable.mediaUrl} IS NOT NULL`));
+      let q = db.select().from(postsTable).$dynamic();
+      const conditions = [eq(postsTable.userId, userId)];
+      if (mediaOnly) conditions.push(sql`${postsTable.mediaUrl} IS NOT NULL` as any);
+      if (postType) conditions.push(eq(postsTable.postType, postType));
+      q = q.where(and(...conditions));
       posts = await q.orderBy(desc(postsTable.createdAt)).limit(limit).offset(offset);
     } else {
-      posts = await db
-        .select()
-        .from(postsTable)
-        .orderBy(desc(postsTable.createdAt))
-        .limit(limit)
-        .offset(offset);
+      let q = db.select().from(postsTable).$dynamic();
+      if (postType) q = q.where(eq(postsTable.postType, postType));
+      posts = await q.orderBy(desc(postsTable.createdAt)).limit(limit).offset(offset);
     }
 
     const enriched = await Promise.all(posts.map((p) => enrichPost(p, viewerId)));
@@ -81,15 +92,19 @@ router.get("/posts", async (req, res) => {
 
 router.post("/posts", requireAuth, async (req, res) => {
   try {
-    const { content, mediaUrl, mediaType } = req.body;
-    if (!content) {
-      res.status(400).json({ error: "Content required" });
-      return;
-    }
+    const { content, mediaUrl, mediaType, postType, pollOptions } = req.body;
+    if (!content) { res.status(400).json({ error: "Content required" }); return; }
 
     const [post] = await db
       .insert(postsTable)
-      .values({ userId: req.user!.id, content, mediaUrl, mediaType })
+      .values({
+        userId: req.user!.id,
+        content,
+        mediaUrl,
+        mediaType,
+        postType: postType ?? "post",
+        pollOptions: pollOptions ?? null,
+      })
       .returning();
 
     const enriched = await enrichPost(post, req.user!.id);
@@ -102,10 +117,7 @@ router.post("/posts", requireAuth, async (req, res) => {
 
 router.post("/posts/upload", requireAuth, upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) {
-      res.status(400).json({ error: "No file uploaded" });
-      return;
-    }
+    if (!req.file) { res.status(400).json({ error: "No file uploaded" }); return; }
     const url = `/api/uploads/${req.file.filename}`;
     const type = req.file.mimetype.startsWith("video") ? "video" : "image";
     res.json({ url, type });
@@ -117,15 +129,11 @@ router.post("/posts/upload", requireAuth, upload.single("file"), async (req, res
 
 router.get("/posts/:postId", async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
+    const postId = parseInt(req.params["postId"] as string);
     const viewerId = req.user?.id;
     const posts = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
-    if (!posts[0]) {
-      res.status(404).json({ error: "Post not found" });
-      return;
-    }
-    const enriched = await enrichPost(posts[0], viewerId);
-    res.json(enriched);
+    if (!posts[0]) { res.status(404).json({ error: "Post not found" }); return; }
+    res.json(await enrichPost(posts[0], viewerId));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -134,10 +142,8 @@ router.get("/posts/:postId", async (req, res) => {
 
 router.delete("/posts/:postId", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
-    await db
-      .delete(postsTable)
-      .where(and(eq(postsTable.id, postId), eq(postsTable.userId, req.user!.id)));
+    const postId = parseInt(req.params["postId"] as string);
+    await db.delete(postsTable).where(and(eq(postsTable.id, postId), eq(postsTable.userId, req.user!.id)));
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
@@ -147,19 +153,12 @@ router.delete("/posts/:postId", requireAuth, async (req, res) => {
 
 router.post("/posts/:postId/like", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
+    const postId = parseInt(req.params["postId"] as string);
     await db.insert(likesTable).values({ userId: req.user!.id, postId }).onConflictDoNothing();
-
     const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
     if (post[0] && post[0].userId !== req.user!.id) {
-      await db.insert(notificationsTable).values({
-        userId: post[0].userId,
-        fromUserId: req.user!.id,
-        postId,
-        type: "like",
-      }).onConflictDoNothing();
+      await db.insert(notificationsTable).values({ userId: post[0].userId, fromUserId: req.user!.id, postId, type: "like" }).onConflictDoNothing();
     }
-
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
@@ -169,10 +168,8 @@ router.post("/posts/:postId/like", requireAuth, async (req, res) => {
 
 router.post("/posts/:postId/unlike", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
-    await db
-      .delete(likesTable)
-      .where(and(eq(likesTable.userId, req.user!.id), eq(likesTable.postId, postId)));
+    const postId = parseInt(req.params["postId"] as string);
+    await db.delete(likesTable).where(and(eq(likesTable.userId, req.user!.id), eq(likesTable.postId, postId)));
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
@@ -182,19 +179,12 @@ router.post("/posts/:postId/unlike", requireAuth, async (req, res) => {
 
 router.post("/posts/:postId/repost", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
+    const postId = parseInt(req.params["postId"] as string);
     await db.insert(repostsTable).values({ userId: req.user!.id, postId }).onConflictDoNothing();
-
     const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
     if (post[0] && post[0].userId !== req.user!.id) {
-      await db.insert(notificationsTable).values({
-        userId: post[0].userId,
-        fromUserId: req.user!.id,
-        postId,
-        type: "repost",
-      }).onConflictDoNothing();
+      await db.insert(notificationsTable).values({ userId: post[0].userId, fromUserId: req.user!.id, postId, type: "repost" }).onConflictDoNothing();
     }
-
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
@@ -204,17 +194,11 @@ router.post("/posts/:postId/repost", requireAuth, async (req, res) => {
 
 router.post("/posts/:postId/bookmark", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
-    const existing = await db
-      .select()
-      .from(bookmarksTable)
-      .where(and(eq(bookmarksTable.userId, req.user!.id), eq(bookmarksTable.postId, postId)))
-      .limit(1);
-
+    const postId = parseInt(req.params["postId"] as string);
+    const existing = await db.select().from(bookmarksTable)
+      .where(and(eq(bookmarksTable.userId, req.user!.id), eq(bookmarksTable.postId, postId))).limit(1);
     if (existing[0]) {
-      await db
-        .delete(bookmarksTable)
-        .where(and(eq(bookmarksTable.userId, req.user!.id), eq(bookmarksTable.postId, postId)));
+      await db.delete(bookmarksTable).where(and(eq(bookmarksTable.userId, req.user!.id), eq(bookmarksTable.postId, postId)));
     } else {
       await db.insert(bookmarksTable).values({ userId: req.user!.id, postId }).onConflictDoNothing();
     }
@@ -225,26 +209,50 @@ router.post("/posts/:postId/bookmark", requireAuth, async (req, res) => {
   }
 });
 
+// ── Poll vote ────────────────────────────────────────────────────────────────
+router.post("/posts/:postId/vote", requireAuth, async (req, res) => {
+  try {
+    const postId = parseInt(req.params["postId"] as string);
+    const { optionIndex } = req.body;
+    if (optionIndex === undefined || optionIndex === null) { res.status(400).json({ error: "optionIndex required" }); return; }
+    await db.insert(pollVotesTable).values({ postId, userId: req.user!.id, optionIndex }).onConflictDoNothing();
+    const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+    res.json(await enrichPost(post[0]!, req.user!.id));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Comments ─────────────────────────────────────────────────────────────────
 router.get("/posts/:postId/comments", async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
+    const postId = parseInt(req.params["postId"] as string);
     const viewerId = req.user?.id;
-    const comments = await db
-      .select()
-      .from(commentsTable)
-      .where(eq(commentsTable.postId, postId))
-      .orderBy(desc(commentsTable.createdAt));
+    const comments = await db.select().from(commentsTable).where(eq(commentsTable.postId, postId)).orderBy(desc(commentsTable.createdAt));
 
-    const enriched = await Promise.all(
-      comments.map(async (c) => ({
+    const enriched = await Promise.all(comments.map(async (c) => {
+      // Like count for this comment
+      const [likeCount] = await db.select({ count: sql<number>`cast(count(*) as int)` })
+        .from(commentLikesTable).where(eq(commentLikesTable.commentId, c.id));
+      let isLiked = false;
+      if (viewerId) {
+        const like = await db.select().from(commentLikesTable)
+          .where(and(eq(commentLikesTable.userId, viewerId), eq(commentLikesTable.commentId, c.id))).limit(1);
+        isLiked = like.length > 0;
+      }
+      return {
         id: c.id,
         postId: c.postId,
         userId: c.userId,
         user: await getUserWithStats(c.userId, viewerId),
         content: c.content,
+        replyToId: c.replyToId,
+        likeCount: likeCount?.count ?? 0,
+        isLiked,
         createdAt: c.createdAt.toISOString(),
-      }))
-    );
+      };
+    }));
     res.json(enriched);
   } catch (err) {
     req.log.error(err);
@@ -254,30 +262,44 @@ router.get("/posts/:postId/comments", async (req, res) => {
 
 router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
   try {
-    const postId = parseInt(req.params["postId"]!);
-    const { content } = req.body;
-    if (!content) {
-      res.status(400).json({ error: "Content required" });
-      return;
-    }
+    const postId = parseInt(req.params["postId"] as string);
+    const { content, replyToId } = req.body;
+    if (!content) { res.status(400).json({ error: "Content required" }); return; }
 
-    const [comment] = await db
-      .insert(commentsTable)
-      .values({ postId, userId: req.user!.id, content })
+    const [comment] = await db.insert(commentsTable)
+      .values({ postId, userId: req.user!.id, content, replyToId: replyToId ?? null })
       .returning();
 
     const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
     if (post[0] && post[0].userId !== req.user!.id) {
-      await db.insert(notificationsTable).values({
-        userId: post[0].userId,
-        fromUserId: req.user!.id,
-        postId,
-        type: "comment",
-      });
+      await db.insert(notificationsTable).values({ userId: post[0].userId, fromUserId: req.user!.id, postId, type: "comment" });
     }
 
     const user = await getUserWithStats(req.user!.id, req.user!.id);
-    res.status(201).json({ ...comment, user, createdAt: comment.createdAt.toISOString() });
+    res.status(201).json({ ...comment, user, likeCount: 0, isLiked: false, createdAt: comment.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Comment likes ─────────────────────────────────────────────────────────────
+router.post("/posts/:postId/comments/:commentId/like", requireAuth, async (req, res) => {
+  try {
+    const commentId = parseInt(req.params["commentId"] as string);
+    await db.insert(commentLikesTable).values({ commentId, userId: req.user!.id }).onConflictDoNothing();
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.delete("/posts/:postId/comments/:commentId/like", requireAuth, async (req, res) => {
+  try {
+    const commentId = parseInt(req.params["commentId"] as string);
+    await db.delete(commentLikesTable).where(and(eq(commentLikesTable.userId, req.user!.id), eq(commentLikesTable.commentId, commentId)));
+    res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
@@ -287,11 +309,7 @@ router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
 router.get("/explore/trending", async (req, res) => {
   try {
     const viewerId = req.user?.id;
-    const posts = await db
-      .select()
-      .from(postsTable)
-      .orderBy(desc(postsTable.createdAt))
-      .limit(20);
+    const posts = await db.select().from(postsTable).orderBy(desc(postsTable.createdAt)).limit(20);
     const enriched = await Promise.all(posts.map((p) => enrichPost(p, viewerId)));
     res.json(enriched);
   } catch (err) {

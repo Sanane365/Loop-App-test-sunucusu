@@ -1,8 +1,9 @@
 import { db } from "@workspace/db";
 import {
   usersTable, followsTable, postsTable, likesTable, repostsTable, bookmarksTable, commentsTable,
+  commentLikesTable, pollVotesTable,
 } from "@workspace/db";
-import { eq, sql, and, inArray, desc } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 
 export async function getUserWithStats(userId: number, viewerId?: number) {
   const user = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -84,28 +85,40 @@ export async function enrichPost(post: typeof postsTable.$inferSelect, viewerId?
   let isLiked = false;
   let isBookmarked = false;
   let isReposted = false;
+  let myPollVote: number | null = null;
 
   if (viewerId) {
-    const like = await db
-      .select()
-      .from(likesTable)
-      .where(and(eq(likesTable.userId, viewerId), eq(likesTable.postId, post.id)))
-      .limit(1);
+    const like = await db.select().from(likesTable)
+      .where(and(eq(likesTable.userId, viewerId), eq(likesTable.postId, post.id))).limit(1);
     isLiked = like.length > 0;
 
-    const bookmark = await db
-      .select()
-      .from(bookmarksTable)
-      .where(and(eq(bookmarksTable.userId, viewerId), eq(bookmarksTable.postId, post.id)))
-      .limit(1);
+    const bookmark = await db.select().from(bookmarksTable)
+      .where(and(eq(bookmarksTable.userId, viewerId), eq(bookmarksTable.postId, post.id))).limit(1);
     isBookmarked = bookmark.length > 0;
 
-    const repost = await db
-      .select()
-      .from(repostsTable)
-      .where(and(eq(repostsTable.userId, viewerId), eq(repostsTable.postId, post.id)))
-      .limit(1);
+    const repost = await db.select().from(repostsTable)
+      .where(and(eq(repostsTable.userId, viewerId), eq(repostsTable.postId, post.id))).limit(1);
     isReposted = repost.length > 0;
+
+    if (post.postType === "poll") {
+      const vote = await db.select().from(pollVotesTable)
+        .where(and(eq(pollVotesTable.userId, viewerId), eq(pollVotesTable.postId, post.id))).limit(1);
+      myPollVote = vote[0]?.optionIndex ?? null;
+    }
+  }
+
+  // Poll vote counts per option
+  let pollVoteCounts: number[] | null = null;
+  if (post.postType === "poll" && post.pollOptions) {
+    const opts = post.pollOptions as string[];
+    const counts = await Promise.all(
+      opts.map((_, i) =>
+        db.select({ count: sql<number>`cast(count(*) as int)` }).from(pollVotesTable)
+          .where(and(eq(pollVotesTable.postId, post.id), eq(pollVotesTable.optionIndex, i)))
+          .then(r => r[0]?.count ?? 0)
+      )
+    );
+    pollVoteCounts = counts;
   }
 
   return {
@@ -115,6 +128,10 @@ export async function enrichPost(post: typeof postsTable.$inferSelect, viewerId?
     content: post.content,
     mediaUrl: post.mediaUrl,
     mediaType: post.mediaType,
+    postType: post.postType,
+    pollOptions: post.pollOptions as string[] | null,
+    pollVoteCounts,
+    myPollVote,
     likeCount: likeCount?.count ?? 0,
     commentCount: commentCount?.count ?? 0,
     repostCount: repostCount?.count ?? 0,

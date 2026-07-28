@@ -141,6 +141,13 @@ export default function DirectMessages() {
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
 
+  // Voice recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   // GIF picker state
   const [gifOpen, setGifOpen] = useState(false);
   const [gifSearch, setGifSearch] = useState("");
@@ -571,16 +578,12 @@ export default function DirectMessages() {
     try {
       const query = q ?? gifSearch;
       const endpoint = !query
-        ? `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=20&media_filter=minimal`
-        : `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=20&media_filter=minimal`;
+        ? `/api/gif/trending`
+        : `/api/gif/search?q=${encodeURIComponent(query)}`;
       const res = await fetch(endpoint);
-      const data = await res.json();
-      setGifs(
-        (data.results ?? []).map((r: any) => ({
-          url: r.media[0]?.gif?.url ?? r.media[0]?.tinygif?.url ?? "",
-          preview: r.media[0]?.tinygif?.url ?? r.media[0]?.gif?.url ?? "",
-        })).filter((g: { url: string }) => g.url)
-      );
+      if (!res.ok) throw new Error("GIF API hatası");
+      const data: { url: string; preview: string }[] = await res.json();
+      setGifs(data);
     } catch { setGifs([]); }
     finally { setGifLoading(false); }
   };
@@ -589,6 +592,52 @@ export default function DirectMessages() {
     setShowPlusMenu(false);
     setGifOpen(true);
     if (gifs.length === 0) searchGifs("");
+  };
+
+  // ── Voice recording ────────────────────────────────────────────────────────
+  const startRecording = async () => {
+    if (!userId) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.start();
+      mediaRecorderRef.current = mr;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+    } catch {
+      toast({ title: "Mikrofon erişimi reddedildi", variant: "destructive" });
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!mediaRecorderRef.current || !userId) return;
+    setIsRecording(false);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    const mr = mediaRecorderRef.current;
+    const duration = recordingSeconds;
+    mediaRecorderRef.current = null;
+    mr.stop();
+    mr.stream.getTracks().forEach(t => t.stop());
+    mr.onstop = async () => {
+      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const formData = new FormData();
+      formData.append("file", blob, "voice.webm");
+      formData.append("duration", String(duration));
+      try {
+        const res = await fetch(`/api/dm/${userId}/voice`, { method: "POST", body: formData });
+        if (res.ok) {
+          fetchMessages(parseInt(userId));
+          fetchConversations();
+        } else {
+          toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
+      }
+    };
   };
 
   const handleSendGif = async (url: string) => {
@@ -999,9 +1048,16 @@ export default function DirectMessages() {
                   <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
                     <Smile className="w-5 h-5" />
                   </button>
-                  <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                  <button
+                    onPointerDown={startRecording}
+                    onPointerUp={stopRecording}
+                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${isRecording ? "bg-red-500 text-white animate-pulse" : "hover:bg-muted text-muted-foreground"}`}
+                  >
                     <Mic className="w-5 h-5" />
                   </button>
+                  {isRecording && (
+                    <span className="text-[11px] text-red-500 font-semibold animate-pulse">{recordingSeconds}s</span>
+                  )}
                 </div>
               )}
             </div>

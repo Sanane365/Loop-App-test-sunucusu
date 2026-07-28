@@ -99,6 +99,13 @@ export default function Chat() {
     if (res.ok) setActiveUsers(await res.json());
   }, []);
 
+  // Auto-refresh active users every 30s
+  useEffect(() => {
+    fetchActiveUsers();
+    const t = setInterval(fetchActiveUsers, 30000);
+    return () => clearInterval(t);
+  }, [fetchActiveUsers]);
+
   const openPanel = useCallback(() => {
     fetchActiveUsers();
     setPanelOpen(true);
@@ -178,16 +185,14 @@ export default function Chat() {
   const searchGifs = async (q?: string) => {
     setGifLoading(true);
     try {
-      const query = (q ?? gifSearch) || "trending";
-      const endpoint = (q === undefined && !gifSearch)
-        ? `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=16&media_filter=minimal`
-        : `https://api.tenor.com/v1/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=16&media_filter=minimal`;
+      const query = q ?? gifSearch;
+      const endpoint = !query
+        ? `/api/gif/trending`
+        : `/api/gif/search?q=${encodeURIComponent(query)}`;
       const res = await fetch(endpoint);
-      const data = await res.json();
-      setGifs(data.results?.map((r: any) => ({
-        url: r.media[0]?.gif?.url ?? r.media[0]?.tinygif?.url,
-        preview: r.media[0]?.tinygif?.url ?? r.media[0]?.gif?.url,
-      })).filter((g: any) => g.url) ?? []);
+      if (!res.ok) throw new Error("GIF API hatası");
+      const data: { url: string; preview: string }[] = await res.json();
+      setGifs(data);
     } catch { setGifs([]); }
     finally { setGifLoading(false); }
   };
@@ -409,7 +414,7 @@ export default function Chat() {
             <h1 className="font-black italic text-xl leading-tight tracking-tight">Genel Sohbet</h1>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span className="text-xs text-muted-foreground font-medium">87 çevrimiçi</span>
+              <span className="text-xs text-muted-foreground font-medium">{activeUsers.length > 0 ? `${activeUsers.length} çevrimiçi` : "Yükleniyor..."}</span>
             </div>
           </div>
 

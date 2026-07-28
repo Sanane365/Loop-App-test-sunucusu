@@ -5,6 +5,7 @@
  * Loop Social Media API
  * OpenAPI spec version: 0.1.0
  */
+import type { PostInputPostType } from './postInputPostType';
 
 export interface PostInput {
   content: string;
@@ -12,4 +13,6 @@ export interface PostInput {
   mediaUrl?: string | null;
   /** @nullable */
   mediaType?: string | null;
+  postType?: PostInputPostType;
+  pollOptions?: string[];
 }

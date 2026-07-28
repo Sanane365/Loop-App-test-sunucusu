@@ -13,6 +13,7 @@ import adminRouter from "./admin";
 import dmRouter from "./dm";
 import loopRouter from "./loop";
 import callsRouter from "./calls";
+import gifRouter from "./gif";
 
 const router: IRouter = Router();
 
@@ -29,6 +30,7 @@ router.use("/admin", adminRouter);
 router.use(dmRouter);
 router.use(loopRouter);
 router.use(callsRouter);
+router.use(gifRouter);
 
 // ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
 // Bu dosya sadece API'yi yönetmeli.

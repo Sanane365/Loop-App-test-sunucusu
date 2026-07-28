@@ -202,7 +202,13 @@ export const UploadAvatarResponse = zod.object({
  */
 export const ListPostsQueryParams = zod.object({
   "page": zod.coerce.number().optional(),
-  "userId": zod.coerce.number().nullish()
+  "userId": zod.coerce.number().nullish(),
+  "postType": zod.coerce.string().nullish(),
+  "bookmarked": zod.coerce.boolean().nullish(),
+  "liked": zod.coerce.boolean().nullish(),
+  "reposted": zod.coerce.boolean().nullish(),
+  "saved": zod.coerce.boolean().nullish(),
+  "mediaOnly": zod.coerce.boolean().nullish()
 })
 
 export const ListPostsResponseItem = zod.object({
@@ -243,7 +249,9 @@ export const ListPostsResponse = zod.array(ListPostsResponseItem)
 export const CreatePostBody = zod.object({
   "content": zod.string(),
   "mediaUrl": zod.string().nullish(),
-  "mediaType": zod.string().nullish()
+  "mediaType": zod.string().nullish(),
+  "postType": zod.enum(['post', 'bulletin', 'poll']).optional(),
+  "pollOptions": zod.array(zod.string()).optional()
 })
 
 

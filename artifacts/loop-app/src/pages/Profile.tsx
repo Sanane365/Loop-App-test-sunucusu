@@ -56,6 +56,12 @@ export default function Profile() {
   const [mediaLoading, setMediaLoading] = useState(false);
   const [likedPosts, setLikedPosts] = useState<any[] | null>(null);
   const [likedLoading, setLikedLoading] = useState(false);
+  const [bulletinPosts, setBulletinPosts] = useState<any[] | null>(null);
+  const [bulletinLoading, setBulletinLoading] = useState(false);
+  const [repostedPosts, setRepostedPosts] = useState<any[] | null>(null);
+  const [repostedLoading, setRepostedLoading] = useState(false);
+  const [savedPosts, setSavedPosts] = useState<any[] | null>(null);
+  const [savedLoading, setSavedLoading] = useState(false);
 
   const handleTabChange = async (tab: Tab) => {
     setActiveTab(tab);
@@ -74,6 +80,30 @@ export default function Profile() {
         setLikedPosts(await r.json());
       } catch { setLikedPosts([]); }
       finally { setLikedLoading(false); }
+    }
+    if (tab === "bulletin" && bulletinPosts === null && !bulletinLoading) {
+      setBulletinLoading(true);
+      try {
+        const r = await fetch(`/api/posts?userId=${targetUserId}&postType=bulletin`);
+        setBulletinPosts(await r.json());
+      } catch { setBulletinPosts([]); }
+      finally { setBulletinLoading(false); }
+    }
+    if (tab === "reposted" && repostedPosts === null && !repostedLoading) {
+      setRepostedLoading(true);
+      try {
+        const r = await fetch(`/api/posts?reposted=true`);
+        setRepostedPosts(await r.json());
+      } catch { setRepostedPosts([]); }
+      finally { setRepostedLoading(false); }
+    }
+    if (tab === "saved" && savedPosts === null && !savedLoading && isMe) {
+      setSavedLoading(true);
+      try {
+        const r = await fetch("/api/posts?saved=true");
+        setSavedPosts(await r.json());
+      } catch { setSavedPosts([]); }
+      finally { setSavedLoading(false); }
     }
   };
 
@@ -229,8 +259,20 @@ export default function Profile() {
   const postCount = (profile as any).postCount ?? 0;
   const spotifyTrackId = (profile as any).spotifyTrackId as string | null | undefined;
 
-  const currentPosts = activeTab === "posts" ? posts : activeTab === "reels" ? mediaPosts : likedPosts;
-  const currentLoading = activeTab === "posts" ? postsLoading : activeTab === "reels" ? mediaLoading : likedLoading;
+  const currentPosts =
+    activeTab === "posts" ? posts :
+    activeTab === "reels" ? mediaPosts :
+    activeTab === "liked" ? likedPosts :
+    activeTab === "bulletin" ? bulletinPosts :
+    activeTab === "reposted" ? repostedPosts :
+    activeTab === "saved" ? savedPosts : null;
+  const currentLoading =
+    activeTab === "posts" ? postsLoading :
+    activeTab === "reels" ? mediaLoading :
+    activeTab === "liked" ? likedLoading :
+    activeTab === "bulletin" ? bulletinLoading :
+    activeTab === "reposted" ? repostedLoading :
+    activeTab === "saved" ? savedLoading : false;
 
   return (
     <AppLayout>

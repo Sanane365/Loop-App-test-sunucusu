@@ -21,6 +21,7 @@ export * from './notification';
 export * from './notificationType';
 export * from './post';
 export * from './postInput';
+export * from './postInputPostType';
 export * from './profileUpdate';
 export * from './registerInput';
 export * from './story';

@@ -84,12 +84,23 @@ export interface UploadResult {
   type: string;
 }
 
+export type PostInputPostType = typeof PostInputPostType[keyof typeof PostInputPostType];
+
+
+export const PostInputPostType = {
+  post: 'post',
+  bulletin: 'bulletin',
+  poll: 'poll',
+} as const;
+
 export interface PostInput {
   content: string;
   /** @nullable */
   mediaUrl?: string | null;
   /** @nullable */
   mediaType?: string | null;
+  postType?: PostInputPostType;
+  pollOptions?: string[];
 }
 
 export interface Comment {
@@ -218,6 +229,30 @@ page?: number;
  * @nullable
  */
 userId?: number | null;
+/**
+ * @nullable
+ */
+postType?: string | null;
+/**
+ * @nullable
+ */
+bookmarked?: boolean | null;
+/**
+ * @nullable
+ */
+liked?: boolean | null;
+/**
+ * @nullable
+ */
+reposted?: boolean | null;
+/**
+ * @nullable
+ */
+saved?: boolean | null;
+/**
+ * @nullable
+ */
+mediaOnly?: boolean | null;
 };
 
 export type ListChatMessagesParams = {

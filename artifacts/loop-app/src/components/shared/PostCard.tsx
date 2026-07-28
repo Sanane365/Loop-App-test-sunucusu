@@ -39,11 +39,14 @@ function CommentBottomSheet({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
+  const [replyingToId, setReplyingToId] = useState<number | null>(null);
+  const [commentLikes, setCommentLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
   const [dragOffset, setDragOffset] = useState(0);
   const [visible, setVisible] = useState(false);
   const startYRef = useRef<number | null>(null);
   const isDraggingRef = useRef(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: comments, isLoading: commentsLoading } = useListComments(postId, {
     query: { enabled: isOpen, queryKey: getListCommentsQueryKey(postId) }
@@ -85,13 +88,43 @@ function CommentBottomSheet({
 
   const handleAddComment = () => {
     if (!newComment.trim()) return;
-    createCommentMutation.mutate({ postId, data: { content: newComment } }, {
-      onSuccess: () => {
-        setNewComment("");
-        queryClient.invalidateQueries({ queryKey: getListCommentsQueryKey(postId) });
-        queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
+    createCommentMutation.mutate(
+      { postId, data: { content: newComment, replyToId: replyingToId ?? undefined } as any },
+      {
+        onSuccess: () => {
+          setNewComment("");
+          setReplyingToId(null);
+          queryClient.invalidateQueries({ queryKey: getListCommentsQueryKey(postId) });
+          queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
+        }
       }
-    });
+    );
+  };
+
+  const handleReply = (comment: any) => {
+    const prefix = `@${comment.user?.username ?? comment.userId} `;
+    setNewComment(prefix);
+    setReplyingToId(comment.id);
+    setTimeout(() => {
+      inputRef.current?.focus();
+      const len = prefix.length;
+      inputRef.current?.setSelectionRange(len, len);
+    }, 50);
+  };
+
+  const handleToggleCommentLike = async (comment: any) => {
+    const prev = commentLikes[comment.id] ?? {
+      liked: comment.isLiked ?? false,
+      count: comment.likeCount ?? 0,
+    };
+    const next = { liked: !prev.liked, count: prev.count + (prev.liked ? -1 : 1) };
+    setCommentLikes(s => ({ ...s, [comment.id]: next }));
+    try {
+      const method = prev.liked ? "DELETE" : "POST";
+      await fetch(`/api/posts/${postId}/comments/${comment.id}/like`, { method });
+    } catch {
+      setCommentLikes(s => ({ ...s, [comment.id]: prev }));
+    }
   };
 
   const isSliding = dragOffset > 0;
@@ -161,7 +194,9 @@ function CommentBottomSheet({
               <p className="text-sm">İlk yorumu sen yap!</p>
             </div>
           ) : (
-            comments?.map(comment => (
+            comments?.map(comment => {
+              const cl = commentLikes[comment.id] ?? { liked: (comment as any).isLiked ?? false, count: (comment as any).likeCount ?? 0 };
+              return (
               <div key={comment.id} className="flex gap-3">
                 <Link href={`/profile/${comment.userId}`} onClick={onClose}>
                   <Avatar className="w-9 h-9 cursor-pointer flex-shrink-0">
@@ -185,17 +220,25 @@ function CommentBottomSheet({
                       <p className="text-[14px] text-foreground leading-[1.45] break-words whitespace-pre-wrap">
                         {comment.content}
                       </p>
-                      <button className="text-[12px] text-muted-foreground mt-1.5 font-medium hover:text-foreground transition-colors">
+                      <button
+                        onClick={() => handleReply(comment)}
+                        className="text-[12px] text-muted-foreground mt-1.5 font-medium hover:text-foreground transition-colors"
+                      >
                         Yanıtla
                       </button>
                     </div>
-                    <button className="flex flex-col items-center gap-0.5 flex-shrink-0 mt-0.5 p-1">
-                      <Heart className="w-4 h-4 text-muted-foreground" />
+                    <button
+                      onClick={() => handleToggleCommentLike(comment)}
+                      className="flex flex-col items-center gap-0.5 flex-shrink-0 mt-0.5 p-1"
+                    >
+                      <Heart className={`w-4 h-4 transition-colors ${cl.liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                      {cl.count > 0 && <span className="text-[10px] text-muted-foreground">{cl.count}</span>}
                     </button>
                   </div>
                 </div>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -207,12 +250,21 @@ function CommentBottomSheet({
               {user?.displayName?.charAt(0) ?? "?"}
             </AvatarFallback>
           </Avatar>
-          <div className="flex-1 flex items-center bg-muted/60 rounded-full px-4 h-10 border border-border/30">
+          <div className="flex-1 flex flex-col bg-muted/60 rounded-2xl px-4 py-2 border border-border/30 gap-1">
+            {replyingToId && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-primary font-medium">Yanıt olarak</span>
+                <button onClick={() => { setReplyingToId(null); setNewComment(""); }} className="text-muted-foreground">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
             <input
+              ref={inputRef}
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
               placeholder="Yorumunuz..."
-              className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none h-6"
               onKeyDown={e => e.key === "Enter" && handleAddComment()}
             />
           </div>

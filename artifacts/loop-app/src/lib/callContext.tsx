@@ -97,9 +97,28 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [callState, callMinimized]);
 
+  // ── AudioContext ref for iOS/autoplay unlock ──────────────────────────────
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
   // ── Attach remote stream ──────────────────────────────────────────────────
   const attachRemoteStream = useCallback((stream: MediaStream) => {
     remoteStreamRef.current = stream;
+
+    // Enable all audio tracks explicitly
+    stream.getAudioTracks().forEach(t => { t.enabled = true; });
+
+    // Web Audio API approach bypasses browser autoplay restrictions
+    try {
+      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
+        audioCtxRef.current = new AudioContext();
+      }
+      const ctx = audioCtxRef.current;
+      const resume = () => ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+      resume().then(() => {
+        const src = ctx.createMediaStreamSource(stream);
+        src.connect(ctx.destination);
+      }).catch(() => {});
+    } catch { /* fallback to audio element */ }
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = stream;

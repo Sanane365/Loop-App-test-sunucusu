@@ -212,6 +212,30 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: postType
+          in: query
+          schema:
+            type: ["string", "null"]
+        - name: bookmarked
+          in: query
+          schema:
+            type: ["boolean", "null"]
+        - name: liked
+          in: query
+          schema:
+            type: ["boolean", "null"]
+        - name: reposted
+          in: query
+          schema:
+            type: ["boolean", "null"]
+        - name: saved
+          in: query
+          schema:
+            type: ["boolean", "null"]
+        - name: mediaOnly
+          in: query
+          schema:
+            type: ["boolean", "null"]
       responses:
         "200":
           description: Posts
@@ -782,6 +806,13 @@ components:
           type: ["string", "null"]
         mediaType:
           type: ["string", "null"]
+        postType:
+          type: string
+          enum: [post, bulletin, poll]
+        pollOptions:
+          type: array
+          items:
+            type: string
 
     Comment:
       type: object

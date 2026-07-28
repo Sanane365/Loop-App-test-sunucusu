@@ -12,4 +12,28 @@ page?: number;
  * @nullable
  */
 userId?: number | null;
+/**
+ * @nullable
+ */
+postType?: string | null;
+/**
+ * @nullable
+ */
+bookmarked?: boolean | null;
+/**
+ * @nullable
+ */
+liked?: boolean | null;
+/**
+ * @nullable
+ */
+reposted?: boolean | null;
+/**
+ * @nullable
+ */
+saved?: boolean | null;
+/**
+ * @nullable
+ */
+mediaOnly?: boolean | null;
 };
