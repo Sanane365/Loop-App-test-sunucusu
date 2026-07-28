@@ -37,6 +37,7 @@ function Router() {
       <Route path="/notifications" component={Notifications} />
       <Route path="/admin" component={Admin} />
       <Route path="/dm" component={DirectMessages} />
+      <Route path="/dm/group/:groupId" component={DirectMessages} />
       <Route path="/dm/:userId" component={DirectMessages} />
       <Route path="/bookmarks" component={Bookmarks} />
       <Route path="/post/:postId" component={PostDetail} />

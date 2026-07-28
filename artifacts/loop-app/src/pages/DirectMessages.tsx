@@ -128,8 +128,27 @@ function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
   );
 }
 
+// ── Group DM types ────────────────────────────────────────────────────────────
+interface DmGroup {
+  id: number;
+  name: string;
+  createdBy: number;
+  createdAt: string;
+  members: { id: number; displayName: string; avatarUrl: string | null }[];
+  lastMessage: DmGroupMessage | null;
+}
+
+interface DmGroupMessage {
+  id: number;
+  groupId: number;
+  senderId: number;
+  content: string | null;
+  createdAt: string;
+  sender: { id: number; displayName: string; avatarUrl: string | null; username: string } | null;
+}
+
 export default function DirectMessages() {
-  const { userId } = useParams<{ userId: string }>();
+  const { userId, groupId } = useParams<{ userId?: string; groupId?: string }>();
   const [, setLocation] = useLocation();
   const { user: me } = useAuth();
   const { toast } = useToast();
@@ -153,6 +172,19 @@ export default function DirectMessages() {
   const [gifSearch, setGifSearch] = useState("");
   const [gifs, setGifs] = useState<{ url: string; preview: string }[]>([]);
   const [gifLoading, setGifLoading] = useState(false);
+
+  // ── Group DM state ─────────────────────────────────────────────────────────
+  const [groups, setGroups] = useState<DmGroup[]>([]);
+  const [groupMessages, setGroupMessages] = useState<DmGroupMessage[]>([]);
+  const [groupContent, setGroupContent] = useState("");
+  const [groupSending, setGroupSending] = useState(false);
+  const groupScrollRef = useRef<HTMLDivElement>(null);
+
+  // Group creation dialog
+  const [newGroupOpen, setNewGroupOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupMemberIds, setNewGroupMemberIds] = useState<Set<number>>(new Set());
+  const [creatingGroup, setCreatingGroup] = useState(false);
 
   // Arama işlemleri global context'ten
   const call = useCall();
@@ -504,13 +536,77 @@ export default function DirectMessages() {
     }
   };
 
+  const fetchGroups = async () => {
+    try {
+      const res = await fetch("/api/dm/groups", { cache: "no-store" });
+      if (res.ok) setGroups(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const fetchGroupMessages = async (gid: number) => {
+    try {
+      const res = await fetch(`/api/dm/groups/${gid}/messages`, { cache: "no-store" });
+      if (res.ok) setGroupMessages(await res.json());
+    } catch { /* silent */ }
+  };
+
+  const sendGroupMessage = async () => {
+    if (!groupContent.trim() || !groupId) return;
+    setGroupSending(true);
+    try {
+      const res = await fetch(`/api/dm/groups/${groupId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: groupContent }),
+      });
+      if (res.ok) {
+        setGroupContent("");
+        fetchGroupMessages(parseInt(groupId));
+        fetchGroups();
+      } else {
+        toast({ title: "Mesaj gönderilemedi", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Mesaj gönderilemedi", variant: "destructive" });
+    } finally {
+      setGroupSending(false);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || newGroupMemberIds.size === 0) return;
+    setCreatingGroup(true);
+    try {
+      const res = await fetch("/api/dm/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGroupName.trim(), memberIds: [...newGroupMemberIds] }),
+      });
+      if (res.ok) {
+        const group = await res.json();
+        setNewGroupOpen(false);
+        setNewGroupName("");
+        setNewGroupMemberIds(new Set());
+        await fetchGroups();
+        setLocation(`/dm/group/${group.id}`);
+        toast({ title: "Grup oluşturuldu! 🎉" });
+      } else {
+        toast({ title: "Hata", description: "Grup oluşturulamadı.", variant: "destructive" });
+      }
+    } finally {
+      setCreatingGroup(false);
+    }
+  };
+
   useEffect(() => {
     fetchConversations();
     fetchLoopPhotos();
+    fetchGroups();
     if (me?.id) fetchMyThoughtLikers();
     const interval = setInterval(() => {
       fetchConversations();
       fetchLoopPhotos();
+      fetchGroups();
       if (me?.id) fetchMyThoughtLikers();
     }, 10000);
     return () => clearInterval(interval);
@@ -537,8 +633,22 @@ export default function DirectMessages() {
   }, [userId]);
 
   useEffect(() => {
+    if (groupId) {
+      const gid = parseInt(groupId);
+      fetchGroupMessages(gid);
+      const interval = setInterval(() => fetchGroupMessages(gid), 3000);
+      return () => clearInterval(interval);
+    }
+    return undefined;
+  }, [groupId]);
+
+  useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    if (groupScrollRef.current) groupScrollRef.current.scrollTop = groupScrollRef.current.scrollHeight;
+  }, [groupMessages]);
 
   // ── Arama başlat (header'daki telefon/video butonları) ──────────────────
   const handleStartCall = async (type: "voice" | "video") => {
@@ -687,6 +797,118 @@ export default function DirectMessages() {
       toast({ title: "Hata", description: "Dosya gönderilemedi.", variant: "destructive" });
     }
   };
+
+  // ── Group chat view ───────────────────────────────────────────────────────
+  if (groupId) {
+    const gid = parseInt(groupId);
+    const activeGroup = groups.find(g => g.id === gid);
+
+    return (
+      <AppLayout>
+        <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)]">
+          {/* Header */}
+          <div className="flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
+            <button
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
+              onClick={() => { setActiveTab("gruplar"); setLocation("/dm"); }}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
+                <Users className="w-5 h-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <span className="font-bold text-[15px] leading-tight truncate block">
+                  {activeGroup?.name ?? "Grup"}
+                </span>
+                {activeGroup && (
+                  <p className="text-[11px] text-muted-foreground leading-tight truncate">
+                    {activeGroup.members.map(m => m.displayName.split(" ")[0]).join(", ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto bg-background px-3 py-2" ref={groupScrollRef}>
+            {groupMessages.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="w-8 h-8 text-primary/40" />
+                </div>
+                <p className="text-sm font-medium">Henüz mesaj yok</p>
+                <p className="text-xs opacity-70">İlk mesajı sen gönder ✨</p>
+              </div>
+            )}
+            {groupMessages.map((msg, idx) => {
+              const isMe = msg.senderId === me?.id;
+              const next = groupMessages[idx + 1];
+              const isLastInRun = !next || next.senderId !== msg.senderId;
+              const msgTime = format(new Date(msg.createdAt), "HH:mm");
+              return (
+                <div key={msg.id} className={`flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                  <div className="w-8 flex-shrink-0 self-end">
+                    {!isMe && isLastInRun ? (
+                      <Avatar className="w-8 h-8">
+                        <AvatarImage src={msg.sender?.avatarUrl || ""} />
+                        <AvatarFallback className="text-[10px] font-bold bg-muted/80">
+                          {msg.sender?.displayName?.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : <div className="w-8" />}
+                  </div>
+                  <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
+                    {!isMe && isLastInRun && (
+                      <span className="text-[10px] text-muted-foreground font-medium mb-0.5 ml-1">
+                        {msg.sender?.displayName}
+                      </span>
+                    )}
+                    {msg.content && (
+                      <div
+                        className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${
+                          isMe
+                            ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
+                            : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
+                        }`}
+                        style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
+                      >
+                        {msg.content}
+                      </div>
+                    )}
+                    {isLastInRun && (
+                      <span className="text-[10px] text-muted-foreground mt-0.5 mx-1">{msgTime}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-border/40 bg-background/95 backdrop-blur-sm px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <input
+                value={groupContent}
+                onChange={e => setGroupContent(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); } }}
+                placeholder="Mesaj yaz…"
+                className="flex-1 px-4 py-2.5 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm placeholder:text-muted-foreground"
+              />
+              <button
+                onClick={sendGroupMessage}
+                disabled={!groupContent.trim() || groupSending}
+                className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors flex-shrink-0"
+              >
+                <Send className="w-4 h-4 text-white" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   // ── Chat view ──────────────────────────────────────────────────────────────
   if (userId) {
@@ -1074,6 +1296,7 @@ export default function DirectMessages() {
 
   const filteredConvs = conversations
     .filter(c => {
+      if (activeTab === "gruplar") return false; // gruplar sekmesinde bireysel DM gizle
       const id = c.user?.id ?? -1;
       if (hiddenIds.has(id)) return false;
       if (searchQuery) {
@@ -1094,10 +1317,17 @@ export default function DirectMessages() {
       return rank(a.user?.id ?? -1) - rank(b.user?.id ?? -1);
     });
 
+  const filteredGroups = groups.filter(g => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return g.name.toLowerCase().includes(q) ||
+      g.members.some(m => m.displayName.toLowerCase().includes(q));
+  });
+
   const TABS: { id: FilterTab; label: string; count?: number }[] = [
     { id: "tumu", label: "Tümü", count: totalUnread > 0 ? totalUnread : undefined },
     { id: "okunmamis", label: "Okunmamış", count: unreadCount > 0 ? unreadCount : undefined },
-    { id: "gruplar", label: "Gruplar" },
+    { id: "gruplar", label: "Gruplar", count: groups.length > 0 ? groups.length : undefined },
     { id: "sabitlenen", label: "Sabitlenen" },
     { id: "arsivlenen", label: "Arşivlenen" },
   ];
@@ -1340,8 +1570,62 @@ export default function DirectMessages() {
             ))}
           </div>
 
-          {/* Conversations */}
-          {filteredConvs.length === 0 ? (
+          {/* Conversations — Gruplar sekmesi */}
+          {activeTab === "gruplar" ? (
+            <div>
+              {/* Yeni Grup butonu */}
+              <div className="px-4 py-3 border-b border-border/30">
+                <button
+                  onClick={() => setNewGroupOpen(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-primary/10 hover:bg-primary/15 text-primary transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-sm">Yeni Grup Oluştur</p>
+                    <p className="text-xs text-primary/70">Arkadaşlarınla grup sohbeti başlat</p>
+                  </div>
+                </button>
+              </div>
+              {filteredGroups.length === 0 ? (
+                <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground px-4">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="w-8 h-8 text-primary/30" />
+                  </div>
+                  <p className="font-medium text-sm">Henüz grup yok</p>
+                  <p className="text-xs text-center opacity-70">Yeni grup oluşturarak arkadaşlarınla sohbet et</p>
+                </div>
+              ) : (
+                filteredGroups.map(g => (
+                  <div
+                    key={g.id}
+                    className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
+                    onClick={() => setLocation(`/dm/group/${g.id}`)}
+                  >
+                    <div className="w-[52px] h-[52px] rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <span className="font-bold text-[15px] truncate">{g.name}</span>
+                        {g.lastMessage && (
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
+                            {formatMsgTime(g.lastMessage.createdAt)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {g.lastMessage?.content
+                          ? `${g.members.find(m => m.id === g.lastMessage!.senderId)?.displayName?.split(" ")[0] ?? ""}: ${g.lastMessage.content}`
+                          : g.members.map(m => m.displayName.split(" ")[0]).join(", ")}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : filteredConvs.length === 0 ? (
             <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground px-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <MessageCircle className="w-8 h-8 text-primary/30" />
@@ -1555,13 +1839,13 @@ export default function DirectMessages() {
                   Temizle
                 </button>
               </div>
-              {/* Grup sohbeti butonu — en az 3 kişi seçilince görünür */}
-              {selectedIds.size >= 3 && (
+              {/* Grup sohbeti butonu — en az 2 kişi seçilince görünür */}
+              {selectedIds.size >= 2 && (
                 <button
                   className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
                   onClick={() => {
-                    // ileriye dönük: grup sohbeti oluştur
-                    alert(`Grup sohbeti: ${selectedIds.size} kişiyle`);
+                    setNewGroupMemberIds(new Set(selectedIds));
+                    setNewGroupOpen(true);
                     setIsSelecting(false);
                     setSelectedIds(new Set());
                   }}
@@ -1570,6 +1854,91 @@ export default function DirectMessages() {
                   Grup Sohbeti Oluştur ({selectedIds.size} kişi)
                 </button>
               )}
+            </div>
+          )}
+
+          {/* ── Yeni Grup Oluştur Bottom Sheet ── */}
+          {newGroupOpen && (
+            <div className="fixed inset-0 z-[55] flex flex-col justify-end">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); }} />
+              <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4 max-h-[80vh] flex flex-col">
+                <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5 flex-shrink-0" />
+                <div className="flex items-center gap-2.5 mb-5 flex-shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-base leading-tight">Yeni Grup Oluştur</p>
+                    <p className="text-xs text-muted-foreground">Arkadaşlarınla grup sohbeti başlat</p>
+                  </div>
+                </div>
+
+                {/* Grup adı */}
+                <input
+                  value={newGroupName}
+                  onChange={e => setNewGroupName(e.target.value)}
+                  placeholder="Grup adı…"
+                  maxLength={50}
+                  className="w-full px-4 py-3 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm mb-4 flex-shrink-0"
+                />
+
+                {/* Üye seçimi */}
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex-shrink-0">
+                  Üye Seç ({newGroupMemberIds.size}/{conversations.length})
+                </p>
+                <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5 mb-4">
+                  {conversations.map(c => {
+                    if (!c.user) return null;
+                    const isSelected = newGroupMemberIds.has(c.user.id);
+                    return (
+                      <button
+                        key={c.user.id}
+                        onClick={() => {
+                          setNewGroupMemberIds(prev => {
+                            const next = new Set(prev);
+                            isSelected ? next.delete(c.user!.id) : next.add(c.user!.id);
+                            return next;
+                          });
+                        }}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10" : "hover:bg-muted/60"}`}
+                      >
+                        <Avatar style={{ width: 40, height: 40 }}>
+                          <AvatarImage src={c.user.avatarUrl || ""} />
+                          <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
+                            {c.user.displayName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm truncate">{c.user.displayName}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{c.user.username}</p>
+                        </div>
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
+                          {isSelected && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {conversations.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-6">Henüz mesajlaştığın biri yok</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 flex-shrink-0">
+                  <button
+                    className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+                    onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); }}
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={handleCreateGroup}
+                    disabled={!newGroupName.trim() || newGroupMemberIds.size === 0 || creatingGroup}
+                    className="flex-1 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                  >
+                    {creatingGroup ? "Oluşturuluyor…" : `Grup Oluştur (${newGroupMemberIds.size} üye)`}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
