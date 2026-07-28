@@ -138,6 +138,11 @@ export default function DirectMessages() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [callState, setCallState] = useState<null | { type: "voice" | "video"; status: "calling" | "connected" }>(null);
+  const [callDuration, setCallDuration] = useState(0);
+  const [micMuted, setMicMuted] = useState(false);
+  const [camOff, setCamOff] = useState(false);
+  const activeTab_ref = useRef<FilterTab>("tumu");
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -521,6 +526,31 @@ export default function DirectMessages() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [messages]);
 
+  // Arama süresi sayacı
+  useEffect(() => {
+    if (callState?.status === "connected") {
+      setCallDuration(0);
+      const t = setInterval(() => setCallDuration(s => s + 1), 1000);
+      return () => clearInterval(t);
+    }
+    return undefined;
+  }, [callState?.status]);
+
+  const startCall = (type: "voice" | "video") => {
+    setCallState({ type, status: "calling" });
+    setMicMuted(false);
+    setCamOff(false);
+    // 3 saniye sonra "bağlandı" simülasyonu
+    setTimeout(() => setCallState({ type, status: "connected" }), 3000);
+  };
+
+  const endCall = () => {
+    setCallState(null);
+    setCallDuration(0);
+  };
+
+  const fmtDuration = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+
   const handleSend = async () => {
     if (!content.trim() || !userId) return;
     setSending(true);
@@ -612,10 +642,16 @@ export default function DirectMessages() {
 
             {/* Sağ aksiyonlar */}
             <div className="flex items-center flex-shrink-0">
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
+              <button
+                onClick={() => startCall("voice")}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary"
+              >
                 <Phone style={{ width: 18, height: 18 }} />
               </button>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
+              <button
+                onClick={() => startCall("video")}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary"
+              >
                 <Video style={{ width: 20, height: 20 }} />
               </button>
               <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
@@ -649,12 +685,18 @@ export default function DirectMessages() {
 
                   {group.messages.map((msg, idx) => {
                     const isMe = msg.senderId === me?.id;
-                    const prevMsg = group.messages[idx - 1];
                     const nextMsg = group.messages[idx + 1];
                     const isLastInRun = !nextMsg || nextMsg.senderId !== msg.senderId;
                     const msgTime = format(new Date(msg.createdAt), "HH:mm");
                     const globalIdx = messages.indexOf(msg);
                     const showUnread = firstUnreadIdx !== -1 && globalIdx === firstUnreadIdx;
+
+                    // WhatsApp tik mantığı: isRead → ✓✓ mor, değilse → ✓ gri
+                    const tickEl = isMe ? (
+                      msg.isRead
+                        ? <span className="text-[12px] text-primary font-bold leading-none">✓✓</span>
+                        : <span className="text-[12px] text-muted-foreground/60 leading-none">✓</span>
+                    ) : null;
 
                     return (
                       <div key={msg.id}>
@@ -668,7 +710,7 @@ export default function DirectMessages() {
                           </div>
                         )}
 
-                        {/* Satır: avatar + balon + saat */}
+                        {/* Satır: avatar + (balon + saat/tik altında) */}
                         <div className={`flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
 
                           {/* Avatar — karşı taraf, serinin son mesajı */}
@@ -685,8 +727,8 @@ export default function DirectMessages() {
                             )}
                           </div>
 
-                          {/* Balon */}
-                          <div className="flex-shrink-0 max-w-[62%]">
+                          {/* Balon + saat-tik altında */}
+                          <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
                             {msg.content && (
                               <div
                                 className={`px-4 py-2.5 text-[14px] leading-[1.5] ${
@@ -703,19 +745,18 @@ export default function DirectMessages() {
                               <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
                                 {msg.mediaType === "video"
                                   ? <video src={msg.mediaUrl} controls className="w-full block" />
-                                  : <img src={`/api${msg.mediaUrl}`} alt="medya" className="w-full h-auto block" />
+                                  : <img src={msg.mediaUrl} alt="medya" className="w-full h-auto block" />
                                 }
                               </div>
                             )}
+                            {/* Saat + tik — balonun altında */}
+                            {isLastInRun && (
+                              <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                                <span className="text-[11px] text-muted-foreground/60 leading-none">{msgTime}</span>
+                                {tickEl}
+                              </div>
+                            )}
                           </div>
-
-                          {/* Saat — balonun yanında, dışarıda */}
-                          {isLastInRun && (
-                            <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5">
-                              {isMe && <span className="text-[11px] text-primary font-semibold leading-none">✓✓</span>}
-                              <span className="text-[11px] text-muted-foreground/70 leading-none">{msgTime}</span>
-                            </div>
-                          )}
 
                         </div>
                       </div>
@@ -811,6 +852,90 @@ export default function DirectMessages() {
               )}
             </div>
           </div>
+
+          {/* ── Arama Ekranı Modalı ── */}
+          {callState && (
+            <div className="fixed inset-0 z-[70] flex flex-col items-center justify-between bg-gradient-to-b from-violet-900 via-purple-900 to-fuchsia-900 pb-12 pt-20">
+              {/* Üst: durum */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative">
+                  <Avatar className="w-24 h-24 ring-4 ring-white/20 shadow-2xl">
+                    <AvatarImage src={otherUser?.avatarUrl || ""} />
+                    <AvatarFallback className="bg-violet-600 text-white text-3xl font-bold">
+                      {otherUser?.displayName?.charAt(0) ?? "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  {/* Nabız animasyonu */}
+                  {callState.status === "calling" && (
+                    <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
+                  )}
+                </div>
+                <div className="text-center">
+                  <p className="text-white text-xl font-bold">{otherUser?.displayName}</p>
+                  <p className="text-white/60 text-sm mt-1">
+                    {callState.status === "calling"
+                      ? callState.type === "voice" ? "Sesli aranıyor…" : "Görüntülü aranıyor…"
+                      : fmtDuration(callDuration)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Orta: görüntülü aramada kamera önizlemesi */}
+              {callState.type === "video" && callState.status === "connected" && (
+                <div className="w-full px-6">
+                  <div className="w-full aspect-video rounded-2xl bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10">
+                    {camOff ? (
+                      <div className="flex flex-col items-center gap-2 text-white/50">
+                        <Video className="w-8 h-8" />
+                        <span className="text-xs">Kamera kapalı</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-white/50">
+                        <Video className="w-8 h-8 text-white/70" />
+                        <span className="text-xs text-white/70">Kamera aktif</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Alt: butonlar */}
+              <div className="flex items-center gap-6">
+                {/* Mikrofon */}
+                <button
+                  onClick={() => setMicMuted(v => !v)}
+                  className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${micMuted ? "bg-white text-purple-900" : "bg-white/20 text-white"}`}
+                >
+                  <Mic className="w-6 h-6" />
+                </button>
+
+                {/* Kapat */}
+                <button
+                  onClick={endCall}
+                  className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center shadow-xl hover:bg-red-600 active:scale-95 transition-all"
+                >
+                  <Phone className="w-7 h-7 text-white rotate-[135deg]" />
+                </button>
+
+                {/* Kamera (video aramada) */}
+                {callState.type === "video" && (
+                  <button
+                    onClick={() => setCamOff(v => !v)}
+                    className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${camOff ? "bg-white text-purple-900" : "bg-white/20 text-white"}`}
+                  >
+                    <Video className="w-6 h-6" />
+                  </button>
+                )}
+
+                {/* Sesli aramada hoparlör */}
+                {callState.type === "voice" && (
+                  <button className="w-14 h-14 rounded-full bg-white/20 text-white flex items-center justify-center">
+                    <span className="text-xl">🔊</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
         </div>
       </AppLayout>
