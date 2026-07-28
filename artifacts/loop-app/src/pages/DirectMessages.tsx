@@ -651,76 +651,71 @@ export default function DirectMessages() {
                     const isMe = msg.senderId === me?.id;
                     const prevMsg = group.messages[idx - 1];
                     const nextMsg = group.messages[idx + 1];
-                    const isFirstInRun = !prevMsg || prevMsg.senderId !== msg.senderId;
-                    const isLastInRun  = !nextMsg || nextMsg.senderId !== msg.senderId;
+                    const isLastInRun = !nextMsg || nextMsg.senderId !== msg.senderId;
                     const msgTime = format(new Date(msg.createdAt), "HH:mm");
                     const globalIdx = messages.indexOf(msg);
                     const showUnread = firstUnreadIdx !== -1 && globalIdx === firstUnreadIdx;
 
-                    // Balon köşe radiusu — WhatsApp/Instagram stilinde
-                    const myBubbleRadius   = `${isFirstInRun ? "22px" : "22px"} 6px ${isLastInRun ? "6px" : "22px"} 22px`;
-                    const herBubbleRadius  = `6px ${isFirstInRun ? "22px" : "22px"} 22px ${isLastInRun ? "22px" : "6px"}`;
-
                     return (
                       <div key={msg.id}>
                         {showUnread && (
-                          <div className="flex items-center gap-2 my-3">
-                            <div className="flex-1 h-px bg-primary/25" />
-                            <span className="text-[11px] text-primary font-semibold">
-                              {messages.filter(m => m.senderId !== me?.id && !m.isRead).length} okunmamış mesaj
+                          <div className="flex items-center gap-2 my-4">
+                            <div className="flex-1 h-px bg-muted-foreground/20" />
+                            <span className="text-[11px] text-muted-foreground/70 font-medium">
+                              — {messages.filter(m => m.senderId !== me?.id && !m.isRead).length} okunmamış mesaj —
                             </span>
-                            <div className="flex-1 h-px bg-primary/25" />
+                            <div className="flex-1 h-px bg-muted-foreground/20" />
                           </div>
                         )}
 
-                        <div className={`flex items-end gap-1.5 ${isLastInRun ? "mb-2" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                        {/* Satır: avatar + balon + saat */}
+                        <div className={`flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
 
                           {/* Avatar — karşı taraf, serinin son mesajı */}
-                          <div className="w-7 flex-shrink-0">
+                          <div className="w-8 flex-shrink-0 self-end">
                             {!isMe && isLastInRun ? (
-                              <Avatar className="w-7 h-7">
+                              <Avatar className="w-8 h-8">
                                 <AvatarImage src={msg.sender?.avatarUrl || ""} />
-                                <AvatarFallback className="text-[10px] font-bold bg-muted">
+                                <AvatarFallback className="text-[10px] font-bold bg-muted/80">
                                   {msg.sender?.displayName?.charAt(0)}
                                 </AvatarFallback>
                               </Avatar>
                             ) : (
-                              <div className="w-7" />
+                              <div className="w-8" />
                             )}
                           </div>
 
-                          {/* Balon + zaman */}
-                          <div className={`flex flex-col max-w-[72%] ${isMe ? "items-end" : "items-start"}`}>
+                          {/* Balon */}
+                          <div className="flex-shrink-0 max-w-[62%]">
                             {msg.content && (
                               <div
-                                className={`px-4 py-2.5 text-[14px] leading-[1.45] ${
+                                className={`px-4 py-2.5 text-[14px] leading-[1.5] ${
                                   isMe
-                                    ? "bg-primary text-primary-foreground"
-                                    : "bg-white dark:bg-zinc-800 text-foreground shadow-sm border border-border/30"
+                                    ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
+                                    : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
                                 }`}
-                                style={{ borderRadius: isMe ? myBubbleRadius : herBubbleRadius }}
+                                style={{ borderRadius: "18px" }}
                               >
                                 {msg.content}
                               </div>
                             )}
                             {msg.mediaUrl && (
-                              <div
-                                className="overflow-hidden max-w-[220px] shadow-sm"
-                                style={{ borderRadius: isMe ? myBubbleRadius : herBubbleRadius }}
-                              >
+                              <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
                                 {msg.mediaType === "video"
                                   ? <video src={msg.mediaUrl} controls className="w-full block" />
                                   : <img src={`/api${msg.mediaUrl}`} alt="medya" className="w-full h-auto block" />
                                 }
                               </div>
                             )}
-                            {isLastInRun && (
-                              <div className={`flex items-center gap-1 mt-1 ${isMe ? "flex-row-reverse" : ""}`}>
-                                <span className="text-[11px] text-muted-foreground">{msgTime}</span>
-                                {isMe && <span className="text-[11px] text-primary/60">✓✓</span>}
-                              </div>
-                            )}
                           </div>
+
+                          {/* Saat — balonun yanında, dışarıda */}
+                          {isLastInRun && (
+                            <div className={`flex items-center gap-0.5 flex-shrink-0 self-end pb-0.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                              <span className="text-[11px] text-muted-foreground/70 leading-none">{msgTime}</span>
+                              {isMe && <span className="text-[11px] text-primary/70 leading-none">✓✓</span>}
+                            </div>
+                          )}
 
                         </div>
                       </div>
