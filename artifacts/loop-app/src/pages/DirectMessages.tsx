@@ -711,9 +711,9 @@ export default function DirectMessages() {
 
                           {/* Saat — balonun yanında, dışarıda */}
                           {isLastInRun && (
-                            <div className={`flex items-center gap-0.5 flex-shrink-0 self-end pb-0.5 ${isMe ? "flex-row-reverse" : ""}`}>
+                            <div className="flex items-center gap-1 flex-shrink-0 self-end pb-0.5">
+                              {isMe && <span className="text-[11px] text-primary font-semibold leading-none">✓✓</span>}
                               <span className="text-[11px] text-muted-foreground/70 leading-none">{msgTime}</span>
-                              {isMe && <span className="text-[11px] text-primary/70 leading-none">✓✓</span>}
                             </div>
                           )}
 
