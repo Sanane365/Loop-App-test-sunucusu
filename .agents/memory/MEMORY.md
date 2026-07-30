@@ -1,3 +1,3 @@
 - [Loop app stack](loop-stack.md) — Turkish social media app, React+Vite frontend + Express5 backend, Drizzle+PG, pnpm monorepo.
-- [Loop auth & roles](loop-auth-roles.md) — Session cookies, role field in users table, admin/moderator guards, mertkaya is admin.
+- [Loop auth & roles](loop-auth-roles.md) — Session cookies, email+username login, Vite proxy required, bcryptjs v3 hash incident + admin reset endpoint.
 - [Loop codegen](loop-codegen.md) — Must run codegen after any OpenAPI spec change; multipart endpoints NOT in spec to avoid collisions.
