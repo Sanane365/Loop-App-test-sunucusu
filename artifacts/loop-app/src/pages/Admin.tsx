@@ -33,6 +33,7 @@ import {
   Network,
   Crown,
   Gavel,
+  KeyRound,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -98,6 +99,9 @@ export default function Admin() {
   const [ipBanOpen, setIpBanOpen] = useState(false);
   const [ipBanAddress, setIpBanAddress] = useState("");
   const [ipBanReason, setIpBanReason] = useState("");
+
+  const [resetPassUser, setResetPassUser] = useState<AdminUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
 
   // Kurucu ve Admin Yetkisine Sahip E-postalar Listesi
   const adminEmails = [
@@ -191,6 +195,26 @@ export default function Admin() {
     if (res.ok) {
       toast({ title: `${username} yasağı kaldırıldı` });
       fetchAll();
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPassUser || newPassword.length < 4) return;
+    try {
+      const res = await fetch(`/api/admin/users/${resetPassUser.id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      if (res.ok) {
+        toast({ title: `✅ @${resetPassUser.username} şifresi sıfırlandı` });
+        setResetPassUser(null);
+        setNewPassword("");
+      } else {
+        toast({ title: "Hata", description: "Şifre sıfırlanamadı", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Hata", variant: "destructive" });
     }
   };
 
@@ -465,6 +489,17 @@ export default function Admin() {
                             <Gavel className="w-3 h-3" /> Yasakla
                           </Button>
                         ))}
+                      {isAdmin && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs gap-1 text-muted-foreground"
+                          title="Şifre Sıfırla"
+                          onClick={() => { setResetPassUser(u); setNewPassword(""); }}
+                        >
+                          <KeyRound className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -660,6 +695,39 @@ export default function Admin() {
                 disabled={!ipBanAddress.trim()}
               >
                 <Network className="w-4 h-4" /> IP Yasakla
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Şifre Sıfırlama Dialog */}
+      <Dialog open={!!resetPassUser} onOpenChange={(o) => { if (!o) { setResetPassUser(null); setNewPassword(""); } }}>
+        <DialogContent className="rounded-2xl w-[90vw] max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-primary" />
+              Şifre Sıfırla
+            </DialogTitle>
+            <DialogDescription>
+              @{resetPassUser?.username} için yeni şifre belirle
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Yeni Şifre</label>
+              <Input
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="En az 4 karakter"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => { setResetPassUser(null); setNewPassword(""); }}>
+                İptal
+              </Button>
+              <Button className="flex-1 gap-1" onClick={handleResetPassword} disabled={newPassword.length < 4}>
+                <KeyRound className="w-4 h-4" /> Sıfırla
               </Button>
             </div>
           </div>

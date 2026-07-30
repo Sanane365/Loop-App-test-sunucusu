@@ -26,7 +26,13 @@ router.post("/auth/login", async (req, res) => {
       return;
     }
 
-    const users = await db.select().from(usersTable).where(eq(usersTable.username, username)).limit(1);
+    // Allow login with either username or email (case-insensitive email)
+    const users = await db.select().from(usersTable)
+      .where(or(
+        eq(usersTable.username, username),
+        eq(usersTable.email, username.toLowerCase()),
+      ))
+      .limit(1);
     const user = users[0];
 
     if (!user || !(await verifyPassword(password, user.passwordHash))) {

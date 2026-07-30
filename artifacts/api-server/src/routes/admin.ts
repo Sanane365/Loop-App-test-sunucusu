@@ -160,4 +160,22 @@ router.post("/ip-ban", requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+// POST /admin/users/:id/reset-password
+router.post("/users/:id/reset-password", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params["id"] as string);
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 4) {
+      res.status(400).json({ error: "En az 4 karakter gerekli" }); return;
+    }
+    const { hashPassword } = await import("../lib/auth");
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, targetId));
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Admin reset-password error:", error);
+    res.status(500).json({ error: "Sunucu hatası" });
+  }
+});
+
 export default router;

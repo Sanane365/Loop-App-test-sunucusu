@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLocation, Link } from "wouter";
 
 const loginSchema = z.object({
-  username: z.string().min(1, "Kullanıcı adı gerekli"),
+  username: z.string().min(1, "Kullanıcı adı veya e-posta gerekli"),
   password: z.string().min(1, "Şifre gerekli"),
 });
 
@@ -56,7 +56,7 @@ export default function Login() {
               name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Kullanıcı Adı</FormLabel>
+                  <FormLabel>Kullanıcı Adı veya E-posta</FormLabel>
                   <FormControl>
                     <Input {...field} data-testid="input-login-username" />
                   </FormControl>
