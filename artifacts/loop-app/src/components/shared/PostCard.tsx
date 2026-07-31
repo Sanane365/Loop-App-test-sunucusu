@@ -93,11 +93,20 @@ function CommentBottomSheet({
   const [gifLoading, setGifLoading] = useState(false);
   const [trendingGifs, setTrendingGifs] = useState<any[]>([]);
 
+  const TENOR_KEY = "LIVDSRZULELA";
+  const mapTenorResults = (results: any[]) =>
+    results.map((r: any) => ({
+      id: r.id,
+      url: r.media?.[0]?.gif?.url ?? r.media?.[0]?.tinygif?.url ?? "",
+      preview: r.media?.[0]?.tinygif?.url ?? r.media?.[0]?.gif?.url ?? "",
+      title: r.title ?? "",
+    })).filter((g: any) => g.url);
+
   useEffect(() => {
     if (gifPanelOpen && trendingGifs.length === 0) {
-      fetch("/api/gif/trending?limit=24")
+      fetch(`https://g.tenor.com/v1/trending?key=${TENOR_KEY}&limit=24&media_filter=minimal&contentfilter=off`)
         .then(r => r.json())
-        .then(data => { if (Array.isArray(data)) setTrendingGifs(data); })
+        .then(data => setTrendingGifs(mapTenorResults(data.results ?? [])))
         .catch(() => {});
     }
   }, [gifPanelOpen]);
@@ -107,9 +116,9 @@ function CommentBottomSheet({
     if (!q.trim()) { setGifResults([]); return; }
     setGifLoading(true);
     try {
-      const r = await fetch(`/api/gif/search?q=${encodeURIComponent(q)}&limit=24`);
+      const r = await fetch(`https://g.tenor.com/v1/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=24&media_filter=minimal&contentfilter=off`);
       const data = await r.json();
-      setGifResults(Array.isArray(data) ? data : []);
+      setGifResults(mapTenorResults(data.results ?? []));
     } finally { setGifLoading(false); }
   }, []);
 
