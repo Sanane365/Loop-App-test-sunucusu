@@ -294,11 +294,13 @@ function CommentBottomSheet({
 function ShareBottomSheet({
   postId,
   postUser,
+  postContent,
   isOpen,
   onClose,
 }: {
   postId: number;
   postUser?: string;
+  postContent?: string;
   isOpen: boolean;
   onClose: () => void;
 }) {
@@ -350,10 +352,9 @@ function ShareBottomSheet({
     if (sent.has(userId)) return;
     setSending(userId);
     try {
-      const postLink = `${window.location.origin}/post/${postId}`;
-      const content = postUser
-        ? `Sana bir gönderi ilettim 👉 ${postLink}`
-        : `Sana bir gönderi ilettim 👉 ${postLink}`;
+      // Use special prefix so DM renders it as a post share card
+      const snippet = (postContent || "").slice(0, 80);
+      const content = `__LOOP_POST_SHARE__:${postId}:${snippet}`;
       const r = await fetch(`/api/dm/${userId}`, {
         method: "POST",
         credentials: "include",
@@ -678,14 +679,14 @@ export function PostCard({ post: postRaw }: { post: Post }) {
               <span className="text-white text-xs font-medium drop-shadow">{formatCount(post.repostCount)}</span>
             </button>
 
-            {/* DM Share */}
-            <button onClick={() => setIsShareOpen(true)} className="flex flex-col items-center gap-0.5">
-              <Send className="w-7 h-7 text-white drop-shadow-lg" />
-            </button>
-
             {/* Bookmark */}
             <button onClick={handleBookmark} className="flex flex-col items-center gap-0.5" data-testid={`post-bookmark-${post.id}`}>
               <Bookmark className={`w-7 h-7 drop-shadow-lg ${isBookmarked ? "fill-primary text-primary" : "text-white"}`} />
+            </button>
+
+            {/* DM Share — yanyana kaydet ile */}
+            <button onClick={() => setIsShareOpen(true)} className="flex flex-col items-center gap-0.5">
+              <Send className="w-7 h-7 text-white drop-shadow-lg" />
             </button>
           </div>
 
@@ -723,6 +724,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
         <ShareBottomSheet
           postId={post.id}
           postUser={post.user?.username}
+          postContent={post.content || ""}
           isOpen={isShareOpen}
           onClose={() => setIsShareOpen(false)}
         />
@@ -826,17 +828,18 @@ export function PostCard({ post: postRaw }: { post: Post }) {
             <span>{likeCount}</span>
           </button>
 
-          {/* DM Share */}
-          <button
-            onClick={() => setIsShareOpen(true)}
-            className="flex items-center gap-1.5 hover:text-primary transition-colors text-sm"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-
-          <button onClick={handleBookmark} className={`flex items-center gap-1.5 hover:text-primary transition-colors text-sm ml-auto ${isBookmarked ? "text-primary" : ""}`} data-testid={`post-bookmark-${post.id}`}>
-            <Bookmark className={`w-5 h-5 ${isBookmarked ? "fill-current" : ""}`} />
-          </button>
+          {/* Kaydet + Paylaş — yanyana, sağ tarafa yaslanmış */}
+          <div className="ml-auto flex items-center gap-3">
+            <button onClick={handleBookmark} className={`flex items-center gap-1.5 hover:text-primary transition-colors text-sm ${isBookmarked ? "text-primary" : ""}`} data-testid={`post-bookmark-${post.id}`}>
+              <Bookmark className={`w-5 h-5 ${isBookmarked ? "fill-current" : ""}`} />
+            </button>
+            <button
+              onClick={() => setIsShareOpen(true)}
+              className="flex items-center gap-1.5 hover:text-primary transition-colors text-sm"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -849,6 +852,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
       <ShareBottomSheet
         postId={post.id}
         postUser={post.user?.username}
+        postContent={post.content || ""}
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
       />

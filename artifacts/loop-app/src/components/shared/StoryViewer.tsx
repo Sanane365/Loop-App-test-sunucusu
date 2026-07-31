@@ -50,6 +50,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
+  // Pinned replies (shown on story bottom-right)
+  const [pinnedReplies, setPinnedReplies] = useState<any[]>([]);
 
   // Story owner viewers panel
   const [showViewers, setShowViewers] = useState(false);
@@ -179,10 +181,30 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     try {
       const r = await fetch(`/api/stories/${currentStory.id}/replies`);
       const data = await r.json();
-      setReplies(Array.isArray(data) ? data : []);
+      const arr = Array.isArray(data) ? data : [];
+      setReplies(arr);
+      setPinnedReplies(arr.filter((r: any) => r.pinned));
     } finally {
       setRepliesLoading(false);
     }
+  };
+
+  const togglePin = async (replyId: number) => {
+    if (!currentStory) return;
+    try {
+      const r = await fetch(`/api/stories/${currentStory.id}/replies/${replyId}/pin`, { method: "POST" });
+      if (r.ok) {
+        const updated = await r.json();
+        setReplies(prev => prev.map(rep => rep.id === replyId ? { ...rep, pinned: updated.pinned } : rep));
+        setPinnedReplies(prev => {
+          if (updated.pinned) {
+            const rep = replies.find(x => x.id === replyId);
+            return rep ? [...prev.filter(x => x.id !== replyId), { ...rep, pinned: true }] : prev;
+          }
+          return prev.filter(x => x.id !== replyId);
+        });
+      }
+    } catch { /* sessiz */ }
   };
 
   const toggleReplies = async () => {
@@ -408,6 +430,25 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
           </div>
         )}
 
+        {/* ── Pinned replies overlay (bottom-right of story, behind bottom bar) ── */}
+        {isOwnStory && pinnedReplies.length > 0 && !showReplies && !showViewers && (
+          <div className="absolute bottom-20 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
+            {pinnedReplies.slice(0, 2).map((r: any) => (
+              <div key={r.id} className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[180px]">
+                <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/20">
+                  {r.avatar_url
+                    ? <img src={r.avatar_url} className="w-full h-full object-cover" alt="" />
+                    : <span className="w-full h-full flex items-center justify-center text-white text-[9px] font-bold">{r.display_name?.charAt(0)}</span>}
+                </div>
+                <div className={`${r.is_emoji ? "text-xl" : "text-white text-xs truncate"}`}>
+                  {r.content}
+                </div>
+                <span className="text-yellow-400 text-[10px] flex-shrink-0">📌</span>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* ── Replies panel (story owner) — slides from right ── */}
         {isOwnStory && showReplies && (
           <div
@@ -429,7 +470,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                   <p className="text-white/50 text-sm">Henüz yanıt yok</p>
                 </div>
               ) : replies.map((r: any) => (
-                <div key={r.id} className="flex gap-2.5 items-start">
+                <div key={r.id} className="flex gap-2 items-start">
                   <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-white/10">
                     {r.avatar_url
                       ? <img src={r.avatar_url} className="w-full h-full object-cover" alt={r.display_name} />
@@ -441,6 +482,16 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                       {r.content}
                     </div>
                   </div>
+                  {/* Öne Çıkart butonu */}
+                  <button
+                    onClick={() => togglePin(r.id)}
+                    className={`flex-shrink-0 mt-1 w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+                      r.pinned ? "bg-yellow-400/30 text-yellow-300" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+                    }`}
+                    title={r.pinned ? "Sabitlemeden kaldır" : "Öne çıkart"}
+                  >
+                    📌
+                  </button>
                 </div>
               ))}
             </div>

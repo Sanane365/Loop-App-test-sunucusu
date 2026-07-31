@@ -60,7 +60,23 @@ function formatMsgTime(dateStr: string) {
 
 function lastMsgPreview(msg: DmMessage) {
   if (msg.voiceUrl) return "🎤 sesli mesaj gönderdi";
-  if (msg.content) return msg.content;
+  if (msg.content) {
+    if (msg.content.startsWith("__STORY_REACTION__:")) {
+      const emoji = msg.content.split(":")[2] ?? "❤️";
+      return `${emoji} hikayene tepki verdi`;
+    }
+    if (msg.content.startsWith("__STORY_REPLY__:")) {
+      const text = msg.content.split(":").slice(2).join(":");
+      return `📖 hikaye yanıtı: ${text}`;
+    }
+    if (msg.content.startsWith("__LOOP_POST_SHARE__:")) {
+      return "📎 bir gönderi paylaştı";
+    }
+    if (msg.content.startsWith("__LOOP_GIF__:")) return "🖼 GIF gönderdi";
+    if (msg.content.startsWith("__LOOP_CALL_VOICE__")) return "📞 sesli arama";
+    if (msg.content.startsWith("__LOOP_CALL_VIDEO__")) return "📹 görüntülü arama";
+    return msg.content;
+  }
   if (msg.mediaUrl) {
     if (msg.mediaType === "video") return "video gönderdi";
     if (msg.mediaType === "audio") return "sesli mesaj gönderdi";
@@ -127,6 +143,75 @@ function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
           transform: "rotate(-45deg)",
         }}
       />
+    </div>
+  );
+}
+
+// ── Group avatar stack (overlapping half-circles) ─────────────────────────────
+function GroupAvatarStack({ members }: { members: { id: number; displayName: string; avatarUrl: string | null }[] }) {
+  const shown = members.slice(0, 3);
+  const offsets = [0, 18, 36];
+  const sizes = shown.length === 1 ? [52] : shown.length === 2 ? [34, 34] : [28, 28, 28];
+  const totalWidth = shown.length === 1 ? 52 : shown.length === 2 ? 46 : 52;
+  return (
+    <div className="relative flex-shrink-0" style={{ width: 52, height: 52 }}>
+      {shown.map((m, i) => {
+        const size = sizes[i] ?? 28;
+        const left = offsets[i] ?? 0;
+        const top = shown.length === 3
+          ? (i === 0 ? 12 : i === 1 ? 0 : 12)
+          : (52 - size) / 2;
+        return (
+          <div
+            key={m.id}
+            className="absolute rounded-full border-2 border-background overflow-hidden bg-gradient-to-br from-primary/30 to-violet-400/30 flex items-center justify-center"
+            style={{ width: size, height: size, left, top, zIndex: shown.length - i }}
+          >
+            {m.avatarUrl
+              ? <img src={m.avatarUrl} className="w-full h-full object-cover" alt={m.displayName} />
+              : <span className="text-primary font-bold" style={{ fontSize: size * 0.38 }}>{m.displayName.charAt(0)}</span>}
+          </div>
+        );
+      })}
+      {/* Grup rozeti */}
+      <div className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-primary flex items-center justify-center border-2 border-background z-10">
+        <Users className="w-2.5 h-2.5 text-white" />
+      </div>
+    </div>
+  );
+}
+
+// ── Group row bileşeni (Gruplar ve Tümü sekmesinde kullanılır) ─────────────────
+function GroupRow({ g, onClick }: { g: { id: number; name: string; members: any[]; lastMessage: any | null; createdAt: string }; onClick: () => void }) {
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
+      onClick={onClick}
+    >
+      <GroupAvatarStack members={g.members} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 mb-0.5">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-bold text-[15px] truncate">{g.name}</span>
+            <Users className="w-3 h-3 text-primary/50 flex-shrink-0" />
+          </div>
+          {g.lastMessage && (
+            <span className="text-[11px] text-muted-foreground flex-shrink-0">
+              {(() => {
+                const d = new Date(g.lastMessage.createdAt);
+                if (isToday(d)) return format(d, "HH:mm");
+                if (isYesterday(d)) return "Dün";
+                return format(d, "dd.MM");
+              })()}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground truncate">
+          {g.lastMessage?.content
+            ? `${g.members.find((m: any) => m.id === g.lastMessage.senderId)?.displayName?.split(" ")[0] ?? ""}: ${g.lastMessage.content}`
+            : g.members.map((m: any) => m.displayName.split(" ")[0]).join(", ")}
+        </p>
+      </div>
     </div>
   );
 }
@@ -1000,6 +1085,32 @@ export default function DirectMessages() {
                       <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
                         <img src={msg.content.slice("__LOOP_GIF__:".length)} alt="GIF" className="w-full h-auto block" loading="lazy" />
                       </div>
+                    ) : msg.content?.startsWith("__STORY_REACTION__:") ? (
+                      /* Hikaye emoji tepkisi */
+                      <div className={`flex items-center gap-2 px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 200 }}>
+                        <span className="text-2xl">{msg.content.split(":")[2]}</span>
+                        <span className="text-xs text-muted-foreground">hikayene tepki verdi</span>
+                      </div>
+                    ) : msg.content?.startsWith("__STORY_REPLY__:") ? (
+                      /* Hikaye metin yanıtı */
+                      <div className={`px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                        <p className="text-[10px] text-muted-foreground font-medium mb-1">📖 Hikaye yanıtı</p>
+                        <p className="text-[14px] text-foreground break-words">{msg.content.split(":").slice(2).join(":")}</p>
+                      </div>
+                    ) : msg.content?.startsWith("__LOOP_POST_SHARE__:") ? (
+                      /* Paylaşılan gönderi kartı */
+                      (() => {
+                        const parts = msg.content.split(":");
+                        const postId = parts[1];
+                        const snippet = parts.slice(2).join(":");
+                        return (
+                          <a href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                            <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
+                            <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
+                            <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
+                          </a>
+                        );
+                      })()
                     ) : msg.content ? (
                       <div
                         className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${
@@ -1335,6 +1446,42 @@ export default function DirectMessages() {
                                   <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
                                     <img src={gifUrl} alt="GIF" className="w-full h-auto block" loading="lazy" />
                                   </div>
+                                );
+                              }
+
+                              // Hikaye emoji tepkisi
+                              if (msg.content?.startsWith("__STORY_REACTION__:")) {
+                                const emoji = msg.content.split(":")[2] ?? "❤️";
+                                return (
+                                  <div className={`flex items-center gap-2 px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 200 }}>
+                                    <span className="text-2xl">{emoji}</span>
+                                    <span className="text-xs text-muted-foreground">hikayene tepki verdi</span>
+                                  </div>
+                                );
+                              }
+
+                              // Hikaye metin yanıtı
+                              if (msg.content?.startsWith("__STORY_REPLY__:")) {
+                                const text = msg.content.split(":").slice(2).join(":");
+                                return (
+                                  <div className={`px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                    <p className="text-[10px] text-muted-foreground font-medium mb-1">📖 Hikaye yanıtı</p>
+                                    <p className="text-[14px] text-foreground break-words">{text}</p>
+                                  </div>
+                                );
+                              }
+
+                              // Paylaşılan gönderi kartı
+                              if (msg.content?.startsWith("__LOOP_POST_SHARE__:")) {
+                                const parts = msg.content.split(":");
+                                const postId = parts[1];
+                                const snippet = parts.slice(2).join(":");
+                                return (
+                                  <a href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                    <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
+                                    <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
+                                    <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
+                                  </a>
                                 );
                               }
 
@@ -1864,34 +2011,11 @@ export default function DirectMessages() {
                 </div>
               ) : (
                 filteredGroups.map(g => (
-                  <div
-                    key={g.id}
-                    className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
-                    onClick={() => setLocation(`/dm/group/${g.id}`)}
-                  >
-                    <div className="w-[52px] h-[52px] rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2 mb-0.5">
-                        <span className="font-bold text-[15px] truncate">{g.name}</span>
-                        {g.lastMessage && (
-                          <span className="text-[11px] text-muted-foreground flex-shrink-0">
-                            {formatMsgTime(g.lastMessage.createdAt)}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {g.lastMessage?.content
-                          ? `${g.members.find(m => m.id === g.lastMessage!.senderId)?.displayName?.split(" ")[0] ?? ""}: ${g.lastMessage.content}`
-                          : g.members.map(m => m.displayName.split(" ")[0]).join(", ")}
-                      </p>
-                    </div>
-                  </div>
+                  <GroupRow key={g.id} g={g} onClick={() => setLocation(`/dm/group/${g.id}`)} />
                 ))
               )}
             </div>
-          ) : filteredConvs.length === 0 ? (
+          ) : filteredConvs.length === 0 && filteredGroups.length === 0 ? (
             <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground px-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <MessageCircle className="w-8 h-8 text-primary/30" />
@@ -1905,6 +2029,10 @@ export default function DirectMessages() {
             </div>
           ) : (
             <div>
+              {/* Tümü sekmesinde gruplar en üstte listelenir */}
+              {activeTab === "tumu" && filteredGroups.map(g => (
+                <GroupRow key={`g-${g.id}`} g={g} onClick={() => setLocation(`/dm/group/${g.id}`)} />
+              ))}
               {filteredConvs.map((c, idx) => {
                 const uid = c.user?.id ?? idx;
                 const preview = lastMsgPreview(c.lastMessage);

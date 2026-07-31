@@ -138,7 +138,7 @@ router.post("/stories/:storyId/view", requireAuth, async (req, res) => {
   }
 });
 
-// Ensure story_replies table exists
+// Ensure story_replies table exists (with pinned column)
 db.execute(sql`
   CREATE TABLE IF NOT EXISTS story_replies (
     id SERIAL PRIMARY KEY,
@@ -146,9 +146,13 @@ db.execute(sql`
     from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     content TEXT NOT NULL,
     is_emoji BOOLEAN NOT NULL DEFAULT false,
+    pinned BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
   )
 `).catch(() => {});
+
+// Add pinned column to existing tables if missing
+db.execute(sql`ALTER TABLE story_replies ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
 
 // POST /stories/:storyId/reply — send a reply or emoji reaction to a story
 router.post("/stories/:storyId/reply", requireAuth, async (req, res) => {
@@ -183,6 +187,30 @@ router.post("/stories/:storyId/reply", requireAuth, async (req, res) => {
     });
 
     res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /stories/:storyId/replies/:replyId/pin — toggle pin (story owner only)
+router.post("/stories/:storyId/replies/:replyId/pin", requireAuth, async (req, res) => {
+  try {
+    const storyId = parseInt(req.params["storyId"]!);
+    const replyId = parseInt(req.params["replyId"]!);
+    const userId = req.user!.id;
+
+    const [story] = await db.select().from(storiesTable).where(eq(storiesTable.id, storyId)).limit(1);
+    if (!story) { res.status(404).json({ error: "Hikaye bulunamadı" }); return; }
+    if (story.userId !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+
+    // Toggle pinned
+    const rows = await db.execute(sql`
+      UPDATE story_replies SET pinned = NOT pinned WHERE id = ${replyId} AND story_id = ${storyId}
+      RETURNING id, pinned
+    `);
+    const updated = (rows.rows as any[])[0];
+    res.json({ id: updated?.id, pinned: updated?.pinned });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
