@@ -189,6 +189,37 @@ router.post("/stories/:storyId/reply", requireAuth, async (req, res) => {
   }
 });
 
+// GET /stories/:storyId/viewers — get all viewers (only for story owner)
+router.get("/stories/:storyId/viewers", requireAuth, async (req, res) => {
+  try {
+    const storyId = parseInt(req.params["storyId"]!);
+    const userId = req.user!.id;
+
+    const [story] = await db.select().from(storiesTable).where(eq(storiesTable.id, storyId)).limit(1);
+    if (!story) { res.status(404).json({ error: "Hikaye bulunamadı" }); return; }
+    if (story.userId !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+
+    const rows = await db
+      .select({
+        id: storyViewsTable.id,
+        userId: storyViewsTable.userId,
+        viewedAt: storyViewsTable.viewedAt,
+        displayName: usersTable.displayName,
+        username: usersTable.username,
+        avatarUrl: usersTable.avatarUrl,
+      })
+      .from(storyViewsTable)
+      .innerJoin(usersTable, eq(usersTable.id, storyViewsTable.userId))
+      .where(eq(storyViewsTable.storyId, storyId))
+      .orderBy(desc(storyViewsTable.viewedAt));
+
+    res.json(rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /stories/:storyId/replies — get all replies (only for story owner)
 router.get("/stories/:storyId/replies", requireAuth, async (req, res) => {
   try {

@@ -81,88 +81,7 @@ router.get("/dm/conversations", requireAuth, async (req, res) => {
   }
 });
 
-// GET /dm/:userId
-router.get("/dm/:userId", requireAuth, async (req, res) => {
-  try {
-    const myId = req.user!.id;
-    const otherId = parseInt(req.params["userId"] as string);
-
-    const messages = await db.select().from(directMessagesTable)
-      .where(or(
-        and(eq(directMessagesTable.senderId, myId), eq(directMessagesTable.receiverId, otherId)),
-        and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.receiverId, myId)),
-      ))
-      .orderBy(desc(directMessagesTable.createdAt)).limit(60);
-
-    await db.update(directMessagesTable).set({ isRead: true })
-      .where(and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.receiverId, myId)));
-
-    const enriched = await Promise.all(messages.reverse().map(enrichMessage));
-    res.json(enriched);
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /dm/:userId — text message (must be AFTER all /dm/groups routes to avoid collision)
-router.post("/dm/:userId", requireAuth, async (req, res) => {
-  // Guard: /dm/groups is a named route — do not handle it here
-  if ((req.params["userId"] as string) === "groups") {
-    res.status(404).json({ error: "Not found" }); return;
-  }
-  try {
-    const senderId = req.user!.id;
-    const receiverId = parseInt(req.params["userId"] as string);
-    const { content } = req.body;
-
-    if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
-
-    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, content }).returning();
-    res.status(201).json(await enrichMessage(msg));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /dm/:userId/media
-router.post("/dm/:userId/media", requireAuth, upload.single("file"), async (req, res) => {
-  try {
-    const senderId = req.user!.id;
-    const receiverId = parseInt(req.params["userId"] as string);
-    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
-
-    const mediaUrl = `/api/uploads/${req.file.filename}`;
-    const mediaType = req.file.mimetype.startsWith("video") ? "video" : "image";
-
-    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, mediaUrl, mediaType }).returning();
-    res.status(201).json(await enrichMessage(msg));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// POST /dm/:userId/voice — voice message
-router.post("/dm/:userId/voice", requireAuth, upload.single("file"), async (req, res) => {
-  try {
-    const senderId = req.user!.id;
-    const receiverId = parseInt(req.params["userId"] as string);
-    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
-
-    const voiceUrl = `/api/uploads/${req.file.filename}`;
-    const voiceDuration = req.body.duration ? parseInt(req.body.duration) : null;
-
-    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, voiceUrl, voiceDuration }).returning();
-    res.status(201).json(await enrichMessage(msg));
-  } catch (err) {
-    req.log.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-// ── Group DM ──────────────────────────────────────────────────────────────────
+// ── Group DM routes — MUST come before /dm/:userId wildcard ──────────────────
 
 // GET /dm/groups
 router.get("/dm/groups", requireAuth, async (req, res) => {
@@ -261,6 +180,85 @@ router.post("/dm/groups/:groupId/media", requireAuth, upload.single("file"), asy
     const [sender] = await db.select({ id: usersTable.id, displayName: usersTable.displayName, avatarUrl: usersTable.avatarUrl, username: usersTable.username })
       .from(usersTable).where(eq(usersTable.id, req.user!.id)).limit(1);
     res.status(201).json({ ...msg, sender, createdAt: msg.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Direct message wildcard routes — MUST come AFTER all named /dm/* routes ──
+
+// GET /dm/:userId
+router.get("/dm/:userId", requireAuth, async (req, res) => {
+  try {
+    const myId = req.user!.id;
+    const otherId = parseInt(req.params["userId"] as string);
+
+    const messages = await db.select().from(directMessagesTable)
+      .where(or(
+        and(eq(directMessagesTable.senderId, myId), eq(directMessagesTable.receiverId, otherId)),
+        and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.receiverId, myId)),
+      ))
+      .orderBy(desc(directMessagesTable.createdAt)).limit(60);
+
+    await db.update(directMessagesTable).set({ isRead: true })
+      .where(and(eq(directMessagesTable.senderId, otherId), eq(directMessagesTable.receiverId, myId)));
+
+    const enriched = await Promise.all(messages.reverse().map(enrichMessage));
+    res.json(enriched);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /dm/:userId — text message
+router.post("/dm/:userId", requireAuth, async (req, res) => {
+  try {
+    const senderId = req.user!.id;
+    const receiverId = parseInt(req.params["userId"] as string);
+    const { content } = req.body;
+
+    if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
+
+    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, content }).returning();
+    res.status(201).json(await enrichMessage(msg));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /dm/:userId/media
+router.post("/dm/:userId/media", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    const senderId = req.user!.id;
+    const receiverId = parseInt(req.params["userId"] as string);
+    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
+
+    const mediaUrl = `/api/uploads/${req.file.filename}`;
+    const mediaType = req.file.mimetype.startsWith("video") ? "video" : "image";
+
+    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, mediaUrl, mediaType }).returning();
+    res.status(201).json(await enrichMessage(msg));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /dm/:userId/voice — voice message
+router.post("/dm/:userId/voice", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    const senderId = req.user!.id;
+    const receiverId = parseInt(req.params["userId"] as string);
+    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
+
+    const voiceUrl = `/api/uploads/${req.file.filename}`;
+    const voiceDuration = req.body.duration ? parseInt(req.body.duration) : null;
+
+    const [msg] = await db.insert(directMessagesTable).values({ senderId, receiverId, voiceUrl, voiceDuration }).returning();
+    res.status(201).json(await enrichMessage(msg));
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

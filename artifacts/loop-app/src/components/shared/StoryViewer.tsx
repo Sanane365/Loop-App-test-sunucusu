@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Send, Eye } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Send, Eye, MessageCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -51,9 +51,20 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const [replies, setReplies] = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
 
+  // Story owner viewers panel
+  const [showViewers, setShowViewers] = useState(false);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [viewersLoading, setViewersLoading] = useState(false);
+
   const currentGroup = groups[groupIdx];
   const currentStory = currentGroup?.stories[storyIdx];
   const isOwnStory = !!user && currentGroup?.user?.id === user.id;
+
+  // Toggle body class so BottomNav can hide itself
+  useEffect(() => {
+    document.body.classList.add("story-viewer-open");
+    return () => document.body.classList.remove("story-viewer-open");
+  }, []);
 
   const goNext = useCallback(() => {
     if (!currentGroup) return;
@@ -61,11 +72,13 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
       setStoryIdx((i) => i + 1);
       setProgress(0);
       setShowReplies(false);
+      setShowViewers(false);
     } else if (groupIdx < groups.length - 1) {
       setGroupIdx((i) => i + 1);
       setStoryIdx(0);
       setProgress(0);
       setShowReplies(false);
+      setShowViewers(false);
     } else {
       onClose();
     }
@@ -76,11 +89,13 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
       setStoryIdx((i) => i - 1);
       setProgress(0);
       setShowReplies(false);
+      setShowViewers(false);
     } else if (groupIdx > 0) {
       setGroupIdx((i) => i - 1);
       setStoryIdx(0);
       setProgress(0);
       setShowReplies(false);
+      setShowViewers(false);
     }
   }, [storyIdx, groupIdx]);
 
@@ -115,7 +130,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     }
   };
   const handleInputBlur = () => {
-    if (paused && !showReplies) setPaused(false);
+    if (paused && !showReplies && !showViewers) setPaused(false);
   };
 
   // Keyboard navigation
@@ -173,10 +188,36 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const toggleReplies = async () => {
     if (!showReplies) {
       setPaused(true);
+      setShowViewers(false);
       setShowReplies(true);
       await loadReplies();
     } else {
       setShowReplies(false);
+      setPaused(false);
+    }
+  };
+
+  // Load viewers (story owner)
+  const loadViewers = async () => {
+    if (!currentStory) return;
+    setViewersLoading(true);
+    try {
+      const r = await fetch(`/api/stories/${currentStory.id}/viewers`);
+      const data = await r.json();
+      setViewers(Array.isArray(data) ? data : []);
+    } finally {
+      setViewersLoading(false);
+    }
+  };
+
+  const toggleViewers = async () => {
+    if (!showViewers) {
+      setPaused(true);
+      setShowReplies(false);
+      setShowViewers(true);
+      await loadViewers();
+    } else {
+      setShowViewers(false);
       setPaused(false);
     }
   };
@@ -218,16 +259,6 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
               {formatDistanceToNow(new Date(currentStory.createdAt), { locale: tr, addSuffix: true })}
             </p>
           </div>
-          {/* Yanıtları gör (sadece kendi hikayesi) */}
-          {isOwnStory && (
-            <button
-              onClick={toggleReplies}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/25 transition-colors mr-1"
-            >
-              <Eye className="w-3.5 h-3.5" />
-              Yanıtları Gör
-            </button>
-          )}
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors"
@@ -257,7 +288,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
           )}
         </div>
 
-        {/* Tap zones (exclude bottom bar area) */}
+        {/* Tap zones */}
         <button
           className="absolute left-0 top-0 w-1/3 z-10"
           style={{ height: "calc(100% - 100px)" }}
@@ -278,49 +309,110 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
           </div>
         )}
 
-        {/* ── Bottom: Reply bar (others' stories) ── */}
-        {!isOwnStory && (
-          <div className="absolute bottom-0 left-0 right-0 z-20 pb-4 px-3">
-            {/* Emoji reactions */}
-            <div className="flex gap-2 justify-center mb-2">
-              {EMOJI_REACTIONS.map((emoji) => (
+        {/* ── Bottom bar ── */}
+        <div className="absolute bottom-0 left-0 right-0 z-20 pb-safe">
+          {/* Others' stories: emoji reactions + text reply */}
+          {!isOwnStory && (
+            <div className="pb-4 px-3">
+              <div className="flex gap-2 justify-center mb-2">
+                {EMOJI_REACTIONS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => sendReply(emoji, true)}
+                    disabled={replySending}
+                    className="text-xl hover:scale-125 active:scale-110 transition-transform"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
+                <input
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onFocus={handleInputFocus}
+                  onBlur={handleInputBlur}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(replyText); } }}
+                  placeholder={`@${currentGroup.user.username}'e yanıt ver…`}
+                  className="flex-1 bg-transparent text-white placeholder:text-white/50 text-sm focus:outline-none"
+                />
                 <button
-                  key={emoji}
-                  onClick={() => sendReply(emoji, true)}
-                  disabled={replySending}
-                  className="text-xl hover:scale-125 active:scale-110 transition-transform"
+                  onClick={() => sendReply(replyText)}
+                  disabled={!replyText.trim() || replySending}
+                  className="w-8 h-8 flex items-center justify-center rounded-full bg-primary disabled:opacity-40"
                 >
-                  {emoji}
+                  <Send className="w-3.5 h-3.5 text-white" />
                 </button>
-              ))}
+              </div>
             </div>
-            {/* Text reply input */}
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
-              <input
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onFocus={handleInputFocus}
-                onBlur={handleInputBlur}
-                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(replyText); } }}
-                placeholder={`@${currentGroup.user.username}'e yanıt ver…`}
-                className="flex-1 bg-transparent text-white placeholder:text-white/50 text-sm focus:outline-none"
-              />
+          )}
+
+          {/* Own stories: İzleyenleri Gör (left) + Yanıtları Gör (right) */}
+          {isOwnStory && (
+            <div className="flex items-center justify-between px-4 pb-6 pt-2">
+              {/* Left: viewers */}
               <button
-                onClick={() => sendReply(replyText)}
-                disabled={!replyText.trim() || replySending}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-primary disabled:opacity-40"
+                onClick={toggleViewers}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/25 transition-colors"
               >
-                <Send className="w-3.5 h-3.5 text-white" />
+                <Eye className="w-3.5 h-3.5" />
+                İzleyenleri Gör
               </button>
+
+              {/* Right: replies */}
+              <button
+                onClick={toggleReplies}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/25 transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Yanıtları Gör
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── Viewers panel (story owner) — slides from left ── */}
+        {isOwnStory && showViewers && (
+          <div
+            className="absolute left-0 top-0 bottom-0 z-30 flex flex-col"
+            style={{ width: "min(280px, 85%)", background: "rgba(0,0,0,0.88)", backdropFilter: "blur(14px)" }}
+          >
+            <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
+              <p className="text-white font-semibold text-sm">İzleyenler</p>
+              <button onClick={() => { setShowViewers(false); setPaused(false); }}>
+                <X className="w-5 h-5 text-white/70 hover:text-white" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3">
+              {viewersLoading ? (
+                <p className="text-white/50 text-sm text-center py-8">Yükleniyor…</p>
+              ) : viewers.length === 0 ? (
+                <div className="text-center py-10">
+                  <p className="text-2xl mb-2">👁</p>
+                  <p className="text-white/50 text-sm">Henüz kimse izlemedi</p>
+                </div>
+              ) : viewers.map((v: any) => (
+                <div key={v.id} className="flex gap-2.5 items-center">
+                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-white/10">
+                    {v.avatarUrl
+                      ? <img src={v.avatarUrl} className="w-full h-full object-cover" alt={v.displayName} />
+                      : <span className="w-full h-full flex items-center justify-center text-white text-xs font-bold">{v.displayName?.charAt(0)}</span>}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-medium truncate">{v.displayName}</p>
+                    <p className="text-white/50 text-[11px]">@{v.username}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* ── Replies panel (story owner) ── */}
+        {/* ── Replies panel (story owner) — slides from right ── */}
         {isOwnStory && showReplies && (
           <div
             className="absolute right-0 top-0 bottom-0 z-30 flex flex-col"
-            style={{ width: "min(280px, 85%)", background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)" }}
+            style={{ width: "min(280px, 85%)", background: "rgba(0,0,0,0.88)", backdropFilter: "blur(14px)" }}
           >
             <div className="flex items-center justify-between px-4 py-4 border-b border-white/10">
               <p className="text-white font-semibold text-sm">Hikaye Yanıtları</p>

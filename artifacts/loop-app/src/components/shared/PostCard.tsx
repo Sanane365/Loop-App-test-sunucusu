@@ -1,12 +1,12 @@
 import { Post, useLikePost, useUnlikePost, useRepostPost, useBookmarkPost, getListPostsQueryKey, useListComments, useCreateComment, getListCommentsQueryKey } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal, Music2, Plus, Share2, X, Smile, ImagePlus } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal, Music2, Plus, Share2, X, Smile, ImagePlus, Search } from "lucide-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
 
 function formatCount(n: number): string {
@@ -290,6 +290,213 @@ function CommentBottomSheet({
   );
 }
 
+// ── DM Share Bottom Sheet ────────────────────────────────────────────────────
+function ShareBottomSheet({
+  postId,
+  postUser,
+  isOpen,
+  onClose,
+}: {
+  postId: number;
+  postUser?: string;
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [contacts, setContacts] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [sending, setSending] = useState<number | null>(null);
+  const [sent, setSent] = useState<Set<number>>(new Set());
+  const [visible, setVisible] = useState(false);
+  const [dragOffset, setDragOffset] = useState(0);
+  const startYRef = useRef<number | null>(null);
+  const isDraggingRef = useRef(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      requestAnimationFrame(() => setVisible(true));
+      // Load recent conversations
+      fetch("/api/dm/conversations", { credentials: "include" })
+        .then(r => r.json())
+        .then(data => {
+          if (Array.isArray(data)) setContacts(data.map((c: any) => c.user).filter(Boolean));
+        })
+        .catch(() => {});
+    } else {
+      setVisible(false);
+      setSearchQuery("");
+      setSearchResults([]);
+      setSent(new Set());
+    }
+  }, [isOpen]);
+
+  const doSearch = useCallback(async (q: string) => {
+    setSearchQuery(q);
+    if (!q.trim()) { setSearchResults([]); return; }
+    setSearching(true);
+    try {
+      const r = await fetch(`/api/users?q=${encodeURIComponent(q)}`, { credentials: "include" });
+      const data = await r.json();
+      setSearchResults(Array.isArray(data) ? data : []);
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
+  const sendToDM = async (userId: number, displayName: string) => {
+    if (sent.has(userId)) return;
+    setSending(userId);
+    try {
+      const postLink = `${window.location.origin}/post/${postId}`;
+      const content = postUser
+        ? `Sana bir gönderi ilettim 👉 ${postLink}`
+        : `Sana bir gönderi ilettim 👉 ${postLink}`;
+      const r = await fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      if (r.ok) {
+        setSent(prev => new Set([...prev, userId]));
+        toast({ title: `${displayName}'e gönderildi ✓` });
+      } else {
+        const d = await r.json();
+        toast({ title: "Gönderilemedi", description: d.error, variant: "destructive" });
+      }
+    } finally {
+      setSending(null);
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startYRef.current = e.touches[0].clientY;
+    isDraggingRef.current = true;
+  };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isDraggingRef.current || startYRef.current === null) return;
+    const dy = e.touches[0].clientY - startYRef.current;
+    setDragOffset(Math.max(0, dy));
+  };
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false;
+    if (dragOffset > 100) { onClose(); setDragOffset(0); }
+    else setDragOffset(0);
+    startYRef.current = null;
+  };
+
+  if (!isOpen) return null;
+
+  const displayList = searchQuery.trim() ? searchResults : contacts;
+
+  return (
+    <div className="fixed inset-0 z-[60]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/50 transition-opacity duration-300" style={{ opacity: visible ? 1 : 0 }} />
+      <div
+        className="absolute bottom-0 left-0 right-0 bg-background rounded-t-[28px] flex flex-col"
+        style={{
+          maxHeight: "70vh",
+          transform: `translateY(${dragOffset > 0 ? dragOffset : visible ? 0 : "100%"}px)`,
+          transition: dragOffset > 0 ? "none" : "transform 0.32s cubic-bezier(0.32,0.72,0,1)",
+          boxShadow: "0 -4px 32px rgba(0,0,0,0.18)",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Drag handle */}
+        <div
+          className="flex flex-col items-center pt-2.5 pb-1 cursor-grab active:cursor-grabbing select-none"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="w-9 h-1 rounded-full bg-muted-foreground/25" />
+        </div>
+
+        {/* Header */}
+        <div className="relative flex items-center justify-between px-4 pb-3 pt-1">
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+          <p className="absolute left-1/2 -translate-x-1/2 font-bold text-[15px]">Paylaş</p>
+          <div className="w-8" />
+        </div>
+
+        {/* Search */}
+        <div className="px-4 pb-3">
+          <div className="flex items-center gap-2 bg-muted rounded-full px-3 py-2">
+            <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <input
+              ref={searchRef}
+              value={searchQuery}
+              onChange={e => doSearch(e.target.value)}
+              placeholder="Kişi ara…"
+              className="flex-1 bg-transparent text-sm focus:outline-none"
+            />
+            {searchQuery && (
+              <button onClick={() => doSearch("")} className="text-muted-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="h-px bg-border/60 mx-4" />
+
+        {/* Contact list */}
+        <div className="flex-1 overflow-y-auto px-4 py-2 min-h-0">
+          {searching ? (
+            <div className="flex justify-center py-6">
+              <div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            </div>
+          ) : displayList.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">
+              {searchQuery ? "Kullanıcı bulunamadı" : "Henüz sohbet yok"}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {displayList.map((u: any) => {
+                const isSent = sent.has(u.id);
+                const isSending = sending === u.id;
+                return (
+                  <div key={u.id} className="flex items-center gap-3 py-2.5 px-1">
+                    <Avatar className="w-11 h-11 flex-shrink-0">
+                      <AvatarImage src={u.avatarUrl || ""} />
+                      <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                        {u.displayName?.charAt(0) || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm truncate">{u.displayName}</p>
+                      <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                    </div>
+                    <button
+                      onClick={() => sendToDM(u.id, u.displayName)}
+                      disabled={isSent || isSending}
+                      className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all
+                        ${isSent
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                    >
+                      {isSending ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                      ) : isSent ? "Gönderildi ✓" : "Gönder"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="h-safe-area-inset-bottom" style={{ height: "env(safe-area-inset-bottom, 0px)" }} />
+      </div>
+    </div>
+  );
+}
+
 // Poll fields are returned by the API but not in the generated schema
 type PostWithPoll = Post & {
   postType?: string | null;
@@ -307,6 +514,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   // Poll state
   const [myPollVote, setMyPollVote] = useState<number | null>(post.myPollVote ?? null);
@@ -470,6 +678,11 @@ export function PostCard({ post: postRaw }: { post: Post }) {
               <span className="text-white text-xs font-medium drop-shadow">{formatCount(post.repostCount)}</span>
             </button>
 
+            {/* DM Share */}
+            <button onClick={() => setIsShareOpen(true)} className="flex flex-col items-center gap-0.5">
+              <Send className="w-7 h-7 text-white drop-shadow-lg" />
+            </button>
+
             {/* Bookmark */}
             <button onClick={handleBookmark} className="flex flex-col items-center gap-0.5" data-testid={`post-bookmark-${post.id}`}>
               <Bookmark className={`w-7 h-7 drop-shadow-lg ${isBookmarked ? "fill-primary text-primary" : "text-white"}`} />
@@ -506,6 +719,12 @@ export function PostCard({ post: postRaw }: { post: Post }) {
           commentCount={post.commentCount}
           isOpen={isCommentsOpen}
           onClose={() => setIsCommentsOpen(false)}
+        />
+        <ShareBottomSheet
+          postId={post.id}
+          postUser={post.user?.username}
+          isOpen={isShareOpen}
+          onClose={() => setIsShareOpen(false)}
         />
       </>
     );
@@ -607,6 +826,14 @@ export function PostCard({ post: postRaw }: { post: Post }) {
             <span>{likeCount}</span>
           </button>
 
+          {/* DM Share */}
+          <button
+            onClick={() => setIsShareOpen(true)}
+            className="flex items-center gap-1.5 hover:text-primary transition-colors text-sm"
+          >
+            <Send className="w-5 h-5" />
+          </button>
+
           <button onClick={handleBookmark} className={`flex items-center gap-1.5 hover:text-primary transition-colors text-sm ml-auto ${isBookmarked ? "text-primary" : ""}`} data-testid={`post-bookmark-${post.id}`}>
             <Bookmark className={`w-5 h-5 ${isBookmarked ? "fill-current" : ""}`} />
           </button>
@@ -618,6 +845,12 @@ export function PostCard({ post: postRaw }: { post: Post }) {
         commentCount={post.commentCount}
         isOpen={isCommentsOpen}
         onClose={() => setIsCommentsOpen(false)}
+      />
+      <ShareBottomSheet
+        postId={post.id}
+        postUser={post.user?.username}
+        isOpen={isShareOpen}
+        onClose={() => setIsShareOpen(false)}
       />
     </>
   );

@@ -1,10 +1,23 @@
 import { Link, useLocation } from "wouter";
 import { Home, Search, PlusCircle, MessageCircle, Mic, User } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { useEffect, useState } from "react";
 
 export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
+  const [storyOpen, setStoryOpen] = useState(false);
+
+  // Hide when story viewer is active (StoryViewer adds this class to body)
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setStoryOpen(document.body.classList.contains("story-viewer-open"));
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  if (storyOpen) return null;
 
   return (
     <div className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex items-center justify-around px-2 z-50 md:hidden">
