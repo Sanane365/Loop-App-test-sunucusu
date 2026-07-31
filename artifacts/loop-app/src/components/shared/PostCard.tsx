@@ -675,7 +675,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
 
             {/* Share/Repost */}
             <button onClick={handleRepost} className="flex flex-col items-center gap-0.5" data-testid={`post-repost-${post.id}`}>
-              <Repeat2 className={`w-7 h-7 drop-shadow-lg ${post.isReposted ? "text-primary" : "text-white"}`} />
+              <Repeat2 className={`w-7 h-7 drop-shadow-lg ${post.isReposted ? "text-green-400" : "text-white"}`} />
               <span className="text-white text-xs font-medium drop-shadow">{formatCount(post.repostCount)}</span>
             </button>
 
@@ -818,7 +818,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
             <span>{post.commentCount}</span>
           </button>
 
-          <button onClick={handleRepost} className={`flex items-center gap-1.5 hover:text-primary transition-colors text-sm ${post.isReposted ? "text-primary" : ""}`} data-testid={`post-repost-${post.id}`}>
+          <button onClick={handleRepost} className={`flex items-center gap-1.5 hover:text-green-500 transition-colors text-sm ${post.isReposted ? "text-green-500" : ""}`} data-testid={`post-repost-${post.id}`}>
             <Repeat2 className="w-5 h-5" />
             <span>{post.repostCount}</span>
           </button>

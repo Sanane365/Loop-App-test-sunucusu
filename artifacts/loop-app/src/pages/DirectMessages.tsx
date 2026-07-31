@@ -2932,48 +2932,57 @@ export default function DirectMessages() {
   );
 }
 
-// ── Paylaşılan gönderi bottom-sheet bileşeni ────────────────────────────────
+// ── Paylaşılan gönderi — ana sayfa feed görünümü ─────────────────────────────
 function SharedPostOverlay({ postId, onClose }: { postId: number; onClose: () => void }) {
-  const [post, setPost] = useState<any>(null);
+  const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const targetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/posts/${postId}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => { setPost(data); setLoading(false); })
+    fetch("/api/posts")
+      .then(r => r.ok ? r.json() : [])
+      .then((data: any[]) => { setPosts(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [postId]);
+  }, []);
+
+  // Hedef gönderiyi görünür yap
+  useEffect(() => {
+    if (!loading && targetRef.current) {
+      setTimeout(() => targetRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 80);
+    }
+  }, [loading]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
-      {/* Arka plan */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
-      {/* Panel */}
+    <div className="fixed inset-0 z-50 flex flex-col bg-secondary/50" onClick={onClose}>
+      {/* Header — geri butonu */}
       <div
-        className="relative w-full max-w-lg mx-auto bg-background rounded-t-3xl overflow-hidden shadow-2xl"
-        style={{ maxHeight: "85vh" }}
+        className="flex items-center gap-2 px-3 py-3 bg-background border-b border-border/40 sticky top-0 z-10 flex-shrink-0"
         onClick={e => e.stopPropagation()}
       >
-        {/* Tutamaç + kapat */}
-        <div className="flex items-center justify-between px-4 pt-3 pb-1">
-          <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
-          <span className="font-bold text-sm text-foreground">Gönderi</span>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="overflow-y-auto" style={{ maxHeight: "calc(85vh - 52px)" }}>
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : post ? (
-            <PostCard post={post} />
-          ) : (
-            <div className="py-12 text-center text-sm text-muted-foreground">Gönderi bulunamadı.</div>
-          )}
-        </div>
+        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
+          <ArrowLeft className="w-5 h-5" />
+        </button>
+        <span className="font-bold text-[15px]">Gönderi</span>
+      </div>
+
+      {/* Feed */}
+      <div className="flex-1 overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : posts.length === 0 ? (
+          <div className="py-20 text-center text-sm text-muted-foreground">Gönderi bulunamadı.</div>
+        ) : (
+          <div className="max-w-screen-md mx-auto">
+            {posts.map(p => (
+              <div key={p.id} ref={p.id === postId ? targetRef : undefined}>
+                <PostCard post={p} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -70,6 +70,20 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     return () => document.body.classList.remove("story-viewer-open");
   }, []);
 
+  // Hikaye değiştiğinde sabitlenen yanıtları sessizce yükle (sayfa yenilemesinde kaybolmasın)
+  useEffect(() => {
+    if (!currentStory || !isOwnStory) return;
+    fetch(`/api/stories/${currentStory.id}/replies`)
+      .then(r => r.ok ? r.json() : [])
+      .then((arr: any[]) => {
+        const pinned = Array.isArray(arr) ? arr.filter(r => r.pinned) : [];
+        if (pinned.length > 0) {
+          setPinnedByStory(prev => ({ ...prev, [currentStory.id]: pinned }));
+        }
+      })
+      .catch(() => {});
+  }, [currentStory?.id, isOwnStory]);
+
   const goNext = useCallback(() => {
     if (!currentGroup) return;
     if (storyIdx < currentGroup.stories.length - 1) {
