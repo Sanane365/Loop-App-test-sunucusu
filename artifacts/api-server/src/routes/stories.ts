@@ -259,7 +259,7 @@ router.get("/stories/:storyId/replies", requireAuth, async (req, res) => {
     if (story.userId !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
 
     const rows = await db.execute(sql`
-      SELECT sr.id, sr.content, sr.is_emoji, sr.created_at,
+      SELECT sr.id, sr.content, sr.is_emoji, sr.pinned, sr.created_at,
              u.id as user_id, u.display_name, u.username, u.avatar_url
       FROM story_replies sr
       JOIN users u ON u.id = sr.from_user_id

@@ -2932,34 +2932,30 @@ export default function DirectMessages() {
   );
 }
 
-// ── Paylaşılan gönderi — ana sayfa feed görünümü ─────────────────────────────
+// ── Paylaşılan gönderi — Instagram tarzı feed görünümü ──────────────────────
 function SharedPostOverlay({ postId, onClose }: { postId: number; onClose: () => void }) {
-  const [posts, setPosts] = useState<any[]>([]);
+  const [targetPost, setTargetPost] = useState<any>(null);
+  const [restPosts, setRestPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const targetRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLoading(true);
-    fetch("/api/posts")
-      .then(r => r.ok ? r.json() : [])
-      .then((data: any[]) => { setPosts(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, []);
-
-  // Hedef gönderiyi görünür yap
-  useEffect(() => {
-    if (!loading && targetRef.current) {
-      setTimeout(() => targetRef.current?.scrollIntoView({ block: "start", behavior: "smooth" }), 80);
-    }
-  }, [loading]);
+    Promise.all([
+      fetch(`/api/posts/${postId}`).then(r => r.ok ? r.json() : null),
+      fetch("/api/posts").then(r => r.ok ? r.json() : [])
+    ]).then(([target, all]) => {
+      setTargetPost(target);
+      // Hedef post'u listenin başına koy, tekrar görünmesin
+      const others = (Array.isArray(all) ? all : []).filter((p: any) => p.id !== postId);
+      setRestPosts(others);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [postId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-secondary/50" onClick={onClose}>
-      {/* Header — geri butonu */}
-      <div
-        className="flex items-center gap-2 px-3 py-3 bg-background border-b border-border/40 sticky top-0 z-10 flex-shrink-0"
-        onClick={e => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex flex-col bg-secondary/50">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-3 bg-background border-b border-border/40 sticky top-0 z-10 flex-shrink-0">
         <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </button>
@@ -2967,20 +2963,19 @@ function SharedPostOverlay({ postId, onClose }: { postId: number; onClose: () =>
       </div>
 
       {/* Feed */}
-      <div className="flex-1 overflow-y-auto" onClick={e => e.stopPropagation()}>
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-        ) : posts.length === 0 ? (
+        ) : !targetPost ? (
           <div className="py-20 text-center text-sm text-muted-foreground">Gönderi bulunamadı.</div>
         ) : (
           <div className="max-w-screen-md mx-auto">
-            {posts.map(p => (
-              <div key={p.id} ref={p.id === postId ? targetRef : undefined}>
-                <PostCard post={p} />
-              </div>
-            ))}
+            {/* Hedef post — her zaman üstte */}
+            <PostCard post={targetPost} />
+            {/* Diğer postlar — feed gibi kaydır */}
+            {restPosts.map(p => <PostCard key={p.id} post={p} />)}
           </div>
         )}
       </div>
