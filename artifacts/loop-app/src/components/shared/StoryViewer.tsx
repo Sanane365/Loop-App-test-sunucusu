@@ -74,17 +74,17 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     return () => document.body.classList.remove("story-viewer-open");
   }, []);
 
-  // Hikaye değiştiğinde sabitlenen yanıtları backend'den yükle + cache'e yaz
+  // Hikaye değiştiğinde sabitlenmiş yanıtları public endpoint'ten yükle + cache'e yaz
+  // (tüm kullanıcılar için — owner olmak gerekmez)
   useEffect(() => {
     if (!currentStory) return;
     const sid = currentStory.id;
-    fetch(`/api/stories/${sid}/replies`)
+    fetch(`/api/stories/${sid}/pinned-replies`)
       .then(r => r.ok ? r.json() : null)
       .then((arr: any[]) => {
         if (!Array.isArray(arr)) return;
-        const pinned = arr.filter(r => r.pinned);
-        _pinnedCache[sid] = pinned;          // module cache güncelle
-        setPinnedByStory(prev => ({ ...prev, [sid]: pinned }));
+        _pinnedCache[sid] = arr;
+        setPinnedByStory(prev => ({ ...prev, [sid]: arr }));
       })
       .catch(() => {});
   }, [currentStory?.id]);
@@ -284,11 +284,13 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
         {/* Progress bars */}
         <div className="absolute top-0 left-0 right-0 z-20 flex gap-1 p-2">
           {currentGroup.stories.map((_, i) => (
-            <div key={i} className="flex-1 h-0.5 bg-white/30 rounded-full overflow-hidden">
+            <div key={i} className="flex-1 h-[3px] bg-white/20 rounded-full">
               <div
-                className="h-full bg-white rounded-full transition-none"
+                className="h-full rounded-full transition-none"
                 style={{
                   width: i < storyIdx ? "100%" : i === storyIdx ? `${progress}%` : "0%",
+                  background: "linear-gradient(90deg, #9333ea, #c026d3)",
+                  boxShadow: "0 0 7px 2px rgba(168,85,247,0.85), 0 0 2px rgba(255,255,255,0.35)",
                 }}
               />
             </div>
@@ -466,8 +468,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
           </div>
         )}
 
-        {/* ── Pinned replies overlay — bu hikaye parçasına özel ── */}
-        {isOwnStory && currentStory && (pinnedByStory[currentStory.id] ?? []).length > 0 && !showReplies && !showViewers && (
+        {/* ── Pinned replies overlay — tüm izleyiciler görebilir ── */}
+        {currentStory && (pinnedByStory[currentStory.id] ?? []).length > 0 && !showReplies && !showViewers && (
           <div className="absolute bottom-20 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
             {(pinnedByStory[currentStory.id] ?? []).slice(0, 2).map((r: any) => (
               <div key={r.id} className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[190px]">

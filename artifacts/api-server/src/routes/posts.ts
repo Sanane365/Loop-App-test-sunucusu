@@ -253,7 +253,17 @@ router.get("/posts/:postId/comments", async (req, res) => {
         createdAt: c.createdAt.toISOString(),
       };
     }));
-    res.json(enriched);
+
+    // Akıllı sıralama: üst düzey yorumlar skora göre, yanıtlar ebeveyniyle birlikte kalır
+    const DAY_MS = 86_400_000;
+    const scoreComment = (c: { likeCount: number; createdAt: string }) => {
+      const ageDays = (Date.now() - new Date(c.createdAt).getTime()) / DAY_MS;
+      const recencyBoost = Math.max(0, (3 - ageDays) * 25); // yeni yorum bonusu, 3 günde solar
+      return c.likeCount * 10 + recencyBoost;
+    };
+    const topLevel = enriched.filter(c => !c.replyToId).sort((a, b) => scoreComment(b) - scoreComment(a));
+    const replyList = enriched.filter(c => c.replyToId != null);
+    res.json([...topLevel, ...replyList]);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

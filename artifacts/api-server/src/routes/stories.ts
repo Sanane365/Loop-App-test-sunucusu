@@ -248,6 +248,25 @@ router.get("/stories/:storyId/viewers", requireAuth, async (req, res) => {
   }
 });
 
+// GET /stories/:storyId/pinned-replies — herkese açık, sadece sabitlenmiş yanıtlar
+router.get("/stories/:storyId/pinned-replies", async (req, res) => {
+  try {
+    const storyId = parseInt(req.params["storyId"]!);
+    const rows = await db.execute(sql`
+      SELECT sr.id, sr.content, sr.is_emoji, sr.created_at,
+             u.id as user_id, u.display_name, u.username, u.avatar_url
+      FROM story_replies sr
+      JOIN users u ON u.id = sr.from_user_id
+      WHERE sr.story_id = ${storyId} AND sr.pinned = true
+      ORDER BY sr.created_at DESC
+    `);
+    res.json(rows.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // GET /stories/:storyId/replies — get all replies (only for story owner)
 router.get("/stories/:storyId/replies", requireAuth, async (req, res) => {
   try {

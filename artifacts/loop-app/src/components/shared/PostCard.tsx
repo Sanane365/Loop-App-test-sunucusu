@@ -41,6 +41,7 @@ function CommentBottomSheet({
   const [newComment, setNewComment] = useState("");
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [commentLikes, setCommentLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
+  const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
   const [dragOffset, setDragOffset] = useState(0);
   const [visible, setVisible] = useState(false);
   const startYRef = useRef<number | null>(null);
@@ -193,53 +194,100 @@ function CommentBottomSheet({
               <MessageCircle className="w-10 h-10 mb-2 opacity-30" />
               <p className="text-sm">İlk yorumu sen yap!</p>
             </div>
-          ) : (
-            comments?.map(comment => {
-              const cl = commentLikes[comment.id] ?? { liked: (comment as any).isLiked ?? false, count: (comment as any).likeCount ?? 0 };
+          ) : (() => {
+            // Yorum ağacını oluştur
+            const allComments = (comments ?? []) as any[];
+            const topLevel = allComments.filter(c => !c.replyToId);
+            const repliesByParent: Record<number, any[]> = {};
+            allComments.forEach(c => {
+              if (c.replyToId) {
+                if (!repliesByParent[c.replyToId]) repliesByParent[c.replyToId] = [];
+                repliesByParent[c.replyToId].push(c);
+              }
+            });
+
+            const renderComment = (comment: any, isReply = false) => {
+              const cl = commentLikes[comment.id] ?? { liked: comment.isLiked ?? false, count: comment.likeCount ?? 0 };
               return (
-              <div key={comment.id} className="flex gap-3">
-                <Link href={`/profile/${comment.userId}`} onClick={onClose}>
-                  <Avatar className="w-9 h-9 cursor-pointer flex-shrink-0">
-                    <AvatarImage src={comment.user?.avatarUrl || ""} />
-                    <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
-                      {comment.user?.displayName?.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                </Link>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="font-semibold text-[13px] text-foreground leading-tight">
-                          {comment.user?.displayName}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          · {formatDistanceToNow(new Date(comment.createdAt), { locale: tr, addSuffix: true })}
-                        </span>
+                <div key={comment.id} className={`flex gap-2.5 ${isReply ? "pl-0" : ""}`}>
+                  <Link href={`/profile/${comment.userId}`} onClick={onClose}>
+                    <Avatar className={`cursor-pointer flex-shrink-0 ${isReply ? "w-7 h-7" : "w-9 h-9"}`}>
+                      <AvatarImage src={comment.user?.avatarUrl || ""} />
+                      <AvatarFallback className={`font-bold bg-primary/10 text-primary ${isReply ? "text-[10px]" : "text-xs"}`}>
+                        {comment.user?.displayName?.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                          <span className={`font-semibold text-foreground leading-tight ${isReply ? "text-[12px]" : "text-[13px]"}`}>
+                            {comment.user?.displayName}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            · {formatDistanceToNow(new Date(comment.createdAt), { locale: tr, addSuffix: true })}
+                          </span>
+                        </div>
+                        <p className={`text-foreground leading-[1.45] break-words whitespace-pre-wrap ${isReply ? "text-[13px]" : "text-[14px]"}`}>
+                          {comment.content}
+                        </p>
+                        <button
+                          onClick={() => handleReply(comment)}
+                          className="text-[12px] text-muted-foreground mt-1 font-medium hover:text-foreground transition-colors"
+                        >
+                          Yanıtla
+                        </button>
                       </div>
-                      <p className="text-[14px] text-foreground leading-[1.45] break-words whitespace-pre-wrap">
-                        {comment.content}
-                      </p>
                       <button
-                        onClick={() => handleReply(comment)}
-                        className="text-[12px] text-muted-foreground mt-1.5 font-medium hover:text-foreground transition-colors"
+                        onClick={() => handleToggleCommentLike(comment)}
+                        className="flex flex-col items-center gap-0.5 flex-shrink-0 mt-0.5 p-1"
                       >
-                        Yanıtla
+                        <Heart className={`transition-colors ${isReply ? "w-3.5 h-3.5" : "w-4 h-4"} ${cl.liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
+                        {cl.count > 0 && <span className="text-[10px] text-muted-foreground">{formatCount(cl.count)}</span>}
                       </button>
                     </div>
-                    <button
-                      onClick={() => handleToggleCommentLike(comment)}
-                      className="flex flex-col items-center gap-0.5 flex-shrink-0 mt-0.5 p-1"
-                    >
-                      <Heart className={`w-4 h-4 transition-colors ${cl.liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`} />
-                      {cl.count > 0 && <span className="text-[10px] text-muted-foreground">{cl.count}</span>}
-                    </button>
                   </div>
                 </div>
-              </div>
               );
-            })
-          )}
+            };
+
+            return (
+              <>
+                {topLevel.map(comment => {
+                  const replies = repliesByParent[comment.id] ?? [];
+                  const isExpanded = expandedReplies.has(comment.id);
+                  return (
+                    <div key={comment.id} className="space-y-0">
+                      {renderComment(comment, false)}
+                      {/* Yanıt görüntüle / gizle */}
+                      {replies.length > 0 && (
+                        <div className="ml-[46px] mt-1">
+                          <button
+                            onClick={() => setExpandedReplies(prev => {
+                              const next = new Set(prev);
+                              if (next.has(comment.id)) next.delete(comment.id);
+                              else next.add(comment.id);
+                              return next;
+                            })}
+                            className="flex items-center gap-2 text-[12px] text-primary font-medium py-1"
+                          >
+                            <span className="w-5 h-px bg-primary/40 inline-block" />
+                            {isExpanded ? "Yanıtları gizle" : `${replies.length} yanıtı görüntüle`}
+                          </button>
+                          {isExpanded && (
+                            <div className="mt-2 space-y-3 pl-0 border-l-2 border-muted/60 ml-1 pl-3">
+                              {replies.map(r => renderComment(r, true))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            );
+          })()}
         </div>
 
         {/* Input bar */}
