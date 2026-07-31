@@ -1104,11 +1104,11 @@ export default function DirectMessages() {
                         const postId = parts[1];
                         const snippet = parts.slice(2).join(":");
                         return (
-                          <a href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                          <Link href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                             <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                             <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
-                          </a>
+                          </Link>
                         );
                       })()
                     ) : msg.content ? (
@@ -1477,11 +1477,11 @@ export default function DirectMessages() {
                                 const postId = parts[1];
                                 const snippet = parts.slice(2).join(":");
                                 return (
-                                  <a href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                  <Link href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                                     <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                                     <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                                     <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
-                                  </a>
+                                  </Link>
                                 );
                               }
 
