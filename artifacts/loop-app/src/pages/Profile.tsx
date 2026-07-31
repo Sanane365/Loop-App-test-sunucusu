@@ -110,6 +110,18 @@ export default function Profile() {
   const followMutation = useFollowUser();
   const unfollowMutation = useUnfollowUser();
 
+  // Bio-only edit
+  const [bioOpen, setBioOpen] = useState(false);
+  const [bioText, setBioText] = useState("");
+  const [bioSaving, setBioSaving] = useState(false);
+
+  // Avatar options menu
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editUsername, setEditUsername] = useState("");
+  const [infoSaving, setInfoSaving] = useState(false);
+
+  // kept for backward compat (Spotify etc.)
   const [editOpen, setEditOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editBio, setEditBio] = useState("");
@@ -233,6 +245,48 @@ export default function Profile() {
     } catch {
       toast({ title: "Hata", description: "Profil güncellenemedi.", variant: "destructive" });
     } finally { setSaving(false); }
+  };
+
+  // Bio-only save
+  const handleSaveBio = async () => {
+    setBioSaving(true);
+    try {
+      const res = await fetch("/api/users/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bio: bioText }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      await queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(targetUserId || 0) });
+      await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      setBioOpen(false);
+      toast({ title: "Biyografi güncellendi" });
+    } catch {
+      toast({ title: "Hata", description: "Biyografi kaydedilemedi.", variant: "destructive" });
+    } finally { setBioSaving(false); }
+  };
+
+  // Save display name + username from avatar menu
+  const handleSaveInfo = async () => {
+    setInfoSaving(true);
+    try {
+      const body: Record<string, string> = {};
+      if (editDisplayName.trim()) body.displayName = editDisplayName.trim();
+      if (editUsername.trim()) body.username = editUsername.trim();
+      const res = await fetch("/api/users/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Güncellenemedi");
+      await queryClient.invalidateQueries({ queryKey: getGetUserQueryKey(targetUserId || 0) });
+      await queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      setAvatarMenuOpen(false);
+      toast({ title: "Bilgiler güncellendi" });
+    } catch (err: any) {
+      toast({ title: "Hata", description: err.message, variant: "destructive" });
+    } finally { setInfoSaving(false); }
   };
 
   const handleAvatarUpload = async (file: File) => {
@@ -365,7 +419,11 @@ export default function Profile() {
             {/* Purple "+" button — bottom-right of avatar, overlapping */}
             {isMe && (
               <button
-                onClick={() => avatarInputRef.current?.click()}
+                onClick={() => {
+                  setEditDisplayName(profile?.displayName ?? "");
+                  setEditUsername(profile?.username ?? "");
+                  setAvatarMenuOpen(true);
+                }}
                 className="absolute bottom-1 right-1 w-10 h-10 bg-primary rounded-full flex items-center justify-center shadow-lg hover:bg-primary/90 active:scale-95 transition-all border-[3px] border-background"
               >
                 <Plus className="w-5 h-5 text-primary-foreground stroke-[2.5]" />
@@ -418,10 +476,10 @@ export default function Profile() {
               )}
             </div>
 
-            {/* Circular pencil button */}
+            {/* Circular pencil button — sadece biyografi */}
             {isMe && (
               <button
-                onClick={openEdit}
+                onClick={() => { setBioText(profile?.bio ?? ""); setBioOpen(true); }}
                 className="flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center hover:bg-muted transition-colors mt-0.5"
                 style={{ background: "color-mix(in srgb, hsl(var(--muted)) 80%, transparent)", border: "1px solid hsl(var(--border))" }}
               >
@@ -771,6 +829,117 @@ export default function Profile() {
                 className="flex-1 py-2.5 rounded-xl bg-[#1DB954] text-white text-sm font-semibold hover:bg-[#1aa34a] transition-colors disabled:opacity-50"
               >
                 {spotifySaving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Bio Edit Dialog ── */}
+      <Dialog open={bioOpen} onOpenChange={setBioOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Pencil className="w-5 h-5 text-primary" />
+              Biyografi Düzenle
+            </DialogTitle>
+            <DialogDescription>Kendinle ilgili bir şeyler yaz</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Textarea
+              value={bioText}
+              onChange={e => setBioText(e.target.value)}
+              placeholder="Kendinden bahset..."
+              className="resize-none rounded-xl"
+              rows={5}
+              maxLength={200}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground text-right">{bioText.length}/200</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setBioOpen(false)}
+                disabled={bioSaving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveBio}
+                disabled={bioSaving}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {bioSaving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Avatar Options Dialog ── */}
+      <Dialog open={avatarMenuOpen} onOpenChange={setAvatarMenuOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Profil Ayarları</DialogTitle>
+            <DialogDescription>Fotoğraf, görünen ad veya kullanıcı adını değiştir</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Photo change button */}
+            <button
+              onClick={() => { setAvatarMenuOpen(false); setTimeout(() => avatarInputRef.current?.click(), 100); }}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl border border-border hover:bg-muted transition-colors text-left"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <ImagePlus className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Profil Fotoğrafını Değiştir</p>
+                <p className="text-xs text-muted-foreground">Galeriden fotoğraf seç</p>
+              </div>
+            </button>
+
+            {/* Display name */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Görünen Ad</label>
+              <Input
+                value={editDisplayName}
+                onChange={e => setEditDisplayName(e.target.value)}
+                placeholder="Görünen adın"
+                maxLength={60}
+                className="rounded-xl"
+              />
+            </div>
+
+            {/* Username */}
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Kullanıcı Adı</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">@</span>
+                <Input
+                  value={editUsername}
+                  onChange={e => setEditUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
+                  placeholder="kullanici_adi"
+                  maxLength={30}
+                  className="rounded-xl pl-7"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">Harf, rakam ve _ kullanabilirsin</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setAvatarMenuOpen(false)}
+                disabled={infoSaving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveInfo}
+                disabled={infoSaving || (!editDisplayName.trim() && !editUsername.trim())}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {infoSaving ? "Kaydediliyor..." : "Kaydet"}
               </button>
             </div>
           </div>

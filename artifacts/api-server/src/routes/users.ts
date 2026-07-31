@@ -61,12 +61,37 @@ router.get("/users/me/profile", requireAuth, async (req, res) => {
 
 router.patch("/users/me/profile", requireAuth, async (req, res) => {
   try {
-    const { displayName, bio, spotifyTrackId, thought } = req.body;
+    const { displayName, bio, spotifyTrackId, thought, username } = req.body;
     const updateData: Record<string, unknown> = {};
     if (displayName !== undefined) updateData.displayName = displayName;
     if (bio !== undefined) updateData.bio = bio;
     if (spotifyTrackId !== undefined) updateData.spotifyTrackId = spotifyTrackId;
     if (thought !== undefined) updateData.thought = thought;
+    if (username !== undefined) {
+      const trimmed = String(username).trim();
+      if (!trimmed || trimmed.length < 3) {
+        res.status(400).json({ error: "Kullanıcı adı en az 3 karakter olmalı" });
+        return;
+      }
+      if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+        res.status(400).json({ error: "Kullanıcı adı sadece harf, rakam ve _ içerebilir" });
+        return;
+      }
+      const existing = await db.select().from(usersTable)
+        .where(eq(usersTable.username, trimmed)).limit(1);
+      if (existing[0] && existing[0].id !== req.user!.id) {
+        res.status(400).json({ error: "Bu kullanıcı adı zaten alınmış" });
+        return;
+      }
+      updateData.username = trimmed;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      const user = await getUserWithStats(req.user!.id, req.user!.id);
+      res.json(user);
+      return;
+    }
+
     await db
       .update(usersTable)
       .set(updateData)
