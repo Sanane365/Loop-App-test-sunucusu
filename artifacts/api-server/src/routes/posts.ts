@@ -14,6 +14,9 @@ import fs from "fs";
 
 const router = Router();
 
+// Comments tablosuna pinned sütunu ekle (yoksa)
+db.execute(sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
@@ -192,6 +195,18 @@ router.post("/posts/:postId/repost", requireAuth, async (req, res) => {
   }
 });
 
+// Repostu geri al
+router.delete("/posts/:postId/repost", requireAuth, async (req, res) => {
+  try {
+    const postId = parseInt(req.params["postId"] as string);
+    await db.delete(repostsTable).where(and(eq(repostsTable.userId, req.user!.id), eq(repostsTable.postId, postId)));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/posts/:postId/bookmark", requireAuth, async (req, res) => {
   try {
     const postId = parseInt(req.params["postId"] as string);
@@ -241,6 +256,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
           .where(and(eq(commentLikesTable.userId, viewerId), eq(commentLikesTable.commentId, c.id))).limit(1);
         isLiked = like.length > 0;
       }
+      const [pinnedRow] = await db.execute(sql`SELECT pinned FROM comments WHERE id = ${c.id}`);
       return {
         id: c.id,
         postId: c.postId,
@@ -248,6 +264,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
         user: await getUserWithStats(c.userId, viewerId),
         content: c.content,
         replyToId: c.replyToId,
+        pinned: (pinnedRow as any)?.pinned ?? false,
         likeCount: likeCount?.count ?? 0,
         isLiked,
         createdAt: c.createdAt.toISOString(),
@@ -287,6 +304,24 @@ router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
 
     const user = await getUserWithStats(req.user!.id, req.user!.id);
     res.status(201).json({ ...comment, user, likeCount: 0, isLiked: false, createdAt: comment.createdAt.toISOString() });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Comment pinning (sadece gönderi sahibi) ───────────────────────────────────
+router.post("/posts/:postId/comments/:commentId/pin", requireAuth, async (req, res) => {
+  try {
+    const postId = parseInt(req.params["postId"] as string);
+    const commentId = parseInt(req.params["commentId"] as string);
+    const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
+    if (!post[0] || post[0].userId !== req.user!.id) { res.status(403).json({ error: "Yetkisiz" }); return; }
+    // Toggle
+    const [current] = await db.execute(sql`SELECT pinned FROM comments WHERE id = ${commentId} AND post_id = ${postId}`);
+    const nowPinned = !(current as any)?.pinned;
+    await db.execute(sql`UPDATE comments SET pinned = ${nowPinned} WHERE id = ${commentId} AND post_id = ${postId}`);
+    res.json({ pinned: nowPinned });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -1,6 +1,6 @@
 import { Post, useLikePost, useUnlikePost, useRepostPost, useBookmarkPost, getListPostsQueryKey, useListComments, useCreateComment, getListCommentsQueryKey } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal, Music2, Plus, Repeat2, X, Smile, ImagePlus, Search } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal, Music2, Plus, Repeat2, X, Smile, ImagePlus, Search, Pin } from "lucide-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -24,14 +24,52 @@ function extractHashtags(content: string): { text: string; tags: string[] } {
   return { text: cleaned, tags };
 }
 
+// ── Çatlak Avatar — özgün geri paylaşım göstergesi ──────────────────────────
+function SplitAvatar({
+  leftSrc, leftFallback,
+  rightSrc, rightFallback,
+  size = "w-10 h-10",
+}: {
+  leftSrc: string; leftFallback: string;
+  rightSrc: string; rightFallback: string;
+  size?: string;
+}) {
+  return (
+    <div className={`${size} relative rounded-full overflow-hidden flex-shrink-0 ring-2 ring-green-400/50`}>
+      {/* Sol dilim — orijinal paylaşımcı */}
+      <div className="absolute inset-0" style={{ clipPath: "polygon(0 0, 100% 0, 60% 100%, 0 100%)" }}>
+        {leftSrc
+          ? <img src={leftSrc} className="w-full h-full object-cover" alt="" />
+          : <div className="w-full h-full bg-primary/20 flex items-center justify-center font-bold text-primary text-sm">{leftFallback}</div>}
+      </div>
+      {/* Sağ dilim — geri paylaşan */}
+      <div className="absolute inset-0" style={{ clipPath: "polygon(64% 0, 100% 0, 100% 100%, 40% 100%)" }}>
+        {rightSrc
+          ? <img src={rightSrc} className="w-full h-full object-cover" alt="" />
+          : <div className="w-full h-full bg-violet-500/20 flex items-center justify-center font-bold text-violet-500 text-sm">{rightFallback}</div>}
+      </div>
+      {/* Çatlak çizgisi — diagonal glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          clipPath: "polygon(58% 0, 66% 0, 42% 100%, 34% 100%)",
+          background: "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(134,239,172,0.7) 100%)",
+        }}
+      />
+    </div>
+  );
+}
+
 // ── Instagram-style draggable comment bottom sheet ─────────────────────────
 function CommentBottomSheet({
   postId,
+  postOwnerId,
   commentCount,
   isOpen,
   onClose,
 }: {
   postId: number;
+  postOwnerId: number;
   commentCount: number;
   isOpen: boolean;
   onClose: () => void;
@@ -42,6 +80,20 @@ function CommentBottomSheet({
   const [replyingToId, setReplyingToId] = useState<number | null>(null);
   const [commentLikes, setCommentLikes] = useState<Record<number, { liked: boolean; count: number }>>({});
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
+  const [pinnedCommentIds, setPinnedCommentIds] = useState<Record<number, boolean>>({});
+  const isPostOwner = !!user && user.id === postOwnerId;
+
+  const handlePinComment = async (commentId: number, currentlyPinned: boolean) => {
+    setPinnedCommentIds(prev => ({ ...prev, [commentId]: !currentlyPinned }));
+    try {
+      const r = await fetch(`/api/posts/${postId}/comments/${commentId}/pin`, { method: "POST" });
+      if (!r.ok) throw new Error();
+      const { pinned } = await r.json();
+      setPinnedCommentIds(prev => ({ ...prev, [commentId]: pinned }));
+    } catch {
+      setPinnedCommentIds(prev => ({ ...prev, [commentId]: currentlyPinned })); // rollback
+    }
+  };
   const [dragOffset, setDragOffset] = useState(0);
   const [visible, setVisible] = useState(false);
   const startYRef = useRef<number | null>(null);
@@ -197,9 +249,17 @@ function CommentBottomSheet({
           ) : (() => {
             // Yorum ağacını oluştur
             const allComments = (comments ?? []) as any[];
-            const topLevel = allComments.filter(c => !c.replyToId);
+            // Sabitlenen yorumlar üstte
+            const sortedAll = [...allComments].sort((a, b) => {
+              const aPinned = pinnedCommentIds[a.id] ?? a.pinned ?? false;
+              const bPinned = pinnedCommentIds[b.id] ?? b.pinned ?? false;
+              if (aPinned && !bPinned) return -1;
+              if (!aPinned && bPinned) return 1;
+              return 0;
+            });
+            const topLevel = sortedAll.filter(c => !c.replyToId);
             const repliesByParent: Record<number, any[]> = {};
-            allComments.forEach(c => {
+            sortedAll.forEach(c => {
               if (c.replyToId) {
                 if (!repliesByParent[c.replyToId]) repliesByParent[c.replyToId] = [];
                 repliesByParent[c.replyToId].push(c);
@@ -232,12 +292,37 @@ function CommentBottomSheet({
                         <p className={`text-foreground leading-[1.45] break-words whitespace-pre-wrap ${isReply ? "text-[13px]" : "text-[14px]"}`}>
                           {comment.content}
                         </p>
-                        <button
-                          onClick={() => handleReply(comment)}
-                          className="text-[12px] text-muted-foreground mt-1 font-medium hover:text-foreground transition-colors"
-                        >
-                          Yanıtla
-                        </button>
+                        <div className="flex items-center gap-3 mt-1">
+                          <button
+                            onClick={() => handleReply(comment)}
+                            className="text-[12px] text-muted-foreground font-medium hover:text-foreground transition-colors"
+                          >
+                            Yanıtla
+                          </button>
+                          {/* Sabitleme butonu — sadece gönderi sahibine görünür */}
+                          {isPostOwner && !isReply && (
+                            <button
+                              onClick={() => {
+                                const isPinned = pinnedCommentIds[comment.id] ?? comment.pinned ?? false;
+                                handlePinComment(comment.id, isPinned);
+                              }}
+                              className={`flex items-center gap-0.5 text-[11px] font-medium transition-colors ${
+                                (pinnedCommentIds[comment.id] ?? comment.pinned)
+                                  ? "text-amber-500"
+                                  : "text-muted-foreground hover:text-amber-400"
+                              }`}
+                            >
+                              <Pin className={`w-3 h-3 ${(pinnedCommentIds[comment.id] ?? comment.pinned) ? "fill-amber-500" : ""}`} />
+                              {(pinnedCommentIds[comment.id] ?? comment.pinned) ? "Sabitlendi" : "Sabitle"}
+                            </button>
+                          )}
+                          {/* Sabitlenmiş rozeti — herkese görünür */}
+                          {!isPostOwner && (pinnedCommentIds[comment.id] ?? comment.pinned) && (
+                            <span className="flex items-center gap-0.5 text-[11px] text-amber-500 font-medium">
+                              <Pin className="w-3 h-3 fill-amber-500" /> Sabitlendi
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         onClick={() => handleToggleCommentLike(comment)}
@@ -558,10 +643,13 @@ export function PostCard({ post: postRaw }: { post: Post }) {
   const post = postRaw as PostWithPoll;
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const [isLiked, setIsLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [isBookmarked, setIsBookmarked] = useState(post.isBookmarked);
+  const [isReposted, setIsReposted] = useState(post.isReposted ?? false);
+  const [repostCount, setRepostCount] = useState(post.repostCount ?? 0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
@@ -628,12 +716,19 @@ export function PostCard({ post: postRaw }: { post: Post }) {
   };
 
   const handleRepost = () => {
-    repostMutation.mutate({ postId: post.id }, {
-      onSuccess: () => {
-        toast({ title: "Yeniden paylaşıldı" });
+    const wasReposted = isReposted;
+    setIsReposted(!wasReposted);
+    setRepostCount(prev => wasReposted ? prev - 1 : prev + 1);
+    fetch(`/api/posts/${post.id}/repost`, { method: wasReposted ? "DELETE" : "POST" })
+      .then(r => {
+        if (!r.ok) throw new Error();
+        toast({ title: wasReposted ? "Paylaşım geri alındı" : "Yeniden paylaşıldı ✓" });
         queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
-      }
-    });
+      })
+      .catch(() => {
+        setIsReposted(wasReposted);
+        setRepostCount(prev => wasReposted ? prev + 1 : prev - 1);
+      });
   };
 
   const handleBookmark = () => {
@@ -723,8 +818,8 @@ export function PostCard({ post: postRaw }: { post: Post }) {
 
             {/* Share/Repost */}
             <button onClick={handleRepost} className="flex flex-col items-center gap-0.5" data-testid={`post-repost-${post.id}`}>
-              <Repeat2 className={`w-7 h-7 drop-shadow-lg ${post.isReposted ? "text-green-400" : "text-white"}`} />
-              <span className="text-white text-xs font-medium drop-shadow">{formatCount(post.repostCount)}</span>
+              <Repeat2 className={`w-7 h-7 drop-shadow-lg ${isReposted ? "text-green-400" : "text-white"}`} />
+              <span className="text-white text-xs font-medium drop-shadow">{formatCount(repostCount)}</span>
             </button>
 
             {/* Bookmark */}
@@ -765,6 +860,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
 
         <CommentBottomSheet
           postId={post.id}
+          postOwnerId={post.userId}
           commentCount={post.commentCount}
           isOpen={isCommentsOpen}
           onClose={() => setIsCommentsOpen(false)}
@@ -786,17 +882,28 @@ export function PostCard({ post: postRaw }: { post: Post }) {
       <div className="mx-4 mb-3 bg-card rounded-2xl p-4 border border-border shadow-sm">
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
-          <Link href={`/profile/${post.userId}`}>
-            <Avatar className="w-10 h-10 border border-border cursor-pointer">
-              <AvatarImage src={post.user?.avatarUrl || ""} />
-              <AvatarFallback>{post.user?.displayName?.charAt(0) || "U"}</AvatarFallback>
-            </Avatar>
-          </Link>
+          {isReposted && user ? (
+            <SplitAvatar
+              leftSrc={post.user?.avatarUrl || ""}
+              leftFallback={post.user?.displayName?.charAt(0) || "U"}
+              rightSrc={user.avatarUrl || ""}
+              rightFallback={user.displayName?.charAt(0) || "U"}
+              size="w-10 h-10"
+            />
+          ) : (
+            <Link href={`/profile/${post.userId}`}>
+              <Avatar className="w-10 h-10 border border-border cursor-pointer">
+                <AvatarImage src={post.user?.avatarUrl || ""} />
+                <AvatarFallback>{post.user?.displayName?.charAt(0) || "U"}</AvatarFallback>
+              </Avatar>
+            </Link>
+          )}
           <div className="flex-1 min-w-0">
             <Link href={`/profile/${post.userId}`} className="font-semibold text-sm hover:underline block truncate">
               {post.user?.displayName}
             </Link>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground flex items-center gap-1 flex-wrap">
+              {isReposted && <><Repeat2 className="w-3 h-3 text-green-500 flex-shrink-0" /><span className="text-green-500 font-medium text-[10px]">Sen paylaştın ·</span></>}
               @{post.user?.username} · {formatDistanceToNow(new Date(post.createdAt), { locale: tr, addSuffix: true })}
             </span>
           </div>
@@ -866,9 +973,9 @@ export function PostCard({ post: postRaw }: { post: Post }) {
             <span>{post.commentCount}</span>
           </button>
 
-          <button onClick={handleRepost} className={`flex items-center gap-1.5 hover:text-green-500 transition-colors text-sm ${post.isReposted ? "text-green-500" : ""}`} data-testid={`post-repost-${post.id}`}>
+          <button onClick={handleRepost} className={`flex items-center gap-1.5 hover:text-green-500 transition-colors text-sm ${isReposted ? "text-green-500" : ""}`} data-testid={`post-repost-${post.id}`}>
             <Repeat2 className="w-5 h-5" />
-            <span>{post.repostCount}</span>
+            <span>{repostCount}</span>
           </button>
 
           <button onClick={handleLike} className={`flex items-center gap-1.5 hover:text-red-500 transition-colors text-sm ${isLiked ? "text-red-500" : ""}`} data-testid={`post-like-${post.id}`}>
@@ -893,6 +1000,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
 
       <CommentBottomSheet
         postId={post.id}
+        postOwnerId={post.userId}
         commentCount={post.commentCount}
         isOpen={isCommentsOpen}
         onClose={() => setIsCommentsOpen(false)}

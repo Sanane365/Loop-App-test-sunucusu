@@ -38,6 +38,29 @@ export default function Profile() {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<Tab>("posts");
 
+  // ── Galeri parçalama — pinch-to-zoom ──
+  const [gridCols, setGridCols] = useState(3);
+  const pinchDistRef = useRef<number | null>(null);
+  const pinchStartColsRef = useRef(3);
+
+  const getPinchDist = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) return 0;
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+  const onPinchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) { pinchDistRef.current = getPinchDist(e); pinchStartColsRef.current = gridCols; }
+  };
+  const onPinchMove = (e: React.TouchEvent) => {
+    if (e.touches.length !== 2 || pinchDistRef.current === null) return;
+    const ratio = pinchDistRef.current / getPinchDist(e); // >1 = sıkıştırma = daha fazla sütun
+    const delta = Math.round((ratio - 1) * 8);
+    const next = Math.min(6, Math.max(3, pinchStartColsRef.current + delta));
+    if (next !== gridCols) setGridCols(next);
+  };
+  const onPinchEnd = () => { pinchDistRef.current = null; };
+
   const isMe = !params.userId || params.userId === "me" || parseInt(params.userId) === me?.id;
   const targetUserId = isMe ? me?.id : parseInt(params.userId || "0");
 
@@ -865,7 +888,13 @@ export default function Profile() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-0.5">
+            <div
+              className="grid gap-0.5 transition-all duration-200"
+              style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}
+              onTouchStart={onPinchStart}
+              onTouchMove={onPinchMove}
+              onTouchEnd={onPinchEnd}
+            >
               {currentPosts.map((post: any) => (
                 <div key={post.id} className="relative aspect-square overflow-hidden bg-muted group">
                   {post.mediaUrl ? (
