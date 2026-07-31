@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useListPosts, getListPostsQueryKey } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StoryRow } from "@/components/shared/StoryRow";
@@ -30,6 +30,11 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const { toast } = useToast();
+
+  // DM'den gelen ?post=ID → post yüklenince o karta scroll yap
+  const scrollPostIdRef = useRef<number | null>(
+    (() => { const p = new URLSearchParams(window.location.search).get("post"); return p ? parseInt(p) : null; })()
+  );
 
   // ── Anonim Sorular ──
   const [publicQuestions, setPublicQuestions] = useState<any[]>([]);
@@ -124,6 +129,24 @@ export default function Home() {
 
   const posts = activeFilter === "bulten" ? bulletinPosts : allPosts;
   const loading = activeFilter === "bulten" ? bulletinLoading : isLoading;
+
+  // DM'den gelen ?post=ID — postlar yüklenince o karta scroll et, sonra URL'i temizle
+  useEffect(() => {
+    const targetId = scrollPostIdRef.current;
+    if (!targetId || loading || !posts?.length) return;
+    const el = document.getElementById(`post-card-${targetId}`);
+    if (!el) return;
+    // Biraz gecikme: layout tamamlanmış olsun
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.outline = "2px solid hsl(var(--primary))";
+      el.style.borderRadius = "12px";
+      setTimeout(() => { el.style.outline = ""; el.style.borderRadius = ""; }, 1800);
+    }, 200);
+    // URL'den post param'ını temizle (geri gidince tekrar scroll etmesin)
+    scrollPostIdRef.current = null;
+    window.history.replaceState({}, "", "/");
+  }, [loading, posts]);
 
   return (
     <div className="min-h-screen bg-secondary/50 pb-16">
@@ -411,7 +434,9 @@ export default function Home() {
                 </div>
               ) : (
                 posts?.map(post => (
-                  <PostCard key={post.id} post={post} />
+                  <div key={post.id} id={`post-card-${post.id}`}>
+                    <PostCard post={post} />
+                  </div>
                 ))
               )}
             </div>

@@ -14,7 +14,6 @@ import {
 
 const TENOR_KEY = "LIVDSRZULELA";
 import { useAuth } from "@/lib/auth";
-import { PostCard } from "@/components/shared/PostCard";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -356,8 +355,6 @@ export default function DirectMessages() {
   const [groupInfoMemberSearchLoading, setGroupInfoMemberSearchLoading] = useState(false);
   const groupPhotoInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Paylaşılan gönderi overlay ──
-  const [sharedPostId, setSharedPostId] = useState<number | null>(null);
 
   // ── Konuşma kart özellikleri (localStorage) ──
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(() => {
@@ -1265,7 +1262,7 @@ export default function DirectMessages() {
                         const postId = parseInt(parts[1]);
                         const snippet = parts.slice(2).join(":");
                         return (
-                          <button onClick={() => setSharedPostId(postId)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                          <button onClick={() => setLocation(`/?post=${postId}`)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                             <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                             <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
@@ -1638,7 +1635,7 @@ export default function DirectMessages() {
                                 const postId = parseInt(parts[1]);
                                 const snippet = parts.slice(2).join(":");
                                 return (
-                                  <button onClick={() => setSharedPostId(postId)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                  <button onClick={() => setLocation(`/?post=${postId}`)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                                     <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                                     <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                                     <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
@@ -2924,61 +2921,6 @@ export default function DirectMessages() {
         )}
       </div>
 
-      {/* ── Paylaşılan gönderi overlay ── */}
-      {sharedPostId !== null && (
-        <SharedPostOverlay postId={sharedPostId} onClose={() => setSharedPostId(null)} />
-      )}
     </AppLayout>
-  );
-}
-
-// ── Paylaşılan gönderi — Instagram tarzı feed görünümü ──────────────────────
-function SharedPostOverlay({ postId, onClose }: { postId: number; onClose: () => void }) {
-  const [targetPost, setTargetPost] = useState<any>(null);
-  const [restPosts, setRestPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetch(`/api/posts/${postId}`).then(r => r.ok ? r.json() : null),
-      fetch("/api/posts").then(r => r.ok ? r.json() : [])
-    ]).then(([target, all]) => {
-      setTargetPost(target);
-      // Hedef post'u listenin başına koy, tekrar görünmesin
-      const others = (Array.isArray(all) ? all : []).filter((p: any) => p.id !== postId);
-      setRestPosts(others);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [postId]);
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-secondary/50">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-3 bg-background border-b border-border/40 sticky top-0 z-10 flex-shrink-0">
-        <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <span className="font-bold text-[15px]">Gönderi</span>
-      </div>
-
-      {/* Feed */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : !targetPost ? (
-          <div className="py-20 text-center text-sm text-muted-foreground">Gönderi bulunamadı.</div>
-        ) : (
-          <div className="max-w-screen-md mx-auto">
-            {/* Hedef post — her zaman üstte */}
-            <PostCard post={targetPost} />
-            {/* Diğer postlar — feed gibi kaydır */}
-            {restPosts.map(p => <PostCard key={p.id} post={p} />)}
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

@@ -70,19 +70,20 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     return () => document.body.classList.remove("story-viewer-open");
   }, []);
 
-  // Hikaye değiştiğinde sabitlenen yanıtları sessizce yükle (sayfa yenilemesinde kaybolmasın)
+  // Hikaye değiştiğinde sabitlenen yanıtları sessizce yükle
+  // isOwnStory beklenmez — backend 403 dönerse catch eder
   useEffect(() => {
-    if (!currentStory || !isOwnStory) return;
+    if (!currentStory) return;
     fetch(`/api/stories/${currentStory.id}/replies`)
-      .then(r => r.ok ? r.json() : [])
+      .then(r => r.ok ? r.json() : null)
       .then((arr: any[]) => {
-        const pinned = Array.isArray(arr) ? arr.filter(r => r.pinned) : [];
-        if (pinned.length > 0) {
-          setPinnedByStory(prev => ({ ...prev, [currentStory.id]: pinned }));
-        }
+        if (!Array.isArray(arr)) return;
+        const pinned = arr.filter(r => r.pinned);
+        // Her zaman state'i güncelle (boş array da dahil)
+        setPinnedByStory(prev => ({ ...prev, [currentStory.id]: pinned }));
       })
       .catch(() => {});
-  }, [currentStory?.id, isOwnStory]);
+  }, [currentStory?.id]);
 
   const goNext = useCallback(() => {
     if (!currentGroup) return;
