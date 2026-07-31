@@ -202,6 +202,21 @@ export default function DirectMessages() {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupMemberIds, setNewGroupMemberIds] = useState<Set<number>>(new Set());
   const [creatingGroup, setCreatingGroup] = useState(false);
+  const [groupMemberSearch, setGroupMemberSearch] = useState("");
+  const [groupSearchResults, setGroupSearchResults] = useState<any[]>([]);
+  const [groupSearchLoading, setGroupSearchLoading] = useState(false);
+
+  const searchGroupMembers = async (q: string) => {
+    setGroupMemberSearch(q);
+    if (!q.trim()) { setGroupSearchResults([]); return; }
+    setGroupSearchLoading(true);
+    try {
+      const r = await fetch(`/api/users?q=${encodeURIComponent(q)}`);
+      const data = await r.json();
+      setGroupSearchResults(Array.isArray(data) ? data : []);
+    } catch { setGroupSearchResults([]); }
+    finally { setGroupSearchLoading(false); }
+  };
 
   // Arama işlemleri global context'ten
   const call = useCall();
@@ -2099,43 +2114,68 @@ export default function DirectMessages() {
 
                 {/* Üye seçimi */}
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex-shrink-0">
-                  Üye Seç ({newGroupMemberIds.size}/{conversations.length})
+                  Üye Seç ({newGroupMemberIds.size} seçildi)
                 </p>
+                {/* Arama kutusu */}
+                <div className="relative mb-2 flex-shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    value={groupMemberSearch}
+                    onChange={e => searchGroupMembers(e.target.value)}
+                    placeholder="Kullanıcı ara..."
+                    className="w-full pl-9 pr-4 py-2 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm"
+                  />
+                </div>
                 <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5 mb-4">
-                  {conversations.map(c => {
-                    if (!c.user) return null;
-                    const isSelected = newGroupMemberIds.has(c.user.id);
+                  {/* Arama sonuçları veya mevcut konuşmalar */}
+                  {(() => {
+                    const displayList = groupMemberSearch.trim()
+                      ? (groupSearchLoading ? [] : groupSearchResults.map(u => ({ user: u })))
+                      : conversations;
                     return (
-                      <button
-                        key={c.user.id}
-                        onClick={() => {
-                          setNewGroupMemberIds(prev => {
-                            const next = new Set(prev);
-                            isSelected ? next.delete(c.user!.id) : next.add(c.user!.id);
-                            return next;
-                          });
-                        }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10" : "hover:bg-muted/60"}`}
-                      >
-                        <Avatar style={{ width: 40, height: 40 }}>
-                          <AvatarImage src={c.user.avatarUrl || ""} />
-                          <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
-                            {c.user.displayName.charAt(0)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm truncate">{c.user.displayName}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{c.user.username}</p>
-                        </div>
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
-                          {isSelected && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
-                        </div>
-                      </button>
+                      <>
+                        {groupSearchLoading && (
+                          <p className="text-sm text-muted-foreground text-center py-4">Aranıyor…</p>
+                        )}
+                        {!groupSearchLoading && displayList.length === 0 && (
+                          <p className="text-sm text-muted-foreground text-center py-6">
+                            {groupMemberSearch.trim() ? "Kullanıcı bulunamadı" : "Üye eklemek için ara"}
+                          </p>
+                        )}
+                        {displayList.map(c => {
+                          if (!c.user) return null;
+                          const isSelected = newGroupMemberIds.has(c.user.id);
+                          return (
+                            <button
+                              key={c.user.id}
+                              onClick={() => {
+                                setNewGroupMemberIds(prev => {
+                                  const next = new Set(prev);
+                                  isSelected ? next.delete(c.user!.id) : next.add(c.user!.id);
+                                  return next;
+                                });
+                              }}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10" : "hover:bg-muted/60"}`}
+                            >
+                              <Avatar style={{ width: 40, height: 40 }}>
+                                <AvatarImage src={c.user.avatarUrl || ""} />
+                                <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
+                                  {c.user.displayName.charAt(0)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-semibold text-sm truncate">{c.user.displayName}</p>
+                                <p className="text-xs text-muted-foreground truncate">@{c.user.username}</p>
+                              </div>
+                              <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
+                                {isSelected && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </>
                     );
-                  })}
-                  {conversations.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-6">Henüz mesajlaştığın biri yok</p>
-                  )}
+                  })()}
                 </div>
 
                 <div className="flex gap-3 flex-shrink-0">

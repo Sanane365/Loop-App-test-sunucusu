@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
-import { postsTable } from "@workspace/db";
+import { postsTable, notificationsTable } from "@workspace/db";
 import { desc } from "drizzle-orm";
 
 const router = Router();
@@ -208,6 +208,23 @@ router.get("/users/me/questions", requireAuth, async (req, res) => {
   try {
     const result = await db.execute(sql`SELECT * FROM questions WHERE to_user_id = ${req.user!.id} ORDER BY created_at DESC`);
     res.json(result.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Profili beğen → bildirim gönder
+router.post("/users/:userId/like-profile", requireAuth, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params["userId"]!);
+    if (targetId === req.user!.id) { res.status(400).json({ error: "Kendinizi beğenemezsiniz" }); return; }
+    await db.insert(notificationsTable).values({
+      userId: targetId,
+      fromUserId: req.user!.id,
+      type: "profile_like",
+    }).onConflictDoNothing();
+    res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -40,7 +40,8 @@ export default function Home() {
     setMyQOpen(true);
     try {
       const r = await fetch("/api/users/me/questions");
-      setMyQuestions(await r.json());
+      const data = await r.json();
+      setMyQuestions(Array.isArray(data) ? data : []);
     } catch { setMyQuestions([]); }
     finally { setMyQLoading(false); }
   };
