@@ -14,6 +14,7 @@ import {
 
 const TENOR_KEY = "LIVDSRZULELA";
 import { useAuth } from "@/lib/auth";
+import { PostCard } from "@/components/shared/PostCard";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -220,6 +221,7 @@ function GroupRow({ g, onClick }: { g: { id: number; name: string; members: any[
 interface DmGroup {
   id: number;
   name: string;
+  avatarUrl: string | null;
   createdBy: number;
   createdAt: string;
   members: { id: number; displayName: string; avatarUrl: string | null }[];
@@ -344,6 +346,18 @@ export default function DirectMessages() {
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Grup ayarları paneli ──
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [editingGroupName, setEditingGroupName] = useState(false);
+  const [groupNameDraft, setGroupNameDraft] = useState("");
+  const [groupInfoMemberSearch, setGroupInfoMemberSearch] = useState("");
+  const [groupInfoMemberResults, setGroupInfoMemberResults] = useState<any[]>([]);
+  const [groupInfoMemberSearchLoading, setGroupInfoMemberSearchLoading] = useState(false);
+  const groupPhotoInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Paylaşılan gönderi overlay ──
+  const [sharedPostId, setSharedPostId] = useState<number | null>(null);
 
   // ── Konuşma kart özellikleri (localStorage) ──
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(() => {
@@ -1025,13 +1039,16 @@ export default function DirectMessages() {
           <div className="flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
             <button
               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
-              onClick={() => { setActiveTab("gruplar"); setLocation("/dm"); }}
+              onClick={() => { setShowGroupInfo(false); setActiveTab("gruplar"); setLocation("/dm"); }}
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0">
-                <Users className="w-5 h-5 text-white" />
+            {/* Avatar + isim — tıkla, grup bilgisi aç */}
+            <button onClick={() => { setShowGroupInfo(v => !v); setGroupNameDraft(activeGroup?.name ?? ""); }} className="flex items-center gap-2.5 flex-1 min-w-0 text-left">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                {activeGroup?.avatarUrl
+                  ? <img src={activeGroup.avatarUrl} className="w-full h-full object-cover" alt="" />
+                  : <Users className="w-5 h-5 text-white" />}
               </div>
               <div className="min-w-0">
                 <span className="font-bold text-[15px] leading-tight truncate block">
@@ -1043,8 +1060,152 @@ export default function DirectMessages() {
                   </p>
                 )}
               </div>
-            </div>
+            </button>
+            {/* Sesli arama */}
+            <button
+              onClick={() => { if (activeGroup?.members[0]) call.startCall("voice", activeGroup.members.find(m => m.id !== me?.id)?.id ?? gid, { id: gid, displayName: activeGroup.name, avatarUrl: activeGroup.avatarUrl ?? null } as any); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
+            >
+              <Phone className="w-5 h-5" />
+            </button>
+            {/* Görüntülü arama */}
+            <button
+              onClick={() => { if (activeGroup?.members[0]) call.startCall("video", activeGroup.members.find(m => m.id !== me?.id)?.id ?? gid, { id: gid, displayName: activeGroup.name, avatarUrl: activeGroup.avatarUrl ?? null } as any); }}
+              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
+            >
+              <Video className="w-5 h-5" />
+            </button>
           </div>
+
+          {/* ── Grup bilgi paneli — sağdan kayar ── */}
+          {showGroupInfo && activeGroup && (
+            <div className="absolute inset-0 z-30 flex">
+              <div className="flex-1" onClick={() => setShowGroupInfo(false)} />
+              <div
+                className="w-[min(320px,90%)] h-full flex flex-col bg-background border-l border-border/50 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-2 px-3 py-3 border-b border-border/40">
+                  <button onClick={() => setShowGroupInfo(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60">
+                    <X className="w-4 h-4" />
+                  </button>
+                  <span className="font-bold text-sm">Grup Bilgisi</span>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {/* Fotoğraf */}
+                  <div className="flex flex-col items-center py-6 gap-2 border-b border-border/40">
+                    <button
+                      onClick={() => groupPhotoInputRef.current?.click()}
+                      className="relative w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center group"
+                    >
+                      {activeGroup.avatarUrl
+                        ? <img src={activeGroup.avatarUrl} className="w-full h-full object-cover" alt="" />
+                        : <Users className="w-9 h-9 text-white" />}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                    </button>
+                    <input ref={groupPhotoInputRef} type="file" accept="image/*" className="hidden" onChange={async e => {
+                      const file = e.target.files?.[0]; if (!file) return;
+                      const fd = new FormData(); fd.append("photo", file);
+                      const r = await fetch(`/api/dm/groups/${gid}/photo`, { method: "POST", body: fd });
+                      if (r.ok) { const updated = await r.json(); setGroups(prev => prev.map(g => g.id === gid ? { ...g, avatarUrl: updated.avatarUrl } : g)); }
+                    }} />
+                    {/* Grup adı */}
+                    {editingGroupName ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          value={groupNameDraft}
+                          onChange={e => setGroupNameDraft(e.target.value)}
+                          className="border border-primary/40 rounded-xl px-3 py-1.5 text-sm font-bold focus:outline-none"
+                          onKeyDown={async e => {
+                            if (e.key === "Enter") {
+                              const r = await fetch(`/api/dm/groups/${gid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: groupNameDraft }) });
+                              if (r.ok) { setGroups(prev => prev.map(g => g.id === gid ? { ...g, name: groupNameDraft } : g)); setEditingGroupName(false); }
+                            }
+                            if (e.key === "Escape") setEditingGroupName(false);
+                          }}
+                          autoFocus
+                        />
+                        <button onClick={async () => {
+                          const r = await fetch(`/api/dm/groups/${gid}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: groupNameDraft }) });
+                          if (r.ok) { setGroups(prev => prev.map(g => g.id === gid ? { ...g, name: groupNameDraft } : g)); setEditingGroupName(false); }
+                        }} className="text-xs text-primary font-semibold">Kaydet</button>
+                      </div>
+                    ) : (
+                      <button onClick={() => setEditingGroupName(true)} className="font-bold text-base text-foreground hover:text-primary transition-colors flex items-center gap-1">
+                        {activeGroup.name}
+                        <span className="text-[11px] text-muted-foreground font-normal ml-1">düzenle</span>
+                      </button>
+                    )}
+                    <p className="text-xs text-muted-foreground">{activeGroup.members.length} üye</p>
+                  </div>
+
+                  {/* Üye listesi */}
+                  <div className="px-4 py-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Üyeler</p>
+                    {activeGroup.members.map(m => (
+                      <div key={m.id} className="flex items-center gap-3 py-2.5">
+                        <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center flex-shrink-0">
+                          {m.avatarUrl ? <img src={m.avatarUrl} className="w-full h-full object-cover" alt={m.displayName} /> : <span className="text-primary font-bold text-sm">{m.displayName.charAt(0)}</span>}
+                        </div>
+                        <span className="flex-1 text-sm font-medium">{m.displayName}</span>
+                        {activeGroup.createdBy === me?.id && m.id !== me?.id && (
+                          <button
+                            onClick={async () => {
+                              const r = await fetch(`/api/dm/groups/${gid}/members/${m.id}`, { method: "DELETE" });
+                              if (r.ok) setGroups(prev => prev.map(g => g.id === gid ? { ...g, members: g.members.filter(x => x.id !== m.id) } : g));
+                            }}
+                            className="text-[11px] text-destructive font-semibold hover:opacity-80 transition-opacity"
+                          >Çıkar</button>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Üye ekle */}
+                    {activeGroup.createdBy === me?.id && (
+                      <div className="mt-3">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                          <input
+                            value={groupMemberSearch}
+                            onChange={async e => {
+                              setGroupInfoMemberSearch(e.target.value);
+                              if (!e.target.value.trim()) { setGroupInfoMemberResults([]); return; }
+                              setGroupInfoMemberSearchLoading(true);
+                              try {
+                                const r = await fetch(`/api/users/search?q=${encodeURIComponent(e.target.value)}`);
+                                const data = await r.json();
+                                setGroupInfoMemberResults((Array.isArray(data) ? data : []).filter((u: any) => !activeGroup.members.some(m => m.id === u.id)));
+                              } finally { setGroupInfoMemberSearchLoading(false); }
+                            }}
+                            placeholder="Üye ekle..."
+                            className="w-full pl-9 pr-3 py-2 rounded-xl bg-muted/60 text-sm focus:outline-none"
+                          />
+                        </div>
+                        {groupInfoMemberResults.map((u: any) => (
+                          <button key={u.id} onClick={async () => {
+                            const r = await fetch(`/api/dm/groups/${gid}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: u.id }) });
+                            if (r.ok) {
+                              setGroups(prev => prev.map(g => g.id === gid ? { ...g, members: [...g.members, { id: u.id, displayName: u.displayName, avatarUrl: u.avatarUrl }] } : g));
+                              setGroupInfoMemberResults(prev => prev.filter(x => x.id !== u.id));
+                              setGroupInfoMemberSearch("");
+                            }
+                          }} className="flex items-center gap-2.5 w-full px-2 py-2 hover:bg-muted/60 rounded-xl transition-colors">
+                            <div className="w-8 h-8 rounded-full overflow-hidden bg-primary/20 flex items-center justify-center flex-shrink-0">
+                              {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" alt={u.displayName} /> : <span className="text-primary text-xs font-bold">{u.displayName?.charAt(0)}</span>}
+                            </div>
+                            <span className="text-sm">{u.displayName}</span>
+                            <span className="ml-auto text-xs text-primary font-semibold">Ekle</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto bg-background px-3 py-2" ref={groupScrollRef}>
@@ -1098,17 +1259,17 @@ export default function DirectMessages() {
                         <p className="text-[14px] text-foreground break-words">{msg.content.split(":").slice(2).join(":")}</p>
                       </div>
                     ) : msg.content?.startsWith("__LOOP_POST_SHARE__:") ? (
-                      /* Paylaşılan gönderi kartı */
+                      /* Paylaşılan gönderi kartı — overlay açar */
                       (() => {
                         const parts = msg.content.split(":");
-                        const postId = parts[1];
+                        const postId = parseInt(parts[1]);
                         const snippet = parts.slice(2).join(":");
                         return (
-                          <Link href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                          <button onClick={() => setSharedPostId(postId)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                             <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                             <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                             <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
-                          </Link>
+                          </button>
                         );
                       })()
                     ) : msg.content ? (
@@ -1471,17 +1632,17 @@ export default function DirectMessages() {
                                 );
                               }
 
-                              // Paylaşılan gönderi kartı
+                              // Paylaşılan gönderi kartı — overlay açar
                               if (msg.content?.startsWith("__LOOP_POST_SHARE__:")) {
                                 const parts = msg.content.split(":");
-                                const postId = parts[1];
+                                const postId = parseInt(parts[1]);
                                 const snippet = parts.slice(2).join(":");
                                 return (
-                                  <Link href={`/post/${postId}`} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                  <button onClick={() => setSharedPostId(postId)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                                     <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                                     <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                                     <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
-                                  </Link>
+                                  </button>
                                 );
                               }
 
@@ -1725,9 +1886,12 @@ export default function DirectMessages() {
       return true;
     })
     .sort((a, b) => {
-      const rank = (id: number) =>
-        pinnedIds.has(id) ? 0 : favIds.has(id) ? 1 : 2;
-      return rank(a.user?.id ?? -1) - rank(b.user?.id ?? -1);
+      if (activeTab !== "tumu") {
+        const rank = (id: number) => pinnedIds.has(id) ? 0 : favIds.has(id) ? 1 : 2;
+        return rank(a.user?.id ?? -1) - rank(b.user?.id ?? -1);
+      }
+      // Tümü: zaman sırasına göre
+      return new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime();
     });
 
   const filteredGroups = groups.filter(g => {
@@ -1736,6 +1900,13 @@ export default function DirectMessages() {
     return g.name.toLowerCase().includes(q) ||
       g.members.some(m => m.displayName.toLowerCase().includes(q));
   });
+
+  // Tümü sekmesinde gruplar + DM'ler zamana göre birleşik liste
+  type TumuItem = { kind: "conv"; data: (typeof filteredConvs)[0]; time: number } | { kind: "group"; data: (typeof filteredGroups)[0]; time: number };
+  const tumuItems: TumuItem[] = activeTab === "tumu" ? [
+    ...filteredConvs.map(c => ({ kind: "conv" as const, data: c, time: new Date(c.lastMessage.createdAt).getTime() })),
+    ...filteredGroups.map(g => ({ kind: "group" as const, data: g, time: g.lastMessage ? new Date(g.lastMessage.createdAt).getTime() : new Date(g.createdAt).getTime() })),
+  ].sort((a, b) => b.time - a.time) : [];
 
   const TABS: { id: FilterTab; label: string; count?: number }[] = [
     { id: "tumu", label: "Tümü", count: totalUnread > 0 ? totalUnread : undefined },
@@ -2029,11 +2200,47 @@ export default function DirectMessages() {
             </div>
           ) : (
             <div>
-              {/* Tümü sekmesinde gruplar en üstte listelenir */}
-              {activeTab === "tumu" && filteredGroups.map(g => (
-                <GroupRow key={`g-${g.id}`} g={g} onClick={() => setLocation(`/dm/group/${g.id}`)} />
-              ))}
-              {filteredConvs.map((c, idx) => {
+              {/* Tümü: gruplar + DM'ler, zaman sırasına göre interleaved */}
+              {activeTab === "tumu" ? (
+                tumuItems.map(item => {
+                  if (item.kind === "group") {
+                    return <GroupRow key={`g-${item.data.id}`} g={item.data} onClick={() => setLocation(`/dm/group/${item.data.id}`)} />;
+                  }
+                  const c = item.data;
+                  const uid = c.user?.id ?? 0;
+                  const time = formatMsgTime(c.lastMessage.createdAt);
+                  const preview = lastMsgPreview(c.lastMessage);
+                  return (
+                    <div
+                      key={uid}
+                      className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
+                      onClick={() => setLocation(`/dm/${c.user?.id}`)}
+                    >
+                      <Avatar className="border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
+                        <AvatarImage src={c.user?.avatarUrl || ""} />
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-base">
+                          {c.user?.displayName?.charAt(0) ?? "?"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="font-bold text-[15px] truncate">{c.user?.displayName ?? "Bilinmiyor"}</span>
+                          <span className="text-[11px] text-muted-foreground flex-shrink-0">{time}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm text-muted-foreground truncate">{preview}</p>
+                          {c.unreadCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground flex-shrink-0">
+                              {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : null}
+              {filteredConvs.filter(() => activeTab !== "tumu").map((c, idx) => {
                 const uid = c.user?.id ?? idx;
                 const preview = lastMsgPreview(c.lastMessage);
                 const isSpecial = isSpecialPreview(c.lastMessage);
@@ -2716,6 +2923,58 @@ export default function DirectMessages() {
           </div>
         )}
       </div>
+
+      {/* ── Paylaşılan gönderi overlay ── */}
+      {sharedPostId !== null && (
+        <SharedPostOverlay postId={sharedPostId} onClose={() => setSharedPostId(null)} />
+      )}
     </AppLayout>
+  );
+}
+
+// ── Paylaşılan gönderi bottom-sheet bileşeni ────────────────────────────────
+function SharedPostOverlay({ postId, onClose }: { postId: number; onClose: () => void }) {
+  const [post, setPost] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/posts/${postId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { setPost(data); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [postId]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={onClose}>
+      {/* Arka plan */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
+      {/* Panel */}
+      <div
+        className="relative w-full max-w-lg mx-auto bg-background rounded-t-3xl overflow-hidden shadow-2xl"
+        style={{ maxHeight: "85vh" }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Tutamaç + kapat */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-1">
+          <div className="w-10 h-1 bg-muted-foreground/30 rounded-full mx-auto absolute left-1/2 -translate-x-1/2 top-3" />
+          <span className="font-bold text-sm text-foreground">Gönderi</span>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto" style={{ maxHeight: "calc(85vh - 52px)" }}>
+          {loading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : post ? (
+            <PostCard post={post} />
+          ) : (
+            <div className="py-12 text-center text-sm text-muted-foreground">Gönderi bulunamadı.</div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

@@ -186,6 +186,86 @@ router.post("/dm/groups/:groupId/media", requireAuth, upload.single("file"), asy
   }
 });
 
+// PATCH /dm/groups/:groupId — grup adı veya fotoğrafını güncelle
+router.patch("/dm/groups/:groupId", requireAuth, async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    const userId = req.user!.id;
+    const [group] = await db.select().from(dmGroupsTable).where(eq(dmGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    if (group.createdBy !== userId) { res.status(403).json({ error: "Sadece grup kurucusu güncelleyebilir" }); return; }
+    const { name, avatarUrl } = req.body;
+    const updates: Partial<typeof group> = {};
+    if (name?.trim()) updates.name = name.trim();
+    if (avatarUrl !== undefined) (updates as any).avatarUrl = avatarUrl;
+    const [updated] = await db.update(dmGroupsTable).set(updates).where(eq(dmGroupsTable.id, groupId)).returning();
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /dm/groups/:groupId/photo — grup fotoğrafı yükle
+router.post("/dm/groups/:groupId/photo", requireAuth, upload.single("photo"), async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    const userId = req.user!.id;
+    const [group] = await db.select().from(dmGroupsTable).where(eq(dmGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    if (group.createdBy !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+    if (!req.file) { res.status(400).json({ error: "Dosya gerekli" }); return; }
+    const avatarUrl = `/api/uploads/${req.file.filename}`;
+    const [updated] = await db.update(dmGroupsTable).set({ avatarUrl }).where(eq(dmGroupsTable.id, groupId)).returning();
+    res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /dm/groups/:groupId/members — üye ekle
+router.post("/dm/groups/:groupId/members", requireAuth, async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    const userId = req.user!.id;
+    const [group] = await db.select().from(dmGroupsTable).where(eq(dmGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    if (group.createdBy !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+    const { userId: newUserId } = req.body;
+    if (!newUserId) { res.status(400).json({ error: "userId gerekli" }); return; }
+    // Zaten üye mi kontrol et
+    const existing = await db.select().from(dmGroupMembersTable)
+      .where(and(eq(dmGroupMembersTable.groupId, groupId), eq(dmGroupMembersTable.userId, newUserId))).limit(1);
+    if (existing.length > 0) { res.status(409).json({ error: "Kullanıcı zaten üye" }); return; }
+    await db.insert(dmGroupMembersTable).values({ groupId, userId: newUserId });
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE /dm/groups/:groupId/members/:memberId — üye çıkar
+router.delete("/dm/groups/:groupId/members/:memberId", requireAuth, async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    const memberId = parseInt(req.params["memberId"] as string);
+    const userId = req.user!.id;
+    const [group] = await db.select().from(dmGroupsTable).where(eq(dmGroupsTable.id, groupId)).limit(1);
+    if (!group) { res.status(404).json({ error: "Grup bulunamadı" }); return; }
+    // Kurucuysa veya kendini çıkarıyorsa izin ver
+    if (group.createdBy !== userId && memberId !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+    await db.delete(dmGroupMembersTable).where(
+      and(eq(dmGroupMembersTable.groupId, groupId), eq(dmGroupMembersTable.userId, memberId))
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── Direct message wildcard routes — MUST come AFTER all named /dm/* routes ──
 
 // GET /dm/:userId

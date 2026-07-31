@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Send, Eye, MessageCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Send, Eye, MessageCircle, Pin } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 interface Story {
   id: number;
@@ -32,6 +33,7 @@ const EMOJI_REACTIONS = ["❤️", "😂", "😮", "🙌", "🔥", "😍", "👏
 export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryViewerProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   const [groupIdx, setGroupIdx] = useState(startGroupIndex);
   const [storyIdx, setStoryIdx] = useState(0);
@@ -50,8 +52,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
-  // Pinned replies (shown on story bottom-right)
-  const [pinnedReplies, setPinnedReplies] = useState<any[]>([]);
+  // Pinned replies per story — key: storyId → replies[]
+  const [pinnedByStory, setPinnedByStory] = useState<Record<number, any[]>>({});
 
   // Story owner viewers panel
   const [showViewers, setShowViewers] = useState(false);
@@ -183,7 +185,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
       const data = await r.json();
       const arr = Array.isArray(data) ? data : [];
       setReplies(arr);
-      setPinnedReplies(arr.filter((r: any) => r.pinned));
+      // pinnedByStory: sadece bu hikaye parçasına ait sabitler
+      setPinnedByStory(prev => ({ ...prev, [currentStory.id]: arr.filter((r: any) => r.pinned) }));
     } finally {
       setRepliesLoading(false);
     }
@@ -191,17 +194,19 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
 
   const togglePin = async (replyId: number) => {
     if (!currentStory) return;
+    const storyId = currentStory.id;
     try {
-      const r = await fetch(`/api/stories/${currentStory.id}/replies/${replyId}/pin`, { method: "POST" });
+      const r = await fetch(`/api/stories/${storyId}/replies/${replyId}/pin`, { method: "POST" });
       if (r.ok) {
         const updated = await r.json();
         setReplies(prev => prev.map(rep => rep.id === replyId ? { ...rep, pinned: updated.pinned } : rep));
-        setPinnedReplies(prev => {
+        setPinnedByStory(prev => {
+          const current = prev[storyId] ?? [];
           if (updated.pinned) {
             const rep = replies.find(x => x.id === replyId);
-            return rep ? [...prev.filter(x => x.id !== replyId), { ...rep, pinned: true }] : prev;
+            return { ...prev, [storyId]: rep ? [...current.filter(x => x.id !== replyId), { ...rep, pinned: true }] : current };
           }
-          return prev.filter(x => x.id !== replyId);
+          return { ...prev, [storyId]: current.filter(x => x.id !== replyId) };
         });
       }
     } catch { /* sessiz */ }
@@ -269,18 +274,26 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
 
         {/* User header */}
         <div className="absolute top-6 left-0 right-0 z-20 flex items-center gap-3 px-4 py-2">
-          <Avatar className="w-9 h-9 border-2 border-white/70">
-            <AvatarImage src={currentGroup.user.avatarUrl || ""} />
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
-              {currentGroup.user.displayName.charAt(0)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
+          <button
+            onClick={() => { onClose(); setLocation(`/profile/${currentGroup.user.id}`); }}
+            className="flex-shrink-0 focus:outline-none"
+          >
+            <Avatar className="w-9 h-9 border-2 border-white/70">
+              <AvatarImage src={currentGroup.user.avatarUrl || ""} />
+              <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                {currentGroup.user.displayName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+          </button>
+          <button
+            onClick={() => { onClose(); setLocation(`/profile/${currentGroup.user.id}`); }}
+            className="flex-1 min-w-0 text-left"
+          >
             <p className="text-white font-semibold text-sm drop-shadow">{currentGroup.user.displayName}</p>
             <p className="text-white/70 text-xs drop-shadow">
               {formatDistanceToNow(new Date(currentStory.createdAt), { locale: tr, addSuffix: true })}
             </p>
-          </div>
+          </button>
           <button
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors"
@@ -414,7 +427,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                   <p className="text-white/50 text-sm">Henüz kimse izlemedi</p>
                 </div>
               ) : viewers.map((v: any) => (
-                <div key={v.id} className="flex gap-2.5 items-center">
+                <button key={v.id} onClick={() => { onClose(); setLocation(`/profile/${v.id}`); }} className="flex gap-2.5 items-center w-full text-left hover:bg-white/5 rounded-xl px-1 py-1 transition-colors">
                   <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-white/10">
                     {v.avatarUrl
                       ? <img src={v.avatarUrl} className="w-full h-full object-cover" alt={v.displayName} />
@@ -424,26 +437,26 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                     <p className="text-white text-sm font-medium truncate">{v.displayName}</p>
                     <p className="text-white/50 text-[11px]">@{v.username}</p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* ── Pinned replies overlay (bottom-right of story, behind bottom bar) ── */}
-        {isOwnStory && pinnedReplies.length > 0 && !showReplies && !showViewers && (
+        {/* ── Pinned replies overlay — bu hikaye parçasına özel ── */}
+        {isOwnStory && currentStory && (pinnedByStory[currentStory.id] ?? []).length > 0 && !showReplies && !showViewers && (
           <div className="absolute bottom-20 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
-            {pinnedReplies.slice(0, 2).map((r: any) => (
-              <div key={r.id} className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[180px]">
+            {(pinnedByStory[currentStory.id] ?? []).slice(0, 2).map((r: any) => (
+              <div key={r.id} className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[190px]">
                 <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/20">
                   {r.avatar_url
                     ? <img src={r.avatar_url} className="w-full h-full object-cover" alt="" />
                     : <span className="w-full h-full flex items-center justify-center text-white text-[9px] font-bold">{r.display_name?.charAt(0)}</span>}
                 </div>
-                <div className={`${r.is_emoji ? "text-xl" : "text-white text-xs truncate"}`}>
+                <div className={`flex-1 min-w-0 ${r.is_emoji ? "text-xl" : "text-white text-xs truncate"}`}>
                   {r.content}
                 </div>
-                <span className="text-yellow-400 text-[10px] flex-shrink-0">📌</span>
+                <Pin className="w-3 h-3 text-amber-400 flex-shrink-0 fill-amber-400" />
               </div>
             ))}
           </div>
@@ -471,11 +484,13 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                 </div>
               ) : replies.map((r: any) => (
                 <div key={r.id} className="flex gap-2 items-start">
-                  <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0 bg-white/10">
-                    {r.avatar_url
-                      ? <img src={r.avatar_url} className="w-full h-full object-cover" alt={r.display_name} />
-                      : <span className="w-full h-full flex items-center justify-center text-white text-xs font-bold">{r.display_name?.charAt(0)}</span>}
-                  </div>
+                  <button onClick={() => { onClose(); setLocation(`/profile/${r.from_user_id}`); }} className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden bg-white/10">
+                      {r.avatar_url
+                        ? <img src={r.avatar_url} className="w-full h-full object-cover" alt={r.display_name} />
+                        : <span className="w-full h-full flex items-center justify-center text-white text-xs font-bold">{r.display_name?.charAt(0)}</span>}
+                    </div>
+                  </button>
                   <div className="flex-1 min-w-0">
                     <p className="text-white/70 text-[10px] font-medium mb-0.5">@{r.username}</p>
                     <div className={`inline-block rounded-2xl px-3 py-1.5 ${r.is_emoji ? "bg-transparent text-3xl" : "bg-white/15 text-white text-sm"}`}>
@@ -486,11 +501,11 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
                   <button
                     onClick={() => togglePin(r.id)}
                     className={`flex-shrink-0 mt-1 w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
-                      r.pinned ? "bg-yellow-400/30 text-yellow-300" : "bg-white/10 text-white/50 hover:bg-white/20 hover:text-white"
+                      r.pinned ? "bg-amber-400/20 text-amber-300" : "bg-white/10 text-white/40 hover:bg-white/20 hover:text-white"
                     }`}
                     title={r.pinned ? "Sabitlemeden kaldır" : "Öne çıkart"}
                   >
-                    📌
+                    <Pin className={`w-3.5 h-3.5 ${r.pinned ? "fill-amber-300" : ""}`} />
                   </button>
                 </div>
               ))}
