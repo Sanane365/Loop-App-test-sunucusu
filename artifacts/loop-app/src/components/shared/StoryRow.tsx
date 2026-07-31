@@ -27,22 +27,14 @@ export function StoryRow() {
 
   return (
     <>
-      <div className="flex items-stretch gap-2.5 overflow-x-auto px-4 py-3 hide-scrollbar">
+      <div className="flex items-stretch gap-2 overflow-x-auto px-3 py-3 hide-scrollbar">
         {/* Hikaye Ekle card */}
         <Link
           href="/create?type=story"
           className="flex flex-col items-center flex-shrink-0 group"
         >
-          <div className="w-[72px] h-[108px] rounded-2xl bg-muted/60 border border-border flex items-center justify-center relative overflow-hidden">
-            {/* User avatar background if exists */}
-            {user?.avatarUrl && (
-              <img
-                src={user.avatarUrl}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover opacity-20"
-              />
-            )}
-            <div className="w-11 h-11 rounded-full border-2 border-dashed border-primary/60 flex items-center justify-center bg-background/50 relative z-10">
+          <div className="w-[76px] h-[140px] rounded-2xl bg-white dark:bg-muted/80 border border-primary/20 flex items-center justify-center relative overflow-hidden shadow-sm">
+            <div className="w-12 h-12 rounded-full border-[2.5px] border-dashed border-primary flex items-center justify-center bg-primary/5 relative z-10">
               <Plus className="w-5 h-5 text-primary" />
             </div>
           </div>
@@ -70,7 +62,7 @@ export function StoryRow() {
               onClick={() => handleStoryClick(idx)}
               className="flex flex-col items-center flex-shrink-0 group focus:outline-none"
             >
-              <div className="w-[72px] h-[108px] rounded-2xl overflow-hidden relative border-2 border-transparent group-hover:border-primary/50 transition-all">
+              <div className="w-[76px] h-[140px] rounded-2xl overflow-hidden relative shadow-sm" style={{ border: us.hasUnviewed ? '2px solid hsl(var(--primary))' : '2px solid transparent' }}>
                 {/* Background image - story media or avatar */}
                 {latestStory?.mediaUrl ? (
                   latestStory.mediaType === "video" ? (
@@ -88,34 +80,37 @@ export function StoryRow() {
                     />
                   )
                 ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-primary/40 to-violet-600/40 flex items-center justify-center">
-                    <Avatar className="w-12 h-12">
-                      <AvatarImage src={us.user.avatarUrl || ""} />
-                      <AvatarFallback className="text-lg">{us.user.displayName.charAt(0)}</AvatarFallback>
-                    </Avatar>
+                  <div className="w-full h-full bg-gradient-to-br from-primary/40 to-violet-600/60 flex items-center justify-center">
+                    {us.user.avatarUrl ? (
+                      <img src={us.user.avatarUrl} alt={us.user.username} className="w-full h-full object-cover" />
+                    ) : (
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback className="text-lg bg-primary/20">{us.user.displayName.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
                 )}
 
                 {/* Gradient overlay at bottom */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
                 {/* Progress bar at top */}
                 {us.hasUnviewed && (
-                  <div className="absolute top-1.5 left-1.5 right-1.5 h-[2px] bg-white/30 rounded-full overflow-hidden">
+                  <div className="absolute top-1.5 left-1.5 right-1.5 h-[2.5px] bg-white/30 rounded-full overflow-hidden">
                     <div className="h-full w-full bg-primary rounded-full" />
                   </div>
                 )}
 
-                {/* User avatar at bottom left */}
+                {/* User info at bottom */}
                 <div className="absolute bottom-1.5 left-1.5 right-1.5">
-                  <div className={`w-6 h-6 rounded-full overflow-hidden border-2 mb-0.5 ${us.hasUnviewed ? 'border-primary' : 'border-white/60'}`}>
+                  <div className={`w-7 h-7 rounded-full overflow-hidden border-2 mb-0.5 mx-auto ${us.hasUnviewed ? 'border-primary' : 'border-white/60'}`}>
                     <Avatar className="w-full h-full">
                       <AvatarImage src={us.user.avatarUrl || ""} />
-                      <AvatarFallback className="text-[8px]">{us.user.displayName.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="text-[9px] bg-primary/30">{us.user.displayName.charAt(0)}</AvatarFallback>
                     </Avatar>
                   </div>
-                  <p className="text-white text-[9px] font-semibold leading-tight truncate">{us.user.username}</p>
-                  {timeAgo && <p className="text-white/70 text-[8px] leading-tight">{timeAgo}</p>}
+                  <p className="text-white text-[10px] font-semibold leading-tight truncate text-center">{us.user.username}</p>
+                  {timeAgo && <p className="text-white/70 text-[9px] leading-tight text-center">{timeAgo}</p>}
                 </div>
               </div>
             </button>
@@ -123,7 +118,7 @@ export function StoryRow() {
         })}
 
         {isLoading && Array(4).fill(0).map((_, i) => (
-          <div key={i} className="w-[72px] h-[108px] rounded-2xl bg-muted animate-pulse flex-shrink-0" />
+          <div key={i} className="w-[76px] h-[140px] rounded-2xl bg-muted animate-pulse flex-shrink-0" />
         ))}
       </div>
 

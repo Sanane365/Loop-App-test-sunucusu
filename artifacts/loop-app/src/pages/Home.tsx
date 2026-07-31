@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListPosts, getListPostsQueryKey } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { StoryRow } from "@/components/shared/StoryRow";
 import { PostCard } from "@/components/shared/PostCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft, MessageSquare } from "lucide-react";
+import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft, Bot, Send, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/layout/Header";
@@ -13,14 +13,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 
-type FilterType = "trend" | "takipte" | "yeni" | "bulten" | "sana-ozel";
+type FilterType = "trend" | "takipte" | "yeni" | "bulten" | "sana-ozel" | "anonim-sorular";
 
 const filters: { id: FilterType; label: string; icon: React.ReactNode; color: string }[] = [
-  { id: "trend", label: "Trend", icon: <TrendingUp className="w-3.5 h-3.5" />, color: "text-primary" },
-  { id: "takipte", label: "Takipte", icon: <MapPin className="w-3.5 h-3.5" />, color: "text-orange-500" },
-  { id: "yeni", label: "Yeni", icon: <Leaf className="w-3.5 h-3.5" />, color: "text-green-500" },
-  { id: "bulten", label: "Bülten", icon: <Sparkles className="w-3.5 h-3.5" />, color: "text-purple-500" },
-  { id: "sana-ozel", label: "Sana Özel", icon: <Sparkles className="w-3.5 h-3.5" />, color: "text-blue-500" },
+  { id: "trend",         label: "Trend",           icon: <TrendingUp className="w-3.5 h-3.5" />, color: "text-primary"      },
+  { id: "takipte",       label: "Takipte",          icon: <MapPin className="w-3.5 h-3.5" />,     color: "text-orange-500"   },
+  { id: "yeni",          label: "Yeni",             icon: <Leaf className="w-3.5 h-3.5" />,        color: "text-green-500"    },
+  { id: "bulten",        label: "Bülten",           icon: <Sparkles className="w-3.5 h-3.5" />,    color: "text-purple-500"   },
+  { id: "sana-ozel",     label: "Sana Özel",        icon: <Sparkles className="w-3.5 h-3.5" />,    color: "text-blue-500"     },
+  { id: "anonim-sorular",label: "Anonim Sorular",   icon: <Bot className="w-3.5 h-3.5" />,         color: "text-violet-500"   },
 ];
 
 export default function Home() {
@@ -30,20 +31,51 @@ export default function Home() {
   const [typePickerOpen, setTypePickerOpen] = useState(false);
   const { toast } = useToast();
 
-  // Anonymous question to self (my inbox)
-  const [myQOpen, setMyQOpen] = useState(false);
-  const [myQuestions, setMyQuestions] = useState<any[]>([]);
-  const [myQLoading, setMyQLoading] = useState(false);
+  // ── Anonim Sorular ──
+  const [publicQuestions, setPublicQuestions] = useState<any[]>([]);
+  const [myQuestions, setMyQuestions]         = useState<any[]>([]);
+  const [qLoading, setQLoading]               = useState(false);
+  const [answeringId, setAnsweringId]         = useState<number | null>(null);
+  const [answerText, setAnswerText]           = useState("");
+  const [submittingAnswer, setSubmittingAnswer] = useState(false);
 
-  const openMyQ = async () => {
-    setMyQLoading(true);
-    setMyQOpen(true);
+  const loadQuestions = async () => {
+    setQLoading(true);
     try {
-      const r = await fetch("/api/users/me/questions");
-      const data = await r.json();
-      setMyQuestions(Array.isArray(data) ? data : []);
-    } catch { setMyQuestions([]); }
-    finally { setMyQLoading(false); }
+      const [pubRes, myRes] = await Promise.all([
+        fetch("/api/questions/public"),
+        fetch("/api/users/me/questions"),
+      ]);
+      const pubData = await pubRes.json();
+      const myData  = await myRes.json();
+      setPublicQuestions(Array.isArray(pubData) ? pubData : []);
+      setMyQuestions(Array.isArray(myData) ? myData : []);
+    } catch { /* sessiz */ }
+    finally { setQLoading(false); }
+  };
+
+  useEffect(() => {
+    if (activeFilter === "anonim-sorular") loadQuestions();
+  }, [activeFilter]);
+
+  const submitAnswer = async (questionId: number) => {
+    if (!answerText.trim()) return;
+    setSubmittingAnswer(true);
+    try {
+      const r = await fetch(`/api/questions/${questionId}/answer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answer: answerText }),
+      });
+      if (r.ok) {
+        toast({ title: "Yanıtın yayınlandı 💜" });
+        setAnsweringId(null);
+        setAnswerText("");
+        loadQuestions();
+      } else {
+        toast({ title: "Hata", variant: "destructive" });
+      }
+    } finally { setSubmittingAnswer(false); }
   };
 
   const { data: allPosts, isLoading } = useListPosts(undefined, {
@@ -109,39 +141,196 @@ export default function Home() {
                 {f.label}
               </button>
             ))}
-            {/* 🤖 Anonim Sorular — Sana Özel'in solunda */}
-            <button
-              onClick={openMyQ}
-              title="Anonim sorularım"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold flex-shrink-0 transition-all text-muted-foreground hover:bg-muted hover:text-foreground border border-dashed border-border"
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              <span>Sorular</span>
-            </button>
             <button className="ml-auto flex-shrink-0 text-muted-foreground hover:text-foreground p-1.5">
               <SlidersHorizontal className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Posts feed */}
-          <div className="pt-3">
-            {loading ? (
-              Array(3).fill(0).map((_, i) => (
-                <div key={i} className="mx-4 mb-4 h-80 bg-card animate-pulse rounded-2xl border border-border" />
-              ))
-            ) : posts?.length === 0 ? (
-              <div className="text-center py-16 text-muted-foreground">
-                <p className="font-medium">Henüz gönderi yok</p>
-                {activeFilter === "bulten" && (
-                  <p className="text-sm mt-1">İlk bülten gönderisini paylaş!</p>
-                )}
+          {/* ── Anonim Sorular Feed ── */}
+          {activeFilter === "anonim-sorular" ? (
+            <div className="pt-2 px-4 space-y-3">
+              {/* Header */}
+              <div className="flex items-center justify-between py-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-violet-500/10 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-violet-500" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-sm">Anonim Sorular</p>
+                    <p className="text-xs text-muted-foreground">Yanıtlanan sorular ve gelen kutunuz</p>
+                  </div>
+                </div>
               </div>
-            ) : (
-              posts?.map(post => (
-                <PostCard key={post.id} post={post} />
-              ))
-            )}
-          </div>
+
+              {/* My inbox unanswered */}
+              {myQuestions.filter((q: any) => !q.answer_text).length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">📬 Sana Gelen</p>
+                  <div className="space-y-2">
+                    {myQuestions.filter((q: any) => !q.answer_text).map((q: any) => (
+                      <div key={q.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+                        {/* Top gradient bar */}
+                        <div className="h-1 w-full bg-gradient-to-r from-violet-500 via-purple-400 to-pink-400" />
+                        <div className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-7 h-7 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                              <Bot className="w-3.5 h-3.5 text-violet-500" />
+                            </div>
+                            <span className="text-xs font-medium text-violet-500">Anonim Soru</span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {new Date(q.created_at).toLocaleDateString("tr-TR", { day:"numeric", month:"short" })}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold leading-snug mb-3">"{q.question_text}"</p>
+
+                          {answeringId === q.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={answerText}
+                                onChange={e => setAnswerText(e.target.value)}
+                                placeholder="Yanıtını yaz..."
+                                className="resize-none rounded-2xl text-sm"
+                                rows={3}
+                                maxLength={500}
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => { setAnsweringId(null); setAnswerText(""); }}
+                                  className="flex-1 py-2 rounded-2xl border border-border text-xs font-semibold hover:bg-muted"
+                                >
+                                  İptal
+                                </button>
+                                <button
+                                  onClick={() => submitAnswer(q.id)}
+                                  disabled={!answerText.trim() || submittingAnswer}
+                                  className="flex-1 py-2 rounded-2xl bg-primary text-primary-foreground text-xs font-semibold disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  {submittingAnswer ? "Gönderiliyor…" : "Yanıtla"}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => { setAnsweringId(q.id); setAnswerText(""); }}
+                              className="w-full py-2.5 rounded-2xl bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors flex items-center justify-center gap-1.5"
+                            >
+                              <Send className="w-3.5 h-3.5" />
+                              Yanıtla
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Answered questions (mine + public) */}
+              {(() => {
+                const myAnswered = myQuestions.filter((q: any) => q.answer_text);
+                // Merge: kendi yanıtladıkları + public feed (dedup by id)
+                const ids = new Set(myAnswered.map((q: any) => q.id));
+                const combined = [...myAnswered, ...publicQuestions.filter((q: any) => !ids.has(q.id))];
+                combined.sort((a, b) => new Date(b.answered_at || b.created_at).getTime() - new Date(a.answered_at || a.created_at).getTime());
+                if (combined.length === 0 && !qLoading) return null;
+                return (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">💬 Yanıtlananlar</p>
+                    <div className="space-y-3">
+                      {qLoading ? (
+                        Array(3).fill(0).map((_, i) => (
+                          <div key={i} className="h-40 bg-muted animate-pulse rounded-3xl" />
+                        ))
+                      ) : combined.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-8 text-sm">Henüz yanıtlanmış soru yok</p>
+                      ) : combined.map((q: any) => (
+                        <div key={q.id} className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm">
+                          <div className="h-1 w-full bg-gradient-to-r from-violet-500 via-purple-400 to-pink-400" />
+                          <div className="p-4">
+                            {/* Who it was asked to */}
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-6 h-6 rounded-full bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                                <Bot className="w-3 h-3 text-violet-500" />
+                              </div>
+                              <span className="text-xs text-muted-foreground">Anonim soru →</span>
+                              <Link href={`/profile/${q.username}`} className="flex items-center gap-1.5 group">
+                                {q.avatar_url ? (
+                                  <img src={q.avatar_url} className="w-5 h-5 rounded-full object-cover border border-border" alt={q.display_name} />
+                                ) : (
+                                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center text-[9px] font-bold text-primary">
+                                    {q.display_name?.charAt(0)}
+                                  </div>
+                                )}
+                                <span className="text-xs font-semibold group-hover:text-primary transition-colors">{q.display_name}</span>
+                              </Link>
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {q.answered_at ? new Date(q.answered_at).toLocaleDateString("tr-TR", { day:"numeric", month:"short" }) : ""}
+                              </span>
+                            </div>
+
+                            {/* Question */}
+                            <div className="bg-muted/50 rounded-2xl px-3.5 py-2.5 mb-2">
+                              <p className="text-sm font-medium leading-snug">"{q.question_text}"</p>
+                            </div>
+
+                            {/* Answer */}
+                            <div className="flex gap-2 items-start">
+                              <div className="flex-shrink-0 mt-0.5">
+                                {q.avatar_url ? (
+                                  <img src={q.avatar_url} className="w-6 h-6 rounded-full object-cover border border-border" alt={q.display_name} />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-bold text-primary">
+                                    {q.display_name?.charAt(0)}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-1 bg-primary/5 border border-primary/10 rounded-2xl px-3 py-2">
+                                <p className="text-xs font-semibold text-primary mb-0.5">{q.display_name}</p>
+                                <p className="text-sm leading-snug">{q.answer_text}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Empty state */}
+              {!qLoading && myQuestions.length === 0 && publicQuestions.length === 0 && (
+                <div className="text-center py-16">
+                  <div className="w-16 h-16 rounded-3xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+                    <Bot className="w-8 h-8 text-violet-500" />
+                  </div>
+                  <p className="font-bold text-base mb-1">Henüz soru yok</p>
+                  <p className="text-sm text-muted-foreground">Profiline anonim soru gönderilince burada görünür</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* ── Normal Posts Feed ── */
+            <div className="pt-3">
+              {loading ? (
+                Array(3).fill(0).map((_, i) => (
+                  <div key={i} className="mx-4 mb-4 h-80 bg-card animate-pulse rounded-2xl border border-border" />
+                ))
+              ) : posts?.length === 0 ? (
+                <div className="text-center py-16 text-muted-foreground">
+                  <p className="font-medium">Henüz gönderi yok</p>
+                  {activeFilter === "bulten" && (
+                    <p className="text-sm mt-1">İlk bülten gönderisini paylaş!</p>
+                  )}
+                </div>
+              ) : (
+                posts?.map(post => (
+                  <PostCard key={post.id} post={post} />
+                ))
+              )}
+            </div>
+          )}
         </div>
       </main>
 
@@ -154,28 +343,6 @@ export default function Home() {
           <Pencil className="w-6 h-6" />
         </button>
       )}
-
-      {/* Anonim sorular inbox */}
-      <Dialog open={myQOpen} onOpenChange={setMyQOpen}>
-        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><span>🤖</span> Anonim Sorularım</DialogTitle>
-            <DialogDescription>Sana gelen anonim sorular</DialogDescription>
-          </DialogHeader>
-          <div className="overflow-y-auto flex-1 space-y-3 py-2">
-            {myQLoading ? (
-              Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)
-            ) : myQuestions.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">Henüz anonim soru gelmedi 🤫</p>
-            ) : myQuestions.map((q: any) => (
-              <div key={q.id} className="bg-muted/50 rounded-xl p-3 border border-border">
-                <p className="text-sm font-medium">{q.question_text}</p>
-                <p className="text-xs text-muted-foreground mt-1">{new Date(q.created_at).toLocaleDateString("tr-TR")}</p>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Type picker modal */}
       <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>

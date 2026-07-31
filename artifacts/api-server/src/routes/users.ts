@@ -206,8 +206,54 @@ router.post("/users/:userId/questions", async (req, res) => {
 
 router.get("/users/me/questions", requireAuth, async (req, res) => {
   try {
-    const result = await db.execute(sql`SELECT * FROM questions WHERE to_user_id = ${req.user!.id} ORDER BY created_at DESC`);
+    const result = await db.execute(sql`
+      SELECT q.*, u.display_name, u.username, u.avatar_url
+      FROM questions q
+      JOIN users u ON u.id = q.to_user_id
+      WHERE q.to_user_id = ${req.user!.id}
+      ORDER BY q.created_at DESC
+    `);
     res.json(result.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /questions/public — yanıtlanmış sorular herkese açık feed
+router.get("/questions/public", async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT q.id, q.question_text, q.answer_text, q.answered_at, q.created_at,
+             u.id as to_user_id, u.display_name, u.username, u.avatar_url
+      FROM questions q
+      JOIN users u ON u.id = q.to_user_id
+      WHERE q.answer_text IS NOT NULL
+      ORDER BY q.answered_at DESC
+      LIMIT 50
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /questions/:id/answer — soruyu yanıtla (sadece alıcı)
+router.post("/questions/:id/answer", requireAuth, async (req, res) => {
+  try {
+    const questionId = parseInt(req.params["id"]!);
+    const { answer } = req.body;
+    if (!answer?.trim()) { res.status(400).json({ error: "Yanıt boş olamaz" }); return; }
+    // sadece sorunun alıcısı yanıtlayabilir
+    const check = await db.execute(sql`SELECT to_user_id FROM questions WHERE id = ${questionId}`);
+    if (!check.rows[0] || (check.rows[0] as any).to_user_id !== req.user!.id) {
+      res.status(403).json({ error: "Bu soruyu yanıtlama yetkiniz yok" }); return;
+    }
+    await db.execute(sql`
+      UPDATE questions SET answer_text = ${answer.trim()}, answered_at = NOW() WHERE id = ${questionId}
+    `);
+    res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

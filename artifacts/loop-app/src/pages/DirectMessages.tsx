@@ -2090,7 +2090,7 @@ export default function DirectMessages() {
           {/* ── Yeni Grup Oluştur Bottom Sheet ── */}
           {newGroupOpen && (
             <div className="fixed inset-0 z-[55] flex flex-col justify-end">
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); }} />
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); setGroupMemberSearch(""); setGroupSearchResults([]); }} />
               <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4 max-h-[80vh] flex flex-col">
                 <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5 flex-shrink-0" />
                 <div className="flex items-center gap-2.5 mb-5 flex-shrink-0">
@@ -2181,7 +2181,7 @@ export default function DirectMessages() {
                 <div className="flex gap-3 flex-shrink-0">
                   <button
                     className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                    onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); }}
+                    onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); setGroupMemberSearch(""); setGroupSearchResults([]); }}
                   >
                     İptal
                   </button>
