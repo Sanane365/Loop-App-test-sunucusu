@@ -104,9 +104,9 @@ function CommentBottomSheet({
 
   useEffect(() => {
     if (gifPanelOpen && trendingGifs.length === 0) {
-      fetch(`https://g.tenor.com/v1/trending?key=${TENOR_KEY}&limit=24&media_filter=minimal&contentfilter=off`)
+      fetch(`/api/gif/trending?limit=24`)
         .then(r => r.json())
-        .then(data => setTrendingGifs(mapTenorResults(data.results ?? [])))
+        .then(data => setTrendingGifs(Array.isArray(data) ? data : []))
         .catch(() => {});
     }
   }, [gifPanelOpen]);
@@ -116,9 +116,9 @@ function CommentBottomSheet({
     if (!q.trim()) { setGifResults([]); return; }
     setGifLoading(true);
     try {
-      const r = await fetch(`https://g.tenor.com/v1/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=24&media_filter=minimal&contentfilter=off`);
+      const r = await fetch(`/api/gif/search?q=${encodeURIComponent(q)}&limit=24`);
       const data = await r.json();
-      setGifResults(mapTenorResults(data.results ?? []));
+      setGifResults(Array.isArray(data) ? data : []);
     } finally { setGifLoading(false); }
   }, []);
 

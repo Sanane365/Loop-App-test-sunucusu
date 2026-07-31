@@ -15,7 +15,7 @@ import {
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
   LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark, Repeat2, Lock, ArrowLeft,
 } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
@@ -302,10 +302,50 @@ export default function Profile() {
   const [highlightImageUploading, setHighlightImageUploading] = useState(false);
   const highlightImageRef = useRef<HTMLInputElement>(null);
   const [highlightViewOpen, setHighlightViewOpen] = useState(false);
-  const [viewingHighlight, setViewingHighlight] = useState<any>(null);
+  const [highlightStoryIdx, setHighlightStoryIdx] = useState(0);
+  const [highlightProgress, setHighlightProgress] = useState(0);
+  const highlightTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [customHighlights, setCustomHighlights] = useState<Array<{ label: string; imageUrl?: string; likes: number; likedByMe: boolean }>>(() => {
     try { return JSON.parse(localStorage.getItem("loop_highlights") || "[]"); } catch { return []; }
   });
+
+  // Tüm highlight'lar (custom önce, sonra statik)
+  const allHighlights = useMemo(() => [
+    ...customHighlights.map(h => ({ ...h, isCustom: true as const })),
+    ...HIGHLIGHTS.map(h => ({ ...h, isCustom: false as const, likes: 0, likedByMe: false, imageUrl: undefined })),
+  ], [customHighlights]);
+  const allHighlightsRef = useRef(allHighlights);
+  allHighlightsRef.current = allHighlights;
+
+  // Stories timer
+  useEffect(() => {
+    if (!highlightViewOpen) {
+      if (highlightTimerRef.current) clearInterval(highlightTimerRef.current);
+      setHighlightProgress(0);
+      return;
+    }
+    setHighlightProgress(0);
+    highlightTimerRef.current = setInterval(() => {
+      setHighlightProgress(p => {
+        const next = p + 2;
+        if (next >= 100) {
+          setTimeout(() => {
+            setHighlightStoryIdx(idx => {
+              const nextIdx = idx + 1;
+              if (nextIdx >= allHighlightsRef.current.length) {
+                setHighlightViewOpen(false);
+                return 0;
+              }
+              return nextIdx;
+            });
+          }, 0);
+          return 100;
+        }
+        return next;
+      });
+    }, 100);
+    return () => { if (highlightTimerRef.current) clearInterval(highlightTimerRef.current); };
+  }, [highlightViewOpen, highlightStoryIdx]);
 
   const handleHighlightImageSelect = async (file: File) => {
     setHighlightImageUploading(true);
@@ -363,7 +403,7 @@ export default function Profile() {
     setPanoSending(true);
     try {
       const r = await fetch(`/api/users/${targetUserId}/pano`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: panoInput.trim() }),
       });
       if (r.ok) {
@@ -965,7 +1005,7 @@ export default function Profile() {
             )}
             {customHighlights.map((h, i) => (
               <div key={`custom-${i}`} className="flex-shrink-0 flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-pointer"
-                onClick={() => { setViewingHighlight({ ...h, idx: i, isCustom: true }); setHighlightViewOpen(true); }}>
+                onClick={() => { setHighlightStoryIdx(i); setHighlightViewOpen(true); }}>
                 <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 22 }}>
                   <div className="flex justify-center -mt-3 mb-1">
                     <div className="bg-white/50 backdrop-blur-sm border border-black/10 rounded-sm" style={{ width: 28, height: 10 }} />
@@ -977,18 +1017,12 @@ export default function Profile() {
                     }
                   </div>
                   <p className="text-center text-[9px] font-semibold text-gray-600 mt-2 leading-tight truncate px-1">{h.label}</p>
-                  <div className="flex justify-center items-center gap-1 mt-0.5">
-                    <button onClick={e => { e.stopPropagation(); toggleHighlightLike(i); }}
-                      className={`text-[9px] flex items-center gap-0.5 ${h.likedByMe ? "text-red-500" : "text-gray-400"}`}>
-                      ♥ {h.likes > 0 ? h.likes : ""}
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
             {HIGHLIGHTS.map((h, i) => (
               <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}
-                onClick={() => { setViewingHighlight({ ...h, idx: i, isCustom: false }); setHighlightViewOpen(true); }}>
+                onClick={() => { setHighlightStoryIdx(customHighlights.length + i); setHighlightViewOpen(true); }}>
                 {/* Polaroid card */}
                 <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 22 }}>
                   {/* Transparent tape */}
@@ -1680,62 +1714,90 @@ export default function Profile() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Highlight View Modal ── */}
-      {highlightViewOpen && viewingHighlight && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
-          onClick={() => setHighlightViewOpen(false)}>
-          <div className="w-full max-w-sm pb-safe bg-card rounded-t-3xl p-6" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center gap-3 mb-4">
-              {/* Mini polaroid */}
-              <div className="bg-white rounded-sm shadow-md flex-shrink-0" style={{ width: 72, padding: 4, paddingBottom: 18 }}>
-                <div className="w-full rounded-sm overflow-hidden" style={{ height: 62 }}>
-                  {viewingHighlight.imageUrl
-                    ? <img src={viewingHighlight.imageUrl} alt={viewingHighlight.label} className="w-full h-full object-cover" />
-                    : <div className={`w-full h-full bg-gradient-to-b ${viewingHighlight.gradient ?? "from-violet-900 to-indigo-600"} flex items-end justify-center`}>
-                        <span className="text-lg pb-1">{viewingHighlight.emoji ?? "✨"}</span>
-                      </div>
-                  }
-                </div>
-                <p className="text-center text-[7px] font-semibold text-gray-600 mt-1 truncate px-0.5">{viewingHighlight.label}</p>
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-lg">{viewingHighlight.label}</h3>
-                {viewingHighlight.isCustom && (
-                  <p className="text-xs text-muted-foreground">Kişisel öne çıkan</p>
-                )}
-              </div>
-            </div>
-            {viewingHighlight.isCustom && (
-              <div className="flex gap-3 mb-3">
-                <button
-                  onClick={() => { toggleHighlightLike(viewingHighlight.idx); setViewingHighlight((prev: any) => ({ ...prev, likedByMe: !prev.likedByMe, likes: prev.likedByMe ? prev.likes - 1 : prev.likes + 1 })); }}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border transition-colors ${viewingHighlight.likedByMe ? "bg-red-50 border-red-200 text-red-500" : "border-border hover:bg-muted"}`}
-                >
-                  {viewingHighlight.likedByMe ? "❤️" : "🤍"} {customHighlights[viewingHighlight.idx]?.likes ?? viewingHighlight.likes} Beğeni
-                </button>
-                {isMe && (
-                  <button
-                    onClick={() => {
-                      const updated = customHighlights.filter((_, i) => i !== viewingHighlight.idx);
-                      setCustomHighlights(updated);
-                      localStorage.setItem("loop_highlights", JSON.stringify(updated));
-                      setHighlightViewOpen(false);
-                      toast({ title: "Öne çıkan silindi" });
+      {/* ── Highlight Stories Viewer ── */}
+      {highlightViewOpen && allHighlights.length > 0 && (() => {
+        const cur = allHighlights[Math.min(highlightStoryIdx, allHighlights.length - 1)];
+        if (!cur) return null;
+        const goNext = () => {
+          const next = highlightStoryIdx + 1;
+          if (next >= allHighlights.length) { setHighlightViewOpen(false); return; }
+          setHighlightStoryIdx(next);
+        };
+        const goPrev = () => setHighlightStoryIdx(i => Math.max(0, i - 1));
+        return (
+          <div className="fixed inset-0 z-[60] bg-black flex flex-col select-none">
+            {/* Progress bars */}
+            <div className="flex gap-1 px-3 pt-10 pb-2 z-10">
+              {allHighlights.map((_, i) => (
+                <div key={i} className="flex-1 h-[3px] bg-white/30 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-white rounded-full"
+                    style={{
+                      width: i < highlightStoryIdx ? "100%" : i === highlightStoryIdx ? `${highlightProgress}%` : "0%",
+                      transition: i === highlightStoryIdx ? "none" : undefined,
                     }}
-                    className="px-4 py-2.5 rounded-xl border border-red-200 text-red-500 font-semibold text-sm hover:bg-red-50 transition-colors"
-                  >
-                    Sil
-                  </button>
-                )}
+                  />
+                </div>
+              ))}
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center gap-3 px-4 py-2 z-10">
+              <Avatar className="w-9 h-9 ring-2 ring-white/60 flex-shrink-0">
+                <AvatarImage src={(profile as any)?.avatarUrl || ""} />
+                <AvatarFallback className="text-xs font-bold bg-primary/20 text-white">
+                  {((profile as any)?.displayName ?? (profile as any)?.username ?? "?").charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="flex-1 text-white font-semibold text-sm truncate">{cur.label}</span>
+              <button
+                onClick={() => setHighlightViewOpen(false)}
+                className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content — tap left/right to navigate */}
+            <div className="flex-1 relative overflow-hidden">
+              {/* Tap zones */}
+              <div className="absolute inset-0 flex z-10">
+                <div className="w-1/3 h-full cursor-pointer" onClick={goPrev} />
+                <div className="flex-1 h-full" />
+                <div className="w-1/3 h-full cursor-pointer" onClick={goNext} />
               </div>
-            )}
-            <button onClick={() => setHighlightViewOpen(false)}
-              className="w-full py-3 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/80 transition-colors">
-              Kapat
-            </button>
+              {/* Media */}
+              {cur.imageUrl
+                ? <img src={cur.imageUrl} alt={cur.label} className="w-full h-full object-cover" />
+                : <div className={`w-full h-full bg-gradient-to-b ${(cur as any).gradient ?? "from-violet-900 via-purple-700 to-indigo-600"}`} />
+              }
+            </div>
+
+            {/* Bottom bar */}
+            <div className="flex items-center gap-3 px-4 py-4 pb-8 bg-gradient-to-t from-black/70 to-transparent">
+              <div className="flex-1 bg-white/10 rounded-2xl px-4 py-2.5">
+                <p className="text-white font-bold text-base">{cur.label}</p>
+                {cur.isCustom && <p className="text-white/50 text-xs mt-0.5">Kişisel öne çıkan</p>}
+              </div>
+              {cur.isCustom && isMe && (
+                <button
+                  onClick={() => {
+                    const idx = highlightStoryIdx;
+                    const updated = customHighlights.filter((_, i) => i !== idx);
+                    setCustomHighlights(updated);
+                    localStorage.setItem("loop_highlights", JSON.stringify(updated));
+                    setHighlightViewOpen(false);
+                    toast({ title: "Öne çıkan silindi" });
+                  }}
+                  className="px-4 py-2.5 rounded-2xl border border-white/20 text-white/70 font-semibold text-sm hover:bg-white/10 transition-colors flex-shrink-0"
+                >
+                  Sil
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Edit Profile Dialog ── */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
