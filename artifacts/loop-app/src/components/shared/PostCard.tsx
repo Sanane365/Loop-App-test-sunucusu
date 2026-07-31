@@ -93,20 +93,20 @@ function CommentBottomSheet({
   const [gifLoading, setGifLoading] = useState(false);
   const [trendingGifs, setTrendingGifs] = useState<any[]>([]);
 
-  const TENOR_KEY = "LIVDSRZULELA";
-  const mapTenorResults = (results: any[]) =>
-    results.map((r: any) => ({
-      id: r.id,
-      url: r.media?.[0]?.gif?.url ?? r.media?.[0]?.tinygif?.url ?? "",
-      preview: r.media?.[0]?.tinygif?.url ?? r.media?.[0]?.gif?.url ?? "",
-      title: r.title ?? "",
+  const GIPHY_KEY = "dc6zaTOxFJmzC";
+  const mapGiphyResults = (data: any[]) =>
+    (data ?? []).map((g: any) => ({
+      id: g.id,
+      url: g.images?.original?.url ?? g.images?.fixed_height?.url ?? "",
+      preview: g.images?.fixed_height_still?.url ?? g.images?.downsized_still?.url ?? g.images?.fixed_height?.url ?? "",
+      title: g.title ?? "",
     })).filter((g: any) => g.url);
 
   useEffect(() => {
     if (gifPanelOpen && trendingGifs.length === 0) {
-      fetch(`/api/gif/trending?limit=24`)
+      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`)
         .then(r => r.json())
-        .then(data => setTrendingGifs(Array.isArray(data) ? data : []))
+        .then(data => setTrendingGifs(mapGiphyResults(data.data ?? [])))
         .catch(() => {});
     }
   }, [gifPanelOpen]);
@@ -116,9 +116,9 @@ function CommentBottomSheet({
     if (!q.trim()) { setGifResults([]); return; }
     setGifLoading(true);
     try {
-      const r = await fetch(`/api/gif/search?q=${encodeURIComponent(q)}&limit=24`);
+      const r = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=g`);
       const data = await r.json();
-      setGifResults(Array.isArray(data) ? data : []);
+      setGifResults(mapGiphyResults(data.data ?? []));
     } finally { setGifLoading(false); }
   }, []);
 

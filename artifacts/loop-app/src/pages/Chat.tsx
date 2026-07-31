@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search, Mic, Send, SquareSquare, X, Users, ImagePlus,
-  StopCircle, Plus, Smile, ArrowRight, MessageCircle,
+  StopCircle, Plus, Smile, ArrowRight, MessageCircle, Reply,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
@@ -19,7 +19,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 
-const TENOR_KEY = "LIVDSRZULELA";
+const GIPHY_KEY = "dc6zaTOxFJmzC";
 
 interface ActiveUser {
   id: number;
@@ -81,6 +81,13 @@ export default function Chat() {
   const [typingUsers, setTypingUsers] = useState<{ username: string; displayName: string }[]>([]);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSentRef = useRef<number>(0);
+
+  // Swipe to reply
+  const [replyTo, setReplyTo] = useState<{ id: number; content: string; displayName: string } | null>(null);
+  const swipeTouchStartX = useRef<number>(0);
+  const swipeTouchMsgId = useRef<number | null>(null);
+  const [swipingMsgId, setSwipingMsgId] = useState<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
   // Swipe state for panel
   const touchStartX = useRef<number | null>(null);
@@ -209,14 +216,17 @@ export default function Chat() {
   const searchGifs = async (q?: string) => {
     setGifLoading(true);
     try {
-      const query = q ?? gifSearch;
+      const query = (q ?? gifSearch).trim();
       const endpoint = !query
-        ? `/api/gif/trending`
-        : `/api/gif/search?q=${encodeURIComponent(query)}`;
+        ? `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`
+        : `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=g`;
       const res = await fetch(endpoint);
-      if (!res.ok) throw new Error("GIF API hatası");
-      const data: { url: string; preview: string }[] = await res.json();
-      setGifs(data);
+      const json = await res.json();
+      const mapped = (json.data ?? []).map((g: any) => ({
+        url: g.images?.original?.url ?? g.images?.fixed_height?.url ?? "",
+        preview: g.images?.fixed_height_still?.url ?? g.images?.fixed_height?.url ?? "",
+      })).filter((g: any) => g.url);
+      setGifs(mapped);
     } catch { setGifs([]); }
     finally { setGifLoading(false); }
   };
@@ -226,10 +236,14 @@ export default function Chat() {
   const handleSend = () => {
     const text = content.trim();
     if (!text) return;
+    const finalContent = replyTo
+      ? `__LOOP_REPLY__:${replyTo.displayName}:${replyTo.content.slice(0, 100)}\n${text}`
+      : text;
     setContent("");
     setMentionSearch(null);
     setMentionUsers([]);
-    sendMutation.mutate({ data: { type: "text", content: text } }, {
+    setReplyTo(null);
+    sendMutation.mutate({ data: { type: "text", content: finalContent } }, {
       onSuccess: () => queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() }),
       onError: () => {
         setContent(text);
@@ -478,8 +492,23 @@ export default function Chat() {
               const prevMsg = messages[idx - 1];
               const sameUserAsPrev = prevMsg?.userId === msg.userId;
 
+              const msgPreview = msg.type === "text" ? (msg.content ?? "").replace(/^__LOOP_REPLY__:[^\n]+\n/, "").slice(0, 100) : msg.type === "gif" ? "GIF" : msg.voiceUrl ? "Sesli mesaj" : "Medya";
               return (
-                <div key={msg.id} className={`flex gap-2.5 items-end ${isMe ? "flex-row-reverse" : ""} ${sameUserAsPrev ? "mt-0.5" : "mt-4"}`}>
+                <div key={msg.id} className={`relative ${sameUserAsPrev ? "mt-0.5" : "mt-4"}`}>
+                  {/* Reply icon (fixed, revealed behind sliding row) */}
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 z-0 pointer-events-none"
+                    style={{ opacity: swipingMsgId === msg.id ? Math.min(swipeOffset / 48, 1) : 0, transition: swipingMsgId === msg.id ? "none" : "opacity 0.15s" }}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${swipeOffset >= 48 && swipingMsgId === msg.id ? "bg-primary/20" : "bg-muted"}`}>
+                      <Reply className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  {/* Sliding row */}
+                  <div className={`relative z-10 flex gap-2.5 items-end ${isMe ? "flex-row-reverse" : ""}`}
+                    style={swipingMsgId === msg.id ? { transform: `translateX(${swipeOffset}px)`, transition: "none" } : { transform: "translateX(0)", transition: "transform 0.2s ease" }}
+                    onTouchStart={(e) => { swipeTouchStartX.current = e.touches[0].clientX; swipeTouchMsgId.current = msg.id; setSwipingMsgId(msg.id); setSwipeOffset(0); }}
+                    onTouchMove={(e) => { if (swipeTouchMsgId.current !== msg.id) return; const dx = e.touches[0].clientX - swipeTouchStartX.current; if (dx > 4) setSwipeOffset(Math.min(dx, 72)); }}
+                    onTouchEnd={() => { if (swipingMsgId === msg.id && swipeOffset >= 48) { setReplyTo({ id: msg.id, content: msgPreview, displayName: msg.user?.displayName ?? "Kullanıcı" }); if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(25); } setSwipingMsgId(null); setSwipeOffset(0); swipeTouchMsgId.current = null; }}
+                  >
                   {/* Avatar — hide if same user as previous */}
                   <button
                     className={`flex-shrink-0 self-end ${sameUserAsPrev ? "opacity-0 pointer-events-none" : ""}`}
@@ -515,7 +544,28 @@ export default function Chat() {
                           }`}
                           style={{ wordBreak: "break-word", overflowWrap: "anywhere" }}
                         >
-                          {renderMessage(msg.content ?? "")}
+                          {(() => {
+                            const c = msg.content ?? "";
+                            if (c.startsWith("__LOOP_REPLY__:")) {
+                              const withoutPrefix = c.slice("__LOOP_REPLY__:".length);
+                              const nl = withoutPrefix.indexOf("\n");
+                              const header = nl !== -1 ? withoutPrefix.slice(0, nl) : withoutPrefix;
+                              const actual = nl !== -1 ? withoutPrefix.slice(nl + 1) : "";
+                              const colon = header.indexOf(":");
+                              const refName = colon !== -1 ? header.slice(0, colon) : header;
+                              const refSnippet = colon !== -1 ? header.slice(colon + 1) : "";
+                              return (
+                                <>
+                                  <div className={`border-l-2 border-primary/60 pl-2 py-0.5 mb-2 rounded-sm ${isMe ? "bg-primary/10" : "bg-muted/50"}`}>
+                                    <p className="text-[11px] font-bold text-primary leading-tight">{refName}</p>
+                                    <p className="text-[11px] text-muted-foreground truncate leading-tight">{refSnippet}</p>
+                                  </div>
+                                  {renderMessage(actual)}
+                                </>
+                              );
+                            }
+                            return renderMessage(c);
+                          })()}
                         </div>
                         {/* Like count if any */}
                         {(msg as any).likeCount > 0 && (
@@ -575,6 +625,7 @@ export default function Chat() {
                       </div>
                     )}
                   </div>
+                  </div>
                 </div>
               );
             })
@@ -600,6 +651,20 @@ export default function Chat() {
             </div>
           )}
         </div>
+
+        {/* Reply preview bar */}
+        {replyTo && (
+          <div className="px-4 py-2 bg-muted/40 border-t border-border flex items-center gap-3">
+            <div className="w-0.5 h-9 bg-primary rounded-full flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-primary truncate leading-tight">{replyTo.displayName}</p>
+              <p className="text-xs text-muted-foreground truncate leading-tight">{replyTo.content}</p>
+            </div>
+            <button onClick={() => setReplyTo(null)} className="text-muted-foreground p-1 hover:text-foreground transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* GIF picker panel */}
         {gifOpen && (
@@ -628,7 +693,7 @@ export default function Chat() {
                   ))
               }
             </div>
-            <p className="text-[10px] text-muted-foreground text-right mt-1">Tenor tarafından desteklenmektedir</p>
+            <p className="text-[10px] text-muted-foreground text-right mt-1">Giphy tarafından desteklenmektedir</p>
           </div>
         )}
 

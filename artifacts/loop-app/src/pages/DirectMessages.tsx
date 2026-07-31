@@ -9,10 +9,16 @@ import {
   Search, SlidersHorizontal, Mic, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
-  Camera, Users, Phone, Video, Info, Smile, BadgeCheck,
+  Camera, Users, Phone, Video, Info, Smile, BadgeCheck, Reply,
 } from "lucide-react";
 
-const TENOR_KEY = "LIVDSRZULELA";
+const GIPHY_KEY = "dc6zaTOxFJmzC";
+const mapGiphyResults = (data: any[]) =>
+  (data ?? []).map((g: any) => ({
+    id: g.id,
+    url: g.images?.original?.url ?? g.images?.fixed_height?.url ?? "",
+    preview: g.images?.fixed_height_still?.url ?? g.images?.downsized_still?.url ?? g.images?.fixed_height?.url ?? "",
+  })).filter((g: any) => g.url);
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -250,6 +256,14 @@ export default function DirectMessages() {
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+
+  // Swipe to reply
+  const [dmReplyTo, setDmReplyTo] = useState<{ id: number; content: string; displayName: string } | null>(null);
+  const [groupReplyTo, setGroupReplyTo] = useState<{ id: number; content: string; displayName: string } | null>(null);
+  const swipeTouchStartX = useRef<number>(0);
+  const swipeTouchMsgId = useRef<number | null>(null);
+  const [swipingMsgId, setSwipingMsgId] = useState<number | null>(null);
+  const [swipeOffset, setSwipeOffset] = useState(0);
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -715,11 +729,15 @@ export default function DirectMessages() {
   const sendGroupMessage = async () => {
     if (!groupContent.trim() || !groupId) return;
     setGroupSending(true);
+    const finalContent = groupReplyTo
+      ? `__LOOP_REPLY__:${groupReplyTo.displayName}:${groupReplyTo.content.slice(0, 100)}\n${groupContent}`
+      : groupContent;
+    setGroupReplyTo(null);
     try {
       const res = await fetch(`/api/dm/groups/${groupId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: groupContent }),
+        body: JSON.stringify({ content: finalContent }),
       });
       if (res.ok) {
         setGroupContent("");
@@ -755,14 +773,13 @@ export default function DirectMessages() {
   const searchGroupGifs = async () => {
     setGroupGifLoading(true);
     try {
-      const q = groupGifSearch.trim() || "trending";
-      const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(q)}&key=${TENOR_KEY}&limit=16&media_filter=gif`;
-      const r = await fetch(url);
-      const data = await r.json();
-      setGroupGifs((data.results ?? []).map((item: { media_formats: { tinygif?: { url: string }; gif?: { url: string } } }) => ({
-        url: item.media_formats?.gif?.url ?? "",
-        preview: item.media_formats?.tinygif?.url ?? "",
-      })));
+      const q = groupGifSearch.trim();
+      const endpoint = !q
+        ? `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=16&rating=g`
+        : `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=16&rating=g`;
+      const r = await fetch(endpoint);
+      const json = await r.json();
+      setGroupGifs(mapGiphyResults(json.data));
     } catch { /* sessiz */ }
     setGroupGifLoading(false);
   };
@@ -898,14 +915,13 @@ export default function DirectMessages() {
   const searchGifs = async (q?: string) => {
     setGifLoading(true);
     try {
-      const query = q ?? gifSearch;
+      const query = (q ?? gifSearch).trim();
       const endpoint = !query
-        ? `/api/gif/trending`
-        : `/api/gif/search?q=${encodeURIComponent(query)}`;
+        ? `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`
+        : `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=g`;
       const res = await fetch(endpoint);
-      if (!res.ok) throw new Error("GIF API hatası");
-      const data: { url: string; preview: string }[] = await res.json();
-      setGifs(data);
+      const json = await res.json();
+      setGifs(mapGiphyResults(json.data));
     } catch { setGifs([]); }
     finally { setGifLoading(false); }
   };
@@ -993,11 +1009,15 @@ export default function DirectMessages() {
   const handleSend = async () => {
     if (!content.trim() || !userId) return;
     setSending(true);
+    const finalContent = dmReplyTo
+      ? `__LOOP_REPLY__:${dmReplyTo.displayName}:${dmReplyTo.content.slice(0, 100)}\n${content}`
+      : content;
+    setDmReplyTo(null);
     try {
       const res = await fetch(`/api/dm/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: finalContent }),
       });
       if (res.ok) {
         setContent("");
@@ -1220,8 +1240,23 @@ export default function DirectMessages() {
               const next = groupMessages[idx + 1];
               const isLastInRun = !next || next.senderId !== msg.senderId;
               const msgTime = format(new Date(msg.createdAt), "HH:mm");
+              const groupMsgPreview = msg.content
+                ? msg.content.replace(/^__LOOP_REPLY__:[^\n]+\n/, "").slice(0, 100)
+                : msg.mediaUrl ? "Medya" : "";
               return (
-                <div key={msg.id} className={`flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                <div key={msg.id} className="relative">
+                  <div className="absolute left-2 top-1/2 -translate-y-1/2 z-0 pointer-events-none"
+                    style={{ opacity: swipingMsgId === msg.id ? Math.min(swipeOffset / 48, 1) : 0, transition: swipingMsgId === msg.id ? "none" : "opacity 0.15s" }}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${swipeOffset >= 48 && swipingMsgId === msg.id ? "bg-primary/20" : "bg-muted"}`}>
+                      <Reply className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className={`relative z-10 flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}
+                    style={swipingMsgId === msg.id ? { transform: `translateX(${swipeOffset}px)`, transition: "none" } : { transform: "translateX(0)", transition: "transform 0.2s ease" }}
+                    onTouchStart={(e) => { swipeTouchStartX.current = e.touches[0].clientX; swipeTouchMsgId.current = msg.id; setSwipingMsgId(msg.id); setSwipeOffset(0); }}
+                    onTouchMove={(e) => { if (swipeTouchMsgId.current !== msg.id) return; const dx = e.touches[0].clientX - swipeTouchStartX.current; if (dx > 4) setSwipeOffset(Math.min(dx, 72)); }}
+                    onTouchEnd={() => { if (swipingMsgId === msg.id && swipeOffset >= 48) { setGroupReplyTo({ id: msg.id, content: groupMsgPreview, displayName: msg.sender?.displayName ?? "Kullanıcı" }); if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(25); } setSwipingMsgId(null); setSwipeOffset(0); swipeTouchMsgId.current = null; }}
+                  >
                   <div className="w-8 flex-shrink-0 self-end">
                     {!isMe && isLastInRun ? (
                       <Avatar className="w-8 h-8">
@@ -1278,7 +1313,20 @@ export default function DirectMessages() {
                         }`}
                         style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
                       >
-                        {msg.content}
+                        {(() => {
+                          const c = msg.content;
+                          if (c.startsWith("__LOOP_REPLY__:")) {
+                            const wp = c.slice("__LOOP_REPLY__:".length);
+                            const nl = wp.indexOf("\n");
+                            const header = nl !== -1 ? wp.slice(0, nl) : wp;
+                            const actual = nl !== -1 ? wp.slice(nl + 1) : "";
+                            const ci = header.indexOf(":");
+                            const refName = ci !== -1 ? header.slice(0, ci) : header;
+                            const refSnippet = ci !== -1 ? header.slice(ci + 1) : "";
+                            return (<><div className={`border-l-2 border-primary/60 pl-2 py-0.5 mb-2 rounded-sm ${isMe ? "bg-[#d8c8ff]/40 dark:bg-violet-700/20" : "bg-muted/50"}`}><p className="text-[10px] font-bold text-primary leading-tight">{refName}</p><p className="text-[10px] text-muted-foreground truncate leading-tight">{refSnippet}</p></div>{actual}</>);
+                          }
+                          return c;
+                        })()}
                       </div>
                     ) : null}
                     {/* Image / Video */}
@@ -1294,6 +1342,7 @@ export default function DirectMessages() {
                       <span className="text-[10px] text-muted-foreground mt-0.5 mx-1">{msgTime}</span>
                     )}
                   </div>
+                  </div>
                 </div>
               );
             })}
@@ -1301,6 +1350,19 @@ export default function DirectMessages() {
 
           {/* Input */}
           <div className="relative">
+            {/* Reply preview bar — group */}
+            {groupReplyTo && (
+              <div className="px-4 py-2 bg-muted/40 border-t border-border flex items-center gap-3">
+                <div className="w-0.5 h-9 bg-primary rounded-full flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-primary truncate leading-tight">{groupReplyTo.displayName}</p>
+                  <p className="text-xs text-muted-foreground truncate leading-tight">{groupReplyTo.content}</p>
+                </div>
+                <button onClick={() => setGroupReplyTo(null)} className="text-muted-foreground p-1 hover:text-foreground transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {/* GIF picker panel */}
             {groupGifOpen && (
               <div className="border-t border-border bg-background px-3 pt-3 pb-2">
@@ -1344,7 +1406,7 @@ export default function DirectMessages() {
                         ))
                   }
                 </div>
-                <p className="text-[10px] text-muted-foreground text-right mt-1.5">Tenor tarafından desteklenmektedir</p>
+                <p className="text-[10px] text-muted-foreground text-right mt-1.5">Giphy tarafından desteklenmektedir</p>
               </div>
             )}
 
@@ -1524,8 +1586,18 @@ export default function DirectMessages() {
                         : <span className="text-[12px] text-muted-foreground/60 leading-none">✓</span>
                     ) : null;
 
+                    const dmMsgPreview = msg.content
+                      ? msg.content.replace(/^__LOOP_REPLY__:[^\n]+\n/, "").slice(0, 100)
+                      : msg.mediaUrl ? "Medya" : msg.voiceUrl ? "Sesli mesaj" : "";
                     return (
-                      <div key={msg.id}>
+                      <div key={msg.id} className="relative">
+                        {/* Reply icon (fixed, revealed behind sliding row) */}
+                        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-0 pointer-events-none"
+                          style={{ opacity: swipingMsgId === msg.id ? Math.min(swipeOffset / 48, 1) : 0, transition: swipingMsgId === msg.id ? "none" : "opacity 0.15s" }}>
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${swipeOffset >= 48 && swipingMsgId === msg.id ? "bg-primary/20" : "bg-muted"}`}>
+                            <Reply className="w-4 h-4 text-muted-foreground" />
+                          </div>
+                        </div>
                         {showUnread && (
                           <div className="flex items-center gap-2 my-4">
                             <div className="flex-1 h-px bg-muted-foreground/20" />
@@ -1537,7 +1609,12 @@ export default function DirectMessages() {
                         )}
 
                         {/* Satır: avatar + (balon + saat/tik altında) */}
-                        <div className={`flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}>
+                        <div className={`relative z-10 flex items-end gap-1.5 ${isLastInRun ? "mb-3" : "mb-0.5"} ${isMe ? "flex-row-reverse" : "flex-row"}`}
+                          style={swipingMsgId === msg.id ? { transform: `translateX(${swipeOffset}px)`, transition: "none" } : { transform: "translateX(0)", transition: "transform 0.2s ease" }}
+                          onTouchStart={(e) => { swipeTouchStartX.current = e.touches[0].clientX; swipeTouchMsgId.current = msg.id; setSwipingMsgId(msg.id); setSwipeOffset(0); }}
+                          onTouchMove={(e) => { if (swipeTouchMsgId.current !== msg.id) return; const dx = e.touches[0].clientX - swipeTouchStartX.current; if (dx > 4) setSwipeOffset(Math.min(dx, 72)); }}
+                          onTouchEnd={() => { if (swipingMsgId === msg.id && swipeOffset >= 48) { const dn = msg.senderId === me?.id ? (me?.displayName ?? "Sen") : (msg.sender?.displayName ?? "Kullanıcı"); setDmReplyTo({ id: msg.id, content: dmMsgPreview, displayName: dn }); if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(25); } setSwipingMsgId(null); setSwipeOffset(0); swipeTouchMsgId.current = null; }}
+                        >
 
                           {/* Avatar — karşı taraf, serinin son mesajı */}
                           <div className="w-8 flex-shrink-0 self-end">
@@ -1652,7 +1729,20 @@ export default function DirectMessages() {
                                   }`}
                                   style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
                                 >
-                                  {msg.content}
+                                  {(() => {
+                                    const c = msg.content ?? "";
+                                    if (c.startsWith("__LOOP_REPLY__:")) {
+                                      const wp = c.slice("__LOOP_REPLY__:".length);
+                                      const nl = wp.indexOf("\n");
+                                      const header = nl !== -1 ? wp.slice(0, nl) : wp;
+                                      const actual = nl !== -1 ? wp.slice(nl + 1) : "";
+                                      const ci = header.indexOf(":");
+                                      const refName = ci !== -1 ? header.slice(0, ci) : header;
+                                      const refSnippet = ci !== -1 ? header.slice(ci + 1) : "";
+                                      return (<><div className={`border-l-2 border-primary/60 pl-2 py-0.5 mb-2 rounded-sm ${isMe ? "bg-[#d8c8ff]/40 dark:bg-violet-700/20" : "bg-muted/50"}`}><p className="text-[10px] font-bold text-primary leading-tight">{refName}</p><p className="text-[10px] text-muted-foreground truncate leading-tight">{refSnippet}</p></div>{actual}</>);
+                                    }
+                                    return c;
+                                  })()}
                                 </div>
                               );
                             })()}
@@ -1719,6 +1809,19 @@ export default function DirectMessages() {
 
           {/* ── Input Bar ── */}
           <div className="relative">
+            {/* Reply preview bar — 1:1 DM */}
+            {dmReplyTo && (
+              <div className="px-4 py-2 bg-muted/40 border-t border-border flex items-center gap-3">
+                <div className="w-0.5 h-9 bg-primary rounded-full flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-primary truncate leading-tight">{dmReplyTo.displayName}</p>
+                  <p className="text-xs text-muted-foreground truncate leading-tight">{dmReplyTo.content}</p>
+                </div>
+                <button onClick={() => setDmReplyTo(null)} className="text-muted-foreground p-1 hover:text-foreground transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             {/* GIF picker panel */}
             {gifOpen && (
               <div className="border-t border-border bg-background px-3 pt-3 pb-2">
@@ -1726,7 +1829,7 @@ export default function DirectMessages() {
                   <input
                     value={gifSearch}
                     onChange={e => setGifSearch(e.target.value)}
-                    placeholder="GIF ara… (Tenor)"
+                    placeholder="GIF ara… (Giphy)"
                     onKeyDown={e => e.key === "Enter" && searchGifs()}
                     className="flex-1 h-8 rounded-full px-3 text-sm bg-muted/60 border border-border/40 focus:outline-none focus:ring-1 focus:ring-primary/30 text-foreground placeholder:text-muted-foreground"
                     autoFocus
