@@ -77,6 +77,11 @@ export default function Chat() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Typing indicator
+  const [typingUsers, setTypingUsers] = useState<{ username: string; displayName: string }[]>([]);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+
   // Swipe state for panel
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -105,6 +110,19 @@ export default function Chat() {
     const t = setInterval(fetchActiveUsers, 30000);
     return () => clearInterval(t);
   }, [fetchActiveUsers]);
+
+  // Poll typing state every 2s
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const r = await fetch("/api/chat/typing", { credentials: "include" });
+        if (r.ok) setTypingUsers(await r.json());
+      } catch {}
+    };
+    poll();
+    const t = setInterval(poll, 2000);
+    return () => clearInterval(t);
+  }, []);
 
   const openPanel = useCallback(() => {
     fetchActiveUsers();
@@ -136,6 +154,12 @@ export default function Chat() {
   const handleInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setContent(val);
+    // Typing signal — throttled to once per 2.5s
+    const now = Date.now();
+    if (val.trim() && now - lastTypingSentRef.current > 2500) {
+      lastTypingSentRef.current = now;
+      fetch("/api/chat/typing", { method: "POST", credentials: "include" }).catch(() => {});
+    }
     const cursor = e.target.selectionStart ?? val.length;
     const textBeforeCursor = val.slice(0, cursor);
     const mentionMatch = textBeforeCursor.match(/@(\w*)$/);
@@ -556,19 +580,25 @@ export default function Chat() {
             })
           )}
 
-          {/* Typing indicator */}
-          <div className="flex items-center gap-2 pt-2 pl-12">
-            <div className="flex items-center gap-0.5">
-              {[0, 1, 2].map(i => (
-                <div
-                  key={i}
-                  className="w-2 h-2 rounded-full bg-primary animate-bounce"
-                  style={{ animationDelay: `${i * 0.15}s`, animationDuration: "0.8s" }}
-                />
-              ))}
+          {/* Typing indicator — only when someone is actually typing */}
+          {typingUsers.length > 0 && (
+            <div className="flex items-center gap-2 pt-2 pl-4">
+              <div className="flex items-center gap-0.5">
+                {[0, 1, 2].map(i => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-primary animate-bounce"
+                    style={{ animationDelay: `${i * 0.15}s`, animationDuration: "0.8s" }}
+                  />
+                ))}
+              </div>
+              <span className="text-sm text-primary font-medium italic">
+                {typingUsers.length === 1
+                  ? `${typingUsers[0].displayName} yazıyor...`
+                  : `${typingUsers.map(u => u.displayName).join(", ")} yazıyor...`}
+              </span>
             </div>
-            <span className="text-sm text-primary font-medium italic">yazıyor...</span>
-          </div>
+          )}
         </div>
 
         {/* GIF picker panel */}

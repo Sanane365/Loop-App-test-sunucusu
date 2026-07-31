@@ -1729,11 +1729,13 @@ export default function Profile() {
             {/* Progress bars */}
             <div className="flex gap-1 px-3 pt-10 pb-2 z-10">
               {allHighlights.map((_, i) => (
-                <div key={i} className="flex-1 h-[3px] bg-white/30 rounded-full overflow-hidden">
+                <div key={i} className="flex-1 h-[3px] bg-white/20 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-white rounded-full"
+                    className="h-full rounded-full"
                     style={{
                       width: i < highlightStoryIdx ? "100%" : i === highlightStoryIdx ? `${highlightProgress}%` : "0%",
+                      background: "linear-gradient(90deg, #a855f7, #7c3aed, #c026d3)",
+                      boxShadow: i === highlightStoryIdx ? "0 0 8px 2px #a855f7aa" : undefined,
                       transition: i === highlightStoryIdx ? "none" : undefined,
                     }}
                   />

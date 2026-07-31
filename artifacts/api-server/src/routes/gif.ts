@@ -22,7 +22,7 @@ router.get("/gif/trending", async (req, res) => {
   try {
     const limit = req.query["limit"] ?? "20";
     const data = await fetchJson(
-      `https://api.tenor.com/v1/trending?key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=off`
+      `https://g.tenor.com/v1/trending?key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=off`
     );
     const results = (data.results ?? []).map((r: any) => ({
       id: r.id,
@@ -43,7 +43,7 @@ router.get("/gif/search", async (req, res) => {
     const q = encodeURIComponent(req.query["q"] as string || "");
     const limit = req.query["limit"] ?? "20";
     const data = await fetchJson(
-      `https://api.tenor.com/v1/search?q=${q}&key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=off`
+      `https://g.tenor.com/v1/search?q=${q}&key=${TENOR_KEY}&limit=${limit}&media_filter=minimal&contentfilter=off`
     );
     const results = (data.results ?? []).map((r: any) => ({
       id: r.id,

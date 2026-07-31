@@ -347,4 +347,31 @@ router.get("/chat/active-users", async (req, res) => {
   }
 });
 
+// In-memory typing state: userId → { displayName, username, expiresAt }
+const typingState = new Map<number, { username: string; displayName: string; expiresAt: number }>();
+
+// POST /chat/typing — kullanıcı yazıyor sinyali gönder
+router.post("/chat/typing", requireAuth, (req, res) => {
+  const u = req.user!;
+  typingState.set(u.id, {
+    username: (u as any).username ?? "kullanıcı",
+    displayName: (u as any).displayName ?? (u as any).username ?? "kullanıcı",
+    expiresAt: Date.now() + 4000,
+  });
+  res.json({ ok: true });
+});
+
+// GET /chat/typing — başka kim yazıyor?
+router.get("/chat/typing", (req, res) => {
+  const now = Date.now();
+  const viewerId = req.user?.id;
+  const result: { username: string; displayName: string }[] = [];
+  for (const [uid, state] of typingState) {
+    if (state.expiresAt < now) { typingState.delete(uid); continue; }
+    if (uid === viewerId) continue;
+    result.push({ username: state.username, displayName: state.displayName });
+  }
+  res.json(result);
+});
+
 export default router;

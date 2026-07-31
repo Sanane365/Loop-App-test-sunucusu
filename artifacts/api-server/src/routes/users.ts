@@ -171,12 +171,13 @@ router.post("/users/:userId/pano", requireAuth, async (req, res) => {
     const profileUserId = parseInt(req.params["userId"]!);
     const { content } = req.body;
     if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
-    const [row] = await db.execute(sql`
+    const rows = await execRows(db.execute(sql`
       INSERT INTO pano_messages (profile_user_id, from_user_id, content)
       VALUES (${profileUserId}, ${(req as any).user!.id}, ${content.trim()})
       RETURNING *
-    `);
-    res.json({ id: (row as any).id, content: (row as any).content, likeCount: 0, replyCount: 0, isLiked: false, createdAt: (row as any).created_at, user: { id: (req as any).user!.id } });
+    `));
+    const row = rows[0];
+    res.json({ id: row.id, content: row.content, likeCount: 0, replyCount: 0, isLiked: false, createdAt: row.created_at, user: { id: (req as any).user!.id } });
   } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
@@ -184,7 +185,7 @@ router.post("/pano/:messageId/like", requireAuth, async (req, res) => {
   try {
     const msgId = parseInt(req.params["messageId"]!);
     const uid = (req as any).user!.id;
-    const [existing] = await db.execute(sql`SELECT 1 FROM pano_message_likes WHERE message_id = ${msgId} AND user_id = ${uid}`);
+    const [existing] = await execRows(db.execute(sql`SELECT 1 FROM pano_message_likes WHERE message_id = ${msgId} AND user_id = ${uid}`));
     if (existing) {
       await db.execute(sql`DELETE FROM pano_message_likes WHERE message_id = ${msgId} AND user_id = ${uid}`);
       await db.execute(sql`UPDATE pano_messages SET like_count = GREATEST(0, like_count - 1) WHERE id = ${msgId}`);
@@ -202,12 +203,12 @@ router.post("/pano/:messageId/reply", requireAuth, async (req, res) => {
     const msgId = parseInt(req.params["messageId"]!);
     const { content } = req.body;
     if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
-    const [row] = await db.execute(sql`
+    const rows = await execRows(db.execute(sql`
       INSERT INTO pano_message_replies (message_id, from_user_id, content)
       VALUES (${msgId}, ${(req as any).user!.id}, ${content.trim()})
       RETURNING *
-    `);
-    res.json(row);
+    `));
+    res.json(rows[0]);
   } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
