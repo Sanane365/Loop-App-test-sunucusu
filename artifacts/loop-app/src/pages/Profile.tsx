@@ -132,30 +132,43 @@ export default function Profile() {
   const [spotifyInput, setSpotifyInput] = useState("");
   const [spotifySaving, setSpotifySaving] = useState(false);
 
-  // Followers / Following dialogs
-  const [followersOpen, setFollowersOpen] = useState(false);
-  const [followingOpen, setFollowingOpen] = useState(false);
-  const [followList, setFollowList] = useState<any[]>([]);
+  // Followers / Following — combined Instagram-style dialog
+  const [followDialogOpen, setFollowDialogOpen] = useState(false);
+  const [followTab, setFollowTab] = useState<"followers" | "following">("followers");
+  const [followersList, setFollowersList] = useState<any[]>([]);
+  const [followingList, setFollowingList] = useState<any[]>([]);
   const [followListLoading, setFollowListLoading] = useState(false);
 
-  const openFollowers = async () => {
+  const loadFollowLists = async () => {
     setFollowListLoading(true);
-    setFollowersOpen(true);
     try {
-      const r = await fetch(`/api/users/${targetUserId}/followers`);
-      setFollowList(await r.json());
-    } catch { setFollowList([]); }
+      const [frs, fing] = await Promise.all([
+        fetch(`/api/users/${targetUserId}/followers`).then(r => r.json()),
+        fetch(`/api/users/${targetUserId}/following`).then(r => r.json()),
+      ]);
+      setFollowersList(Array.isArray(frs) ? frs : []);
+      setFollowingList(Array.isArray(fing) ? fing : []);
+    } catch { setFollowersList([]); setFollowingList([]); }
     finally { setFollowListLoading(false); }
   };
 
-  const openFollowing = async () => {
-    setFollowListLoading(true);
-    setFollowingOpen(true);
+  const openFollowers = () => { setFollowTab("followers"); setFollowDialogOpen(true); loadFollowLists(); };
+  const openFollowing = () => { setFollowTab("following"); setFollowDialogOpen(true); loadFollowLists(); };
+
+  const handleUnfollow = async (userId: number) => {
     try {
-      const r = await fetch(`/api/users/${targetUserId}/following`);
-      setFollowList(await r.json());
-    } catch { setFollowList([]); }
-    finally { setFollowListLoading(false); }
+      await fetch(`/api/users/${userId}/unfollow`, { method: "POST" });
+      setFollowingList(prev => prev.filter((u: any) => u.id !== userId));
+      toast({ title: "Takipten çıkıldı" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const handleRemoveFollower = async (userId: number) => {
+    try {
+      await fetch(`/api/users/${userId}/remove-follower`, { method: "POST" });
+      setFollowersList(prev => prev.filter((u: any) => u.id !== userId));
+      toast({ title: "Takipçi kaldırıldı" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
   };
 
   // Anonymous question
@@ -723,6 +736,17 @@ export default function Profile() {
             </button>
           </div>
           <div className="flex gap-4 overflow-x-auto pb-4 px-1 hide-scrollbar">
+            {/* ── Yeni Anı ekle — en sol ── */}
+            {isMe && (
+              <div className="flex-shrink-0 flex flex-col items-center gap-1 mt-2">
+                <button
+                  className="bg-white rounded-sm shadow-md border-2 border-dashed border-primary/30 flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors"
+                  style={{ width: 100, height: 132 }}
+                >
+                  <Plus className="w-7 h-7 text-primary/40" />
+                </button>
+              </div>
+            )}
             {HIGHLIGHTS.map((h, i) => (
               <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}>
                 {/* Polaroid card */}
@@ -740,16 +764,6 @@ export default function Profile() {
                 </div>
               </div>
             ))}
-            {isMe && (
-              <div className="flex-shrink-0 flex flex-col items-center gap-1 mt-2">
-                <button
-                  className="bg-white rounded-sm shadow-md border-2 border-dashed border-primary/30 flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors"
-                  style={{ width: 100, height: 132 }}
-                >
-                  <Plus className="w-7 h-7 text-primary/40" />
-                </button>
-              </div>
-            )}
           </div>
         </div>
 
@@ -861,47 +875,91 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Followers Dialog ── */}
-      <Dialog open={followersOpen} onOpenChange={v => { setFollowersOpen(v); if (!v) setFollowList([]); }}>
-        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
-          <DialogHeader><DialogTitle>Takipçiler</DialogTitle><DialogDescription>{profile?.followerCount ?? 0} takipçi</DialogDescription></DialogHeader>
-          <div className="overflow-y-auto flex-1 space-y-2 py-2">
-            {followListLoading ? (
-              Array(3).fill(0).map((_, i) => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)
-            ) : followList.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">Henüz takipçi yok</p>
-            ) : followList.map((u: any) => (
-              <div key={u.id} className="flex items-center gap-3 px-1 py-1">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden">
-                  {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-primary font-bold">{u.displayName?.charAt(0)}</span>}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{u.displayName}</p>
-                  <p className="text-xs text-muted-foreground">@{u.username}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* ── Takipçi / Takip Edilenler — Instagram-style tam ekran ── */}
+      <Dialog open={followDialogOpen} onOpenChange={v => { setFollowDialogOpen(v); if (!v) { setFollowersList([]); setFollowingList([]); } }}>
+        <DialogContent className="p-0 gap-0 w-full max-w-md rounded-2xl overflow-hidden flex flex-col" style={{ maxHeight: "85vh" }}>
+          {/* Başlık */}
+          <DialogHeader className="px-4 pt-4 pb-0 flex-shrink-0">
+            <DialogTitle className="text-base font-bold text-center">{profile?.displayName}</DialogTitle>
+            <DialogDescription className="sr-only">Takipçi ve takip listesi</DialogDescription>
+          </DialogHeader>
 
-      {/* ── Following Dialog ── */}
-      <Dialog open={followingOpen} onOpenChange={v => { setFollowingOpen(v); if (!v) setFollowList([]); }}>
-        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
-          <DialogHeader><DialogTitle>Takip Edilenler</DialogTitle><DialogDescription>{profile?.followingCount ?? 0} takip edilen</DialogDescription></DialogHeader>
-          <div className="overflow-y-auto flex-1 space-y-2 py-2">
+          {/* Tab çubuğu */}
+          <div className="flex border-b border-border flex-shrink-0 mt-3">
+            <button
+              onClick={() => setFollowTab("followers")}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                followTab === "followers"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Takipçi · {profile?.followerCount ?? 0}
+            </button>
+            <button
+              onClick={() => setFollowTab("following")}
+              className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                followTab === "following"
+                  ? "border-b-2 border-primary text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Takip · {profile?.followingCount ?? 0}
+            </button>
+          </div>
+
+          {/* Liste */}
+          <div className="overflow-y-auto flex-1">
             {followListLoading ? (
-              Array(3).fill(0).map((_, i) => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)
-            ) : followList.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">Henüz takip edilmiyor</p>
-            ) : followList.map((u: any) => (
-              <div key={u.id} className="flex items-center gap-3 px-1 py-1">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden">
-                  {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-primary font-bold">{u.displayName?.charAt(0)}</span>}
+              <div className="space-y-1 p-3">
+                {Array(5).fill(0).map((_, i) => (
+                  <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
+                ))}
+              </div>
+            ) : (followTab === "followers" ? followersList : followingList).length === 0 ? (
+              <p className="text-center text-muted-foreground py-12 text-sm">
+                {followTab === "followers" ? "Henüz takipçi yok" : "Henüz kimse takip edilmiyor"}
+              </p>
+            ) : (followTab === "followers" ? followersList : followingList).map((u: any) => (
+              <div key={u.id} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors">
+                {/* Avatar */}
+                <div className="w-12 h-12 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden border border-border">
+                  {u.avatarUrl
+                    ? <img src={u.avatarUrl} className="w-full h-full object-cover" alt={u.displayName} />
+                    : <span className="w-full h-full flex items-center justify-center text-primary font-bold text-lg">{u.displayName?.charAt(0)}</span>}
                 </div>
+
+                {/* İsim + kullanıcı adı */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-sm truncate">{u.displayName}</p>
+                  <p className="font-semibold text-sm truncate leading-tight">{u.displayName}</p>
                   <p className="text-xs text-muted-foreground">@{u.username}</p>
+                </div>
+
+                {/* Aksiyon butonları */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {/* Profili Gör */}
+                  <Link href={`/profile/${u.username}`} onClick={() => setFollowDialogOpen(false)}>
+                    <button className="px-3 py-1.5 rounded-full bg-muted text-xs font-semibold hover:bg-muted/80 transition-colors">
+                      Profil
+                    </button>
+                  </Link>
+                  {/* Takipten Çıkar / Kaldır — sadece kendi profilinde */}
+                  {isMe && followTab === "following" && (
+                    <button
+                      onClick={() => handleUnfollow(u.id)}
+                      className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-destructive hover:bg-destructive/5 transition-colors"
+                    >
+                      Çıkar
+                    </button>
+                  )}
+                  {isMe && followTab === "followers" && (
+                    <button
+                      onClick={() => handleRemoveFollower(u.id)}
+                      className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                    >
+                      Kaldır
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

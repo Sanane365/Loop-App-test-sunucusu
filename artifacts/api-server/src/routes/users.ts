@@ -214,6 +214,21 @@ router.get("/users/me/questions", requireAuth, async (req, res) => {
   }
 });
 
+// Remove a follower (kendi takipçini kaldır)
+router.post("/users/:userId/remove-follower", requireAuth, async (req, res) => {
+  try {
+    const followerId = parseInt(req.params["userId"]!);
+    const followingId = req.user!.id;
+    await db
+      .delete(followsTable)
+      .where(and(eq(followsTable.followerId, followerId), eq(followsTable.followingId, followingId)));
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/users/:userId/follow", requireAuth, async (req, res) => {
   try {
     const followingId = parseInt(req.params["userId"]!);
