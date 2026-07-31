@@ -201,10 +201,44 @@ export default function DirectMessages() {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupMemberIds, setNewGroupMemberIds] = useState<Set<number>>(new Set());
+  const [newGroupSelectedUsers, setNewGroupSelectedUsers] = useState<any[]>([]);
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [groupMemberSearch, setGroupMemberSearch] = useState("");
   const [groupSearchResults, setGroupSearchResults] = useState<any[]>([]);
   const [groupSearchLoading, setGroupSearchLoading] = useState(false);
+
+  const openGroupPanel = () => {
+    setNewGroupName("");
+    setNewGroupMemberIds(new Set());
+    setNewGroupSelectedUsers([]);
+    setGroupMemberSearch("");
+    setGroupSearchResults([]);
+    setNewGroupOpen(true);
+  };
+
+  const closeGroupPanel = () => {
+    setNewGroupOpen(false);
+    setNewGroupName("");
+    setNewGroupMemberIds(new Set());
+    setNewGroupSelectedUsers([]);
+    setGroupMemberSearch("");
+    setGroupSearchResults([]);
+  };
+
+  const toggleGroupMember = (user: any) => {
+    const id = user.id;
+    setNewGroupMemberIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+        setNewGroupSelectedUsers(u => u.filter(x => x.id !== id));
+      } else {
+        next.add(id);
+        setNewGroupSelectedUsers(u => [...u, user]);
+      }
+      return next;
+    });
+  };
 
   const searchGroupMembers = async (q: string) => {
     setGroupMemberSearch(q);
@@ -657,22 +691,24 @@ export default function DirectMessages() {
     if (!newGroupName.trim() || newGroupMemberIds.size === 0) return;
     setCreatingGroup(true);
     try {
+      const memberIds = [...newGroupMemberIds];
       const res = await fetch("/api/dm/groups", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newGroupName.trim(), memberIds: [...newGroupMemberIds] }),
+        body: JSON.stringify({ name: newGroupName.trim(), memberIds }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const group = await res.json();
-        setNewGroupOpen(false);
-        setNewGroupName("");
-        setNewGroupMemberIds(new Set());
+        closeGroupPanel();
         await fetchGroups();
-        setLocation(`/dm/group/${group.id}`);
+        setLocation(`/dm/group/${data.id}`);
         toast({ title: "Grup oluşturuldu! 🎉" });
       } else {
-        toast({ title: "Hata", description: "Grup oluşturulamadı.", variant: "destructive" });
+        toast({ title: "Hata", description: data?.error || "Grup oluşturulamadı.", variant: "destructive" });
       }
+    } catch (e: any) {
+      toast({ title: "Bağlantı hatası", description: e?.message, variant: "destructive" });
     } finally {
       setCreatingGroup(false);
     }
@@ -1806,7 +1842,7 @@ export default function DirectMessages() {
               {/* Yeni Grup butonu */}
               <div className="px-4 py-3 border-b border-border/30">
                 <button
-                  onClick={() => setNewGroupOpen(true)}
+                  onClick={openGroupPanel}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl bg-primary/10 hover:bg-primary/15 text-primary transition-colors"
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
@@ -2074,8 +2110,7 @@ export default function DirectMessages() {
                 <button
                   className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold"
                   onClick={() => {
-                    setNewGroupMemberIds(new Set(selectedIds));
-                    setNewGroupOpen(true);
+                    openGroupPanel();
                     setIsSelecting(false);
                     setSelectedIds(new Set());
                   }}
@@ -2090,11 +2125,11 @@ export default function DirectMessages() {
           {/* ── Yeni Grup Oluştur Bottom Sheet ── */}
           {newGroupOpen && (
             <div className="fixed inset-0 z-[55] flex flex-col justify-end">
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); setGroupMemberSearch(""); setGroupSearchResults([]); }} />
-              <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4 max-h-[80vh] flex flex-col">
-                <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5 flex-shrink-0" />
-                <div className="flex items-center gap-2.5 mb-5 flex-shrink-0">
-                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={closeGroupPanel} />
+              <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4 max-h-[85vh] flex flex-col">
+                <div className="w-10 h-1 rounded-full bg-border mx-auto mb-4 flex-shrink-0" />
+                <div className="flex items-center gap-2.5 mb-4 flex-shrink-0">
+                  <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
                     <Users className="w-5 h-5 text-primary" />
                   </div>
                   <div>
@@ -2109,59 +2144,60 @@ export default function DirectMessages() {
                   onChange={e => setNewGroupName(e.target.value)}
                   placeholder="Grup adı…"
                   maxLength={50}
-                  className="w-full px-4 py-3 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm mb-4 flex-shrink-0"
+                  className="w-full px-4 py-3 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm mb-3 flex-shrink-0"
                 />
 
-                {/* Üye seçimi */}
+                {/* Seçilen üyeler — chips */}
+                {newGroupSelectedUsers.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2 mb-2 flex-shrink-0 hide-scrollbar">
+                    {newGroupSelectedUsers.map(u => (
+                      <button
+                        key={u.id}
+                        onClick={() => toggleGroupMember(u)}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-primary/15 text-primary text-xs font-semibold flex-shrink-0"
+                      >
+                        {u.displayName}
+                        <span className="text-[10px] opacity-70">✕</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Üye seçimi başlığı */}
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex-shrink-0">
-                  Üye Seç ({newGroupMemberIds.size} seçildi)
+                  Üye Ara & Seç
                 </p>
+
                 {/* Arama kutusu */}
                 <div className="relative mb-2 flex-shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <input
                     value={groupMemberSearch}
                     onChange={e => searchGroupMembers(e.target.value)}
-                    placeholder="Kullanıcı ara..."
-                    className="w-full pl-9 pr-4 py-2 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm"
+                    placeholder="İsim veya kullanıcı adı ara…"
+                    autoComplete="off"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm"
                   />
                 </div>
-                <div className="flex-1 overflow-y-auto min-h-0 space-y-0.5 mb-4">
-                  {/* Arama sonuçları veya mevcut konuşmalar */}
-                  {(() => {
-                    const displayList = groupMemberSearch.trim()
-                      ? (groupSearchLoading ? [] : groupSearchResults.map(u => ({ user: u })))
-                      : conversations;
-                    return (
-                      <>
-                        {groupSearchLoading && (
-                          <p className="text-sm text-muted-foreground text-center py-4">Aranıyor…</p>
-                        )}
-                        {!groupSearchLoading && displayList.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-6">
-                            {groupMemberSearch.trim() ? "Kullanıcı bulunamadı" : "Üye eklemek için ara"}
-                          </p>
-                        )}
-                        {displayList.map(c => {
+
+                {/* Kullanıcı listesi */}
+                <div className="flex-1 overflow-y-auto min-h-0 mb-4">
+                  {groupSearchLoading ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">Aranıyor…</p>
+                  ) : !groupMemberSearch.trim() ? (
+                    /* Mevcut konuşmalar veya hint */
+                    conversations.length > 0 ? (
+                      <div className="space-y-0.5">
+                        {conversations.map(c => {
                           if (!c.user) return null;
                           const isSelected = newGroupMemberIds.has(c.user.id);
                           return (
-                            <button
-                              key={c.user.id}
-                              onClick={() => {
-                                setNewGroupMemberIds(prev => {
-                                  const next = new Set(prev);
-                                  isSelected ? next.delete(c.user!.id) : next.add(c.user!.id);
-                                  return next;
-                                });
-                              }}
-                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10" : "hover:bg-muted/60"}`}
+                            <button key={c.user.id} onClick={() => toggleGroupMember(c.user)}
+                              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/60"}`}
                             >
-                              <Avatar style={{ width: 40, height: 40 }}>
+                              <Avatar style={{ width: 38, height: 38 }}>
                                 <AvatarImage src={c.user.avatarUrl || ""} />
-                                <AvatarFallback className="bg-muted text-foreground font-bold text-sm">
-                                  {c.user.displayName.charAt(0)}
-                                </AvatarFallback>
+                                <AvatarFallback className="bg-muted text-foreground font-bold text-sm">{c.user.displayName.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-sm truncate">{c.user.displayName}</p>
@@ -2173,16 +2209,43 @@ export default function DirectMessages() {
                             </button>
                           );
                         })}
-                      </>
-                    );
-                  })()}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-sm text-muted-foreground">Üye eklemek için yukarıdan ara</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">Herhangi bir kullanıcıyı arayabilirsin</p>
+                      </div>
+                    )
+                  ) : groupSearchResults.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Kullanıcı bulunamadı</p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {groupSearchResults.map(u => {
+                        const isSelected = newGroupMemberIds.has(u.id);
+                        return (
+                          <button key={u.id} onClick={() => toggleGroupMember(u)}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-colors text-left ${isSelected ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/60"}`}
+                          >
+                            <Avatar style={{ width: 38, height: 38 }}>
+                              <AvatarImage src={u.avatarUrl || ""} />
+                              <AvatarFallback className="bg-muted text-foreground font-bold text-sm">{u.displayName?.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-sm truncate">{u.displayName}</p>
+                              <p className="text-xs text-muted-foreground truncate">@{u.username}</p>
+                            </div>
+                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
+                              {isSelected && <span className="text-primary-foreground text-[10px] font-bold">✓</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3 flex-shrink-0">
-                  <button
-                    className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
-                    onClick={() => { setNewGroupOpen(false); setNewGroupName(""); setNewGroupMemberIds(new Set()); setGroupMemberSearch(""); setGroupSearchResults([]); }}
-                  >
+                  <button className="flex-1 py-3 rounded-2xl border border-border text-sm font-semibold hover:bg-muted transition-colors" onClick={closeGroupPanel}>
                     İptal
                   </button>
                   <button
@@ -2190,7 +2253,7 @@ export default function DirectMessages() {
                     disabled={!newGroupName.trim() || newGroupMemberIds.size === 0 || creatingGroup}
                     className="flex-1 py-3 rounded-2xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 hover:bg-primary/90 transition-colors"
                   >
-                    {creatingGroup ? "Oluşturuluyor…" : `Grup Oluştur (${newGroupMemberIds.size} üye)`}
+                    {creatingGroup ? "Oluşturuluyor…" : newGroupMemberIds.size > 0 ? `Grup Oluştur (${newGroupMemberIds.size} üye)` : "Grup Oluştur"}
                   </button>
                 </div>
               </div>

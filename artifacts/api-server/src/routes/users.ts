@@ -245,19 +245,49 @@ router.post("/questions/:id/answer", requireAuth, async (req, res) => {
     const questionId = parseInt(req.params["id"]!);
     const { answer } = req.body;
     if (!answer?.trim()) { res.status(400).json({ error: "Yanıt boş olamaz" }); return; }
-    // sadece sorunun alıcısı yanıtlayabilir
     const check = await db.execute(sql`SELECT to_user_id FROM questions WHERE id = ${questionId}`);
     if (!check.rows[0] || (check.rows[0] as any).to_user_id !== req.user!.id) {
       res.status(403).json({ error: "Bu soruyu yanıtlama yetkiniz yok" }); return;
     }
-    await db.execute(sql`
-      UPDATE questions SET answer_text = ${answer.trim()}, answered_at = NOW() WHERE id = ${questionId}
-    `);
+    await db.execute(sql`UPDATE questions SET answer_text = ${answer.trim()}, answered_at = NOW() WHERE id = ${questionId}`);
     res.json({ ok: true });
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+});
+
+// GET /questions/:id/comments
+router.get("/questions/:id/comments", async (req, res) => {
+  try {
+    const questionId = parseInt(req.params["id"]!);
+    const result = await db.execute(sql`
+      SELECT qc.id, qc.content, qc.created_at, u.id as user_id, u.display_name, u.username, u.avatar_url
+      FROM question_comments qc
+      JOIN users u ON u.id = qc.user_id
+      WHERE qc.question_id = ${questionId}
+      ORDER BY qc.created_at ASC
+    `);
+    res.json(result.rows);
+  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// POST /questions/:id/comments
+router.post("/questions/:id/comments", requireAuth, async (req, res) => {
+  try {
+    const questionId = parseInt(req.params["id"]!);
+    const { content } = req.body;
+    if (!content?.trim()) { res.status(400).json({ error: "Yorum boş olamaz" }); return; }
+    const result = await db.execute(sql`
+      INSERT INTO question_comments (question_id, user_id, content)
+      VALUES (${questionId}, ${req.user!.id}, ${content.trim()})
+      RETURNING *
+    `);
+    const comment = result.rows[0] as any;
+    const userRow = await db.execute(sql`SELECT display_name, username, avatar_url FROM users WHERE id = ${req.user!.id}`);
+    const u = userRow.rows[0] as any;
+    res.status(201).json({ ...comment, display_name: u?.display_name, username: u?.username, avatar_url: u?.avatar_url });
+  } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
 // Profili beğen → bildirim gönder

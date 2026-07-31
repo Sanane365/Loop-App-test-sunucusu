@@ -10,7 +10,7 @@ import {
   getGetSuggestedUsersQueryKey,
 } from "@workspace/api-client-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Search, Flame, Heart, TrendingUp, MessageCircle, UserPlus, UserCheck } from "lucide-react";
+import { Search, Flame, Heart, TrendingUp, MessageCircle, UserPlus, UserCheck, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -46,6 +46,7 @@ const categories: { id: CategoryId; label: string; icon: React.ReactNode; title:
 export default function Explore() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState<CategoryId>("gundem");
+  const [suggestedDismissed, setSuggestedDismissed] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: users, isLoading: loadingUsers } = useListUsers(
@@ -168,6 +169,58 @@ export default function Explore() {
           </div>
         ) : (
           <>
+            {/* ── Tanıyabileceğin Kişiler — Üstte ── */}
+            {!suggestedDismissed && suggested && suggested.length > 0 && (
+              <div className="px-4 pt-4 pb-2">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Tanıyabileceğin Kişiler
+                  </p>
+                  <button
+                    onClick={() => setSuggestedDismissed(true)}
+                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+                  {suggested.map(user => {
+                    const isFollowed = followingIds.has(user.id) || (user as any).isFollowing;
+                    return (
+                      <div
+                        key={user.id}
+                        className="w-36 flex-shrink-0 bg-card border border-border rounded-2xl flex flex-col items-center gap-3 p-4 text-center"
+                      >
+                        <Link href={`/profile/${user.id}`}>
+                          <Avatar className="w-14 h-14 cursor-pointer">
+                            <AvatarImage src={user.avatarUrl || ""} />
+                            <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
+                              {user.displayName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </Link>
+                        <div className="w-full min-w-0">
+                          <p className="font-semibold text-sm truncate">{user.displayName}</p>
+                          <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
+                        </div>
+                        <button
+                          onClick={() => handleFollow(user.id, !!isFollowed)}
+                          className={`w-full py-1.5 rounded-full text-xs font-semibold transition-all ${
+                            isFollowed
+                              ? "border border-border text-muted-foreground"
+                              : "bg-primary text-primary-foreground"
+                          }`}
+                          disabled={followMutation.isPending || unfollowMutation.isPending}
+                        >
+                          {isFollowed ? "Takiptesin" : "Takip Et"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Category pills */}
             <div className="flex gap-2.5 overflow-x-auto px-4 py-3 hide-scrollbar">
               {categories.map(cat => (
@@ -263,49 +316,6 @@ export default function Explore() {
               </div>
             </div>
 
-            {/* Suggested users */}
-            {suggested && suggested.length > 0 && (
-              <div className="px-4 mt-6">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">
-                  Tanıyabileceğin Kişiler
-                </p>
-                <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
-                  {suggested.map(user => {
-                    const isFollowed = followingIds.has(user.id) || (user as any).isFollowing;
-                    return (
-                      <div
-                        key={user.id}
-                        className="w-36 flex-shrink-0 bg-card border border-border rounded-2xl flex flex-col items-center gap-3 p-4 text-center"
-                      >
-                        <Link href={`/profile/${user.id}`}>
-                          <Avatar className="w-14 h-14 cursor-pointer">
-                            <AvatarImage src={user.avatarUrl || ""} />
-                            <AvatarFallback className="bg-primary/10 text-primary font-bold text-xl">
-                              {user.displayName.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                        </Link>
-                        <div className="w-full min-w-0">
-                          <p className="font-semibold text-sm truncate">{user.displayName}</p>
-                          <p className="text-xs text-muted-foreground truncate">@{user.username}</p>
-                        </div>
-                        <button
-                          onClick={() => handleFollow(user.id, !!isFollowed)}
-                          className={`w-full py-1.5 rounded-full text-xs font-semibold transition-all ${
-                            isFollowed
-                              ? "border border-border text-muted-foreground"
-                              : "bg-primary text-primary-foreground"
-                          }`}
-                          disabled={followMutation.isPending || unfollowMutation.isPending}
-                        >
-                          {isFollowed ? "Takiptesin" : "Takip Et"}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </>
         )}
       </div>

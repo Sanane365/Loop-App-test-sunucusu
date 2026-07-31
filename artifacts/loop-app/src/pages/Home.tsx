@@ -4,7 +4,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { StoryRow } from "@/components/shared/StoryRow";
 import { PostCard } from "@/components/shared/PostCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft, Bot, Send, ChevronRight } from "lucide-react";
+import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft, Bot, Send, ChevronRight, MessageCircle, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/layout/Header";
@@ -38,6 +38,41 @@ export default function Home() {
   const [answeringId, setAnsweringId]         = useState<number | null>(null);
   const [answerText, setAnswerText]           = useState("");
   const [submittingAnswer, setSubmittingAnswer] = useState(false);
+  // Yorumlar
+  const [openCommentsId, setOpenCommentsId]   = useState<number | null>(null);
+  const [commentsByQ, setCommentsByQ]         = useState<Record<number, any[]>>({});
+  const [newComment, setNewComment]           = useState("");
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+
+  const loadComments = async (questionId: number) => {
+    try {
+      const r = await fetch(`/api/questions/${questionId}/comments`);
+      const data = await r.json();
+      setCommentsByQ(prev => ({ ...prev, [questionId]: Array.isArray(data) ? data : [] }));
+    } catch { setCommentsByQ(prev => ({ ...prev, [questionId]: [] })); }
+  };
+
+  const toggleComments = async (questionId: number) => {
+    if (openCommentsId === questionId) { setOpenCommentsId(null); return; }
+    setOpenCommentsId(questionId);
+    if (!commentsByQ[questionId]) await loadComments(questionId);
+  };
+
+  const submitComment = async (questionId: number) => {
+    if (!newComment.trim()) return;
+    setCommentSubmitting(true);
+    try {
+      const r = await fetch(`/api/questions/${questionId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: newComment }),
+      });
+      if (r.ok) {
+        setNewComment("");
+        await loadComments(questionId);
+      } else { toast({ title: "Hata", variant: "destructive" }); }
+    } finally { setCommentSubmitting(false); }
+  };
 
   const loadQuestions = async () => {
     setQLoading(true);
@@ -276,7 +311,7 @@ export default function Home() {
                             </div>
 
                             {/* Answer */}
-                            <div className="flex gap-2 items-start">
+                            <div className="flex gap-2 items-start mb-2">
                               <div className="flex-shrink-0 mt-0.5">
                                 {q.avatar_url ? (
                                   <img src={q.avatar_url} className="w-6 h-6 rounded-full object-cover border border-border" alt={q.display_name} />
@@ -291,6 +326,56 @@ export default function Home() {
                                 <p className="text-sm leading-snug">{q.answer_text}</p>
                               </div>
                             </div>
+
+                            {/* Yorum butonu */}
+                            <button
+                              onClick={() => toggleComments(q.id)}
+                              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors ml-8 mt-1"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" />
+                              {commentsByQ[q.id]?.length
+                                ? `${commentsByQ[q.id].length} yorum`
+                                : "Yorum yap"}
+                              {openCommentsId === q.id && <span className="text-[10px]">▲</span>}
+                              {openCommentsId !== q.id && <span className="text-[10px]">▼</span>}
+                            </button>
+
+                            {/* Yorum bölümü */}
+                            {openCommentsId === q.id && (
+                              <div className="mt-3 ml-8 space-y-2">
+                                {/* Mevcut yorumlar */}
+                                {(commentsByQ[q.id] || []).map((c: any) => (
+                                  <div key={c.id} className="flex gap-2 items-start">
+                                    <div className="w-5 h-5 rounded-full bg-muted flex-shrink-0 overflow-hidden mt-0.5">
+                                      {c.avatar_url
+                                        ? <img src={c.avatar_url} className="w-full h-full object-cover" alt={c.display_name} />
+                                        : <span className="w-full h-full flex items-center justify-center text-[8px] font-bold">{c.display_name?.charAt(0)}</span>}
+                                    </div>
+                                    <div className="flex-1 bg-muted/60 rounded-xl px-2.5 py-1.5">
+                                      <p className="text-[10px] font-semibold mb-0.5">{c.display_name}</p>
+                                      <p className="text-xs leading-snug">{c.content}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                                {/* Yeni yorum input */}
+                                <div className="flex gap-2 items-center">
+                                  <input
+                                    value={newComment}
+                                    onChange={e => setNewComment(e.target.value)}
+                                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitComment(q.id); } }}
+                                    placeholder="Yorum yaz…"
+                                    className="flex-1 px-3 py-1.5 rounded-full bg-muted/60 text-xs border border-transparent focus:border-primary/30 focus:outline-none"
+                                  />
+                                  <button
+                                    onClick={() => submitComment(q.id)}
+                                    disabled={!newComment.trim() || commentSubmitting}
+                                    className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
