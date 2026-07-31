@@ -2,3 +2,4 @@
 - [Loop auth & roles](loop-auth-roles.md) — Session cookies, email+username login, Vite proxy required, bcryptjs v3 hash incident + admin reset endpoint.
 - [Loop codegen](loop-codegen.md) — Must run codegen after any OpenAPI spec change; multipart endpoints NOT in spec to avoid collisions.
 - [Express route ordering in dm.ts](dm-route-ordering.md) — POST /dm/:userId must never match named sub-paths like /dm/groups; guard with `if (userId === "groups") return 404`.
+- [Drizzle db.execute() result format](drizzle-execute-result.md) — db.execute(sql`...`) with node-postgres returns QueryResult (not array); use execRows helper or `.rows` property.

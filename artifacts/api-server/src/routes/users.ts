@@ -105,7 +105,130 @@ router.patch("/users/me/profile", requireAuth, async (req, res) => {
   }
 });
 
-// Genel dosya yükleme — yorum görselleri vb. için
+// ── Pano (Community Board) ────────────────────────────────────────────────────
+// Runtime migration for pano board
+db.execute(sql`CREATE TABLE IF NOT EXISTS pano_messages (
+  id SERIAL PRIMARY KEY,
+  profile_user_id INTEGER NOT NULL,
+  from_user_id INTEGER,
+  content TEXT NOT NULL,
+  like_count INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`).catch(() => {});
+db.execute(sql`CREATE TABLE IF NOT EXISTS pano_message_likes (
+  message_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  PRIMARY KEY (message_id, user_id)
+)`).catch(() => {});
+db.execute(sql`CREATE TABLE IF NOT EXISTS pano_message_replies (
+  id SERIAL PRIMARY KEY,
+  message_id INTEGER NOT NULL,
+  from_user_id INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+)`).catch(() => {});
+
+// Helper to extract rows from Drizzle/pg execute result (supports both QueryResult.rows and plain array)
+const execRows = async (q: ReturnType<typeof db.execute>): Promise<any[]> => {
+  const r = await q as any;
+  return Array.isArray(r) ? r : (r?.rows ?? []);
+};
+
+router.get("/users/:userId/pano", async (req, res) => {
+  try {
+    const profileUserId = parseInt(req.params["userId"]!);
+    const viewerId = (req as any).user?.id;
+    const rows = await execRows(db.execute(sql`
+      SELECT pm.*, u.username, u.display_name, u.avatar_url
+      FROM pano_messages pm
+      LEFT JOIN users u ON u.id = pm.from_user_id
+      WHERE pm.profile_user_id = ${profileUserId}
+      ORDER BY pm.created_at DESC LIMIT 30
+    `));
+    const messages = await Promise.all(rows.map(async (r) => {
+      const [rc] = await execRows(db.execute(sql`SELECT COUNT(*)::int as c FROM pano_message_replies WHERE message_id = ${r.id}`));
+      let isLiked = false;
+      if (viewerId) {
+        const [lk] = await execRows(db.execute(sql`SELECT 1 FROM pano_message_likes WHERE message_id = ${r.id} AND user_id = ${viewerId}`));
+        isLiked = !!lk;
+      }
+      return {
+        id: r.id,
+        content: r.content,
+        likeCount: Number(r.like_count ?? 0),
+        replyCount: Number(rc?.c ?? 0),
+        isLiked,
+        createdAt: r.created_at,
+        user: r.from_user_id ? { id: r.from_user_id, username: r.username, displayName: r.display_name, avatarUrl: r.avatar_url } : null,
+      };
+    }));
+    res.json(messages);
+  } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/users/:userId/pano", requireAuth, async (req, res) => {
+  try {
+    const profileUserId = parseInt(req.params["userId"]!);
+    const { content } = req.body;
+    if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
+    const [row] = await db.execute(sql`
+      INSERT INTO pano_messages (profile_user_id, from_user_id, content)
+      VALUES (${profileUserId}, ${(req as any).user!.id}, ${content.trim()})
+      RETURNING *
+    `);
+    res.json({ id: (row as any).id, content: (row as any).content, likeCount: 0, replyCount: 0, isLiked: false, createdAt: (row as any).created_at, user: { id: (req as any).user!.id } });
+  } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/pano/:messageId/like", requireAuth, async (req, res) => {
+  try {
+    const msgId = parseInt(req.params["messageId"]!);
+    const uid = (req as any).user!.id;
+    const [existing] = await db.execute(sql`SELECT 1 FROM pano_message_likes WHERE message_id = ${msgId} AND user_id = ${uid}`);
+    if (existing) {
+      await db.execute(sql`DELETE FROM pano_message_likes WHERE message_id = ${msgId} AND user_id = ${uid}`);
+      await db.execute(sql`UPDATE pano_messages SET like_count = GREATEST(0, like_count - 1) WHERE id = ${msgId}`);
+      res.json({ liked: false });
+    } else {
+      await db.execute(sql`INSERT INTO pano_message_likes (message_id, user_id) VALUES (${msgId}, ${uid}) ON CONFLICT DO NOTHING`);
+      await db.execute(sql`UPDATE pano_messages SET like_count = like_count + 1 WHERE id = ${msgId}`);
+      res.json({ liked: true });
+    }
+  } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.post("/pano/:messageId/reply", requireAuth, async (req, res) => {
+  try {
+    const msgId = parseInt(req.params["messageId"]!);
+    const { content } = req.body;
+    if (!content?.trim()) { res.status(400).json({ error: "Content required" }); return; }
+    const [row] = await db.execute(sql`
+      INSERT INTO pano_message_replies (message_id, from_user_id, content)
+      VALUES (${msgId}, ${(req as any).user!.id}, ${content.trim()})
+      RETURNING *
+    `);
+    res.json(row);
+  } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+router.get("/pano/:messageId/replies", async (req, res) => {
+  try {
+    const msgId = parseInt(req.params["messageId"]!);
+    const rows = await execRows(db.execute(sql`
+      SELECT r.*, u.username, u.display_name, u.avatar_url
+      FROM pano_message_replies r
+      LEFT JOIN users u ON u.id = r.from_user_id
+      WHERE r.message_id = ${msgId}
+      ORDER BY r.created_at ASC
+    `));
+    res.json(rows.map(r => ({
+      id: r.id, content: r.content, createdAt: r.created_at,
+      user: { id: r.from_user_id, username: r.username, displayName: r.display_name, avatarUrl: r.avatar_url },
+    })));
+  } catch (err) { req.log?.error(err); res.status(500).json({ error: "Internal server error" }); }
+});
+
+// ── Genel dosya yükleme — yorum görselleri vb. için
 router.post("/upload", requireAuth, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) { res.status(400).json({ error: "No file" }); return; }

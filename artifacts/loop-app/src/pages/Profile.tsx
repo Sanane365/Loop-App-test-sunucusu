@@ -15,9 +15,11 @@ import {
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
   LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark, Repeat2, Lock, ArrowLeft,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { formatDistanceToNow } from "date-fns";
+import { tr } from "date-fns/locale";
 
 type Tab = "posts" | "reels" | "bulletin" | "liked" | "reposted" | "saved";
 
@@ -296,17 +298,103 @@ export default function Profile() {
   // Öne çıkanlar (highlights) — localStorage kalıcı
   const [highlightAddOpen, setHighlightAddOpen] = useState(false);
   const [highlightLabel, setHighlightLabel] = useState("");
-  const [customHighlights, setCustomHighlights] = useState<Array<{ label: string }>>(() => {
+  const [highlightImageUrl, setHighlightImageUrl] = useState<string | null>(null);
+  const [highlightImageUploading, setHighlightImageUploading] = useState(false);
+  const highlightImageRef = useRef<HTMLInputElement>(null);
+  const [highlightViewOpen, setHighlightViewOpen] = useState(false);
+  const [viewingHighlight, setViewingHighlight] = useState<any>(null);
+  const [customHighlights, setCustomHighlights] = useState<Array<{ label: string; imageUrl?: string; likes: number; likedByMe: boolean }>>(() => {
     try { return JSON.parse(localStorage.getItem("loop_highlights") || "[]"); } catch { return []; }
   });
+
+  const handleHighlightImageSelect = async (file: File) => {
+    setHighlightImageUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" });
+      if (r.ok) { const { url } = await r.json(); setHighlightImageUrl(url); }
+    } catch {}
+    setHighlightImageUploading(false);
+  };
+
   const addHighlight = () => {
     if (!highlightLabel.trim()) return;
-    const updated = [...customHighlights, { label: highlightLabel.trim() }];
+    const updated = [...customHighlights, { label: highlightLabel.trim(), imageUrl: highlightImageUrl ?? undefined, likes: 0, likedByMe: false }];
     setCustomHighlights(updated);
     localStorage.setItem("loop_highlights", JSON.stringify(updated));
     setHighlightLabel("");
+    setHighlightImageUrl(null);
     setHighlightAddOpen(false);
     toast({ title: "Öne çıkan eklendi" });
+  };
+
+  const toggleHighlightLike = (idx: number) => {
+    const updated = customHighlights.map((h, i) => {
+      if (i !== idx) return h;
+      return { ...h, likedByMe: !h.likedByMe, likes: h.likedByMe ? h.likes - 1 : h.likes + 1 };
+    });
+    setCustomHighlights(updated);
+    localStorage.setItem("loop_highlights", JSON.stringify(updated));
+  };
+
+  // Pano board
+  const [panoMessages, setPanoMessages] = useState<any[]>([]);
+  const [panoInput, setPanoInput] = useState("");
+  const [panoSending, setPanoSending] = useState(false);
+  const [panoReplyOpen, setPanoReplyOpen] = useState<number | null>(null);
+  const [panoReplyText, setPanoReplyText] = useState("");
+  const [panoReplies, setPanoReplies] = useState<Record<number, any[]>>({});
+
+  const loadPanoMessages = useCallback(async () => {
+    if (!targetUserId) return;
+    try {
+      const r = await fetch(`/api/users/${targetUserId}/pano`);
+      const data = await r.json();
+      if (Array.isArray(data)) setPanoMessages(data);
+    } catch {}
+  }, [targetUserId]);
+
+  useEffect(() => { loadPanoMessages(); }, [loadPanoMessages]);
+
+  const sendPanoMessage = async () => {
+    if (!panoInput.trim() || !targetUserId) return;
+    setPanoSending(true);
+    try {
+      const r = await fetch(`/api/users/${targetUserId}/pano`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: panoInput.trim() }),
+      });
+      if (r.ok) {
+        setPanoInput("");
+        loadPanoMessages();
+      }
+    } catch {} finally { setPanoSending(false); }
+  };
+
+  const togglePanoLike = async (msgId: number) => {
+    const r = await fetch(`/api/pano/${msgId}/like`, { method: "POST", credentials: "include" });
+    if (r.ok) {
+      const { liked } = await r.json();
+      setPanoMessages(prev => prev.map(m => m.id === msgId ? { ...m, likeCount: m.likeCount + (liked ? 1 : -1), isLiked: liked } : m));
+    }
+  };
+
+  const loadPanoReplies = async (msgId: number) => {
+    const r = await fetch(`/api/pano/${msgId}/replies`);
+    if (r.ok) { const data = await r.json(); setPanoReplies(prev => ({ ...prev, [msgId]: data })); }
+    setPanoReplyOpen(msgId);
+  };
+
+  const sendPanoReply = async (msgId: number) => {
+    if (!panoReplyText.trim()) return;
+    await fetch(`/api/pano/${msgId}/reply`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: panoReplyText.trim() }),
+    });
+    setPanoReplyText("");
+    loadPanoReplies(msgId);
+    setPanoMessages(prev => prev.map(m => m.id === msgId ? { ...m, replyCount: (m.replyCount ?? 0) + 1 } : m));
   };
 
   const handleChangePassword = async () => {
@@ -875,36 +963,176 @@ export default function Profile() {
               </div>
             )}
             {customHighlights.map((h, i) => (
-              <div key={`custom-${i}`} className="flex-shrink-0 flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-pointer">
-                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 28 }}>
+              <div key={`custom-${i}`} className="flex-shrink-0 flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-pointer"
+                onClick={() => { setViewingHighlight({ ...h, idx: i, isCustom: true }); setHighlightViewOpen(true); }}>
+                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 22 }}>
                   <div className="flex justify-center -mt-3 mb-1">
-                    <div className="bg-violet-300 opacity-80 rounded-sm" style={{ width: 28, height: 10 }} />
+                    <div className="bg-white/50 backdrop-blur-sm border border-black/10 rounded-sm" style={{ width: 28, height: 10 }} />
                   </div>
-                  <div className="w-full rounded-sm bg-gradient-to-b from-violet-900 via-purple-700 to-indigo-600 flex items-end justify-center" style={{ height: 88 }}>
-                    <span className="text-2xl pb-1">✨</span>
+                  <div className="w-full rounded-sm overflow-hidden flex items-end justify-center" style={{ height: 88 }}>
+                    {h.imageUrl
+                      ? <img src={h.imageUrl} alt={h.label} className="w-full h-full object-cover" />
+                      : <div className="w-full h-full bg-gradient-to-b from-violet-900 via-purple-700 to-indigo-600 flex items-end justify-center"><span className="text-2xl pb-1">✨</span></div>
+                    }
                   </div>
                   <p className="text-center text-[9px] font-semibold text-gray-600 mt-2 leading-tight truncate px-1">{h.label}</p>
+                  <div className="flex justify-center items-center gap-1 mt-0.5">
+                    <button onClick={e => { e.stopPropagation(); toggleHighlightLike(i); }}
+                      className={`text-[9px] flex items-center gap-0.5 ${h.likedByMe ? "text-red-500" : "text-gray-400"}`}>
+                      ♥ {h.likes > 0 ? h.likes : ""}
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
             {HIGHLIGHTS.map((h, i) => (
-              <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}>
+              <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}
+                onClick={() => { setViewingHighlight({ ...h, idx: i, isCustom: false }); setHighlightViewOpen(true); }}>
                 {/* Polaroid card */}
-                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 28 }}>
-                  {/* Tape at top */}
+                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 22 }}>
+                  {/* Transparent tape */}
                   <div className="flex justify-center -mt-3 mb-1">
-                    <div className={`${h.tape} opacity-80 rounded-sm`} style={{ width: 28, height: 10 }} />
+                    <div className="bg-white/50 backdrop-blur-sm border border-black/10 rounded-sm" style={{ width: 28, height: 10 }} />
                   </div>
                   {/* Photo */}
                   <div className={`w-full rounded-sm bg-gradient-to-b ${h.gradient} flex items-end justify-center`} style={{ height: 88 }}>
                     <span className="text-2xl pb-1">{i === 0 ? "✏️" : i === 1 ? "🌙" : i === 2 ? "💜" : i === 3 ? "✨" : "♫"}</span>
                   </div>
-                  {/* Label inside white area */}
+                  {/* Label */}
                   <p className="text-center text-[9px] font-semibold text-gray-600 mt-2 leading-tight truncate px-1">{h.label}</p>
                 </div>
               </div>
             ))}
           </div>
+        </div>
+
+        {/* ── Pano (Community Board) ── */}
+        <div className="mx-4 mt-4">
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-bold text-sm flex items-center gap-2">📋 Pano</span>
+            {!isMe && me && (
+              <span className="text-xs text-muted-foreground">Profil sahibine mesaj yaz</span>
+            )}
+          </div>
+
+          {/* Input alanı (ziyaretçiler için veya kendi profiline) */}
+          {me && (
+            <div className="mb-3 flex gap-2 items-center">
+              <Avatar className="w-8 h-8 flex-shrink-0">
+                <AvatarImage src={me.avatarUrl || ""} />
+                <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{me.displayName?.charAt(0) ?? "?"}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 flex gap-2">
+                <input
+                  value={panoInput}
+                  onChange={e => setPanoInput(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && sendPanoMessage()}
+                  placeholder="Bir şeyler yaz..."
+                  maxLength={280}
+                  className="flex-1 bg-muted/60 border border-border/30 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary/40"
+                />
+                <button
+                  onClick={sendPanoMessage}
+                  disabled={!panoInput.trim() || panoSending}
+                  className="w-9 h-9 rounded-full bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                >
+                  <Send className="w-4 h-4 text-primary-foreground" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Mesaj listesi */}
+          {panoMessages.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm bg-muted/30 rounded-2xl border border-border/30">
+              <p className="text-2xl mb-1">📋</p>
+              <p>Henüz pano mesajı yok</p>
+              {!isMe && me && <p className="text-xs mt-1">İlk mesajı yaz!</p>}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {panoMessages.map((msg) => (
+                <div key={msg.id} className="bg-card border border-border rounded-xl p-3">
+                  {/* Profile label */}
+                  <p className="text-[10px] text-muted-foreground mb-2 font-medium">
+                    {profile.username}'in profilinde 😊
+                  </p>
+                  {/* User row */}
+                  <div className="flex items-center gap-2 mb-2">
+                    {msg.user && (
+                      <>
+                        <Avatar className="w-7 h-7 flex-shrink-0">
+                          <AvatarImage src={msg.user.avatarUrl || ""} />
+                          <AvatarFallback className="text-[10px] font-bold bg-primary/10 text-primary">{(msg.user.displayName || msg.user.username || "?").charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <Link to={`/profile/${msg.user.id}`} className="font-bold text-sm hover:underline">{msg.user.username ?? msg.user.displayName}</Link>
+                        <span className="text-[10px] text-muted-foreground">
+                          {msg.createdAt ? formatDistanceToNow(new Date(msg.createdAt), { addSuffix: true, locale: tr }) : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {/* Content */}
+                  <p className="text-sm mb-2 leading-relaxed">{msg.content}</p>
+                  {/* Actions */}
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <button
+                      onClick={() => panoReplyOpen === msg.id ? setPanoReplyOpen(null) : loadPanoReplies(msg.id)}
+                      className="text-primary font-medium hover:opacity-70 transition-opacity"
+                    >
+                      {(msg.replyCount ?? 0) > 0 ? `${msg.replyCount} yanıt` : "İlk cevabı yaz"}
+                    </button>
+                    <button
+                      onClick={() => me && togglePanoLike(msg.id)}
+                      className={`flex items-center gap-1 transition-colors ${msg.isLiked ? "text-red-500" : "hover:text-foreground"}`}
+                    >
+                      👍 {msg.likeCount > 0 ? msg.likeCount : ""}
+                    </button>
+                    <button className="hover:text-foreground transition-colors">😊</button>
+                    <button className="hover:text-foreground transition-colors ml-auto">···</button>
+                  </div>
+                  {/* Reply panel */}
+                  {panoReplyOpen === msg.id && (
+                    <div className="mt-2 pt-2 border-t border-border/40">
+                      {(panoReplies[msg.id] ?? []).map((reply: any) => (
+                        <div key={reply.id} className="flex gap-2 mb-2">
+                          <Avatar className="w-6 h-6 flex-shrink-0">
+                            <AvatarImage src={reply.user?.avatarUrl || ""} />
+                            <AvatarFallback className="text-[9px] font-bold bg-primary/10 text-primary">{(reply.user?.username || "?").charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 bg-muted/50 rounded-xl px-3 py-1.5">
+                            <span className="font-semibold text-xs">{reply.user?.username}</span>
+                            <p className="text-xs mt-0.5">{reply.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                      {me && (
+                        <div className="flex gap-2 mt-2">
+                          <Avatar className="w-6 h-6 flex-shrink-0">
+                            <AvatarImage src={me.avatarUrl || ""} />
+                            <AvatarFallback className="text-[9px] font-bold bg-primary/10 text-primary">{me.displayName?.charAt(0) ?? "?"}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 flex gap-1">
+                            <input
+                              value={panoReplyText}
+                              onChange={e => setPanoReplyText(e.target.value)}
+                              onKeyDown={e => e.key === "Enter" && sendPanoReply(msg.id)}
+                              placeholder="Yanıtla..."
+                              className="flex-1 bg-muted/60 border border-border/30 rounded-full px-3 py-1 text-xs focus:outline-none"
+                            />
+                            <button onClick={() => sendPanoReply(msg.id)} disabled={!panoReplyText.trim()}
+                              className="w-7 h-7 rounded-full bg-primary flex items-center justify-center disabled:opacity-40">
+                              <Send className="w-3 h-3 text-primary-foreground" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Anonymous Q&A card ── */}
@@ -1521,18 +1749,39 @@ export default function Profile() {
       </Dialog>
 
       {/* ── Öne Çıkan Ekle Dialogu ── */}
-      <Dialog open={highlightAddOpen} onOpenChange={setHighlightAddOpen}>
+      <input ref={highlightImageRef} type="file" accept="image/*" className="hidden"
+        onChange={e => { const f = e.target.files?.[0]; if (f) handleHighlightImageSelect(f); e.target.value = ""; }} />
+      <Dialog open={highlightAddOpen} onOpenChange={o => { setHighlightAddOpen(o); if (!o) { setHighlightImageUrl(null); setHighlightLabel(""); } }}>
         <DialogContent className="rounded-3xl w-[90vw] max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Star className="w-5 h-5 text-primary" />
               Öne Çıkan Ekle
             </DialogTitle>
-            <DialogDescription>
-              Profilinde polaroid kartı olarak gösterilecek
-            </DialogDescription>
+            <DialogDescription>Profilinde polaroid kartı olarak gösterilecek</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {/* Image upload */}
+            <button
+              onClick={() => highlightImageRef.current?.click()}
+              disabled={highlightImageUploading}
+              className="w-full h-36 rounded-2xl border-2 border-dashed border-border overflow-hidden flex items-center justify-center relative hover:border-primary transition-colors"
+            >
+              {highlightImageUrl
+                ? <img src={highlightImageUrl} alt="" className="w-full h-full object-cover" />
+                : highlightImageUploading
+                  ? <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                  : <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <ImagePlus className="w-8 h-8" />
+                      <span className="text-sm font-medium">Kapak fotoğrafı ekle</span>
+                    </div>
+              }
+              {highlightImageUrl && (
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <span className="text-white text-sm font-semibold bg-black/60 px-3 py-1 rounded-full">Değiştir</span>
+                </div>
+              )}
+            </button>
             <Input
               value={highlightLabel}
               onChange={e => setHighlightLabel(e.target.value)}
@@ -1544,7 +1793,7 @@ export default function Profile() {
             />
             <div className="flex gap-3">
               <button
-                onClick={() => setHighlightAddOpen(false)}
+                onClick={() => { setHighlightAddOpen(false); setHighlightImageUrl(null); setHighlightLabel(""); }}
                 className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
               >
                 İptal
@@ -1560,6 +1809,63 @@ export default function Profile() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* ── Highlight View Modal ── */}
+      {highlightViewOpen && viewingHighlight && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setHighlightViewOpen(false)}>
+          <div className="w-full max-w-sm pb-safe bg-card rounded-t-3xl p-6" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              {/* Mini polaroid */}
+              <div className="bg-white rounded-sm shadow-md flex-shrink-0" style={{ width: 72, padding: 4, paddingBottom: 18 }}>
+                <div className="w-full rounded-sm overflow-hidden" style={{ height: 62 }}>
+                  {viewingHighlight.imageUrl
+                    ? <img src={viewingHighlight.imageUrl} alt={viewingHighlight.label} className="w-full h-full object-cover" />
+                    : <div className={`w-full h-full bg-gradient-to-b ${viewingHighlight.gradient ?? "from-violet-900 to-indigo-600"} flex items-end justify-center`}>
+                        <span className="text-lg pb-1">{viewingHighlight.emoji ?? "✨"}</span>
+                      </div>
+                  }
+                </div>
+                <p className="text-center text-[7px] font-semibold text-gray-600 mt-1 truncate px-0.5">{viewingHighlight.label}</p>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-lg">{viewingHighlight.label}</h3>
+                {viewingHighlight.isCustom && (
+                  <p className="text-xs text-muted-foreground">Kişisel öne çıkan</p>
+                )}
+              </div>
+            </div>
+            {viewingHighlight.isCustom && (
+              <div className="flex gap-3 mb-3">
+                <button
+                  onClick={() => { toggleHighlightLike(viewingHighlight.idx); setViewingHighlight((prev: any) => ({ ...prev, likedByMe: !prev.likedByMe, likes: prev.likedByMe ? prev.likes - 1 : prev.likes + 1 })); }}
+                  className={`flex-1 py-2.5 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 border transition-colors ${viewingHighlight.likedByMe ? "bg-red-50 border-red-200 text-red-500" : "border-border hover:bg-muted"}`}
+                >
+                  {viewingHighlight.likedByMe ? "❤️" : "🤍"} {customHighlights[viewingHighlight.idx]?.likes ?? viewingHighlight.likes} Beğeni
+                </button>
+                {isMe && (
+                  <button
+                    onClick={() => {
+                      const updated = customHighlights.filter((_, i) => i !== viewingHighlight.idx);
+                      setCustomHighlights(updated);
+                      localStorage.setItem("loop_highlights", JSON.stringify(updated));
+                      setHighlightViewOpen(false);
+                      toast({ title: "Öne çıkan silindi" });
+                    }}
+                    className="px-4 py-2.5 rounded-xl border border-red-200 text-red-500 font-semibold text-sm hover:bg-red-50 transition-colors"
+                  >
+                    Sil
+                  </button>
+                )}
+              </div>
+            )}
+            <button onClick={() => setHighlightViewOpen(false)}
+              className="w-full py-3 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/80 transition-colors">
+              Kapat
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Edit Profile Dialog ── */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
