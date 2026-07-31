@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { usersTable, followsTable } from "@workspace/db";
-import { eq, and, ilike, ne } from "drizzle-orm";
+import { eq, and, ilike, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { getUserWithStats, enrichPost } from "../lib/helpers";
 import multer from "multer";
@@ -156,6 +156,58 @@ router.get("/users/:userId", async (req, res) => {
     const enrichedPosts = await Promise.all(posts.map((p) => enrichPost(p, viewerId)));
 
     res.json({ ...user, posts: enrichedPosts });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/users/:userId/followers", async (req, res) => {
+  try {
+    const userId = parseInt(req.params["userId"]!);
+    const viewerId = req.user?.id;
+    const rows = await db.select().from(followsTable).where(eq(followsTable.followingId, userId));
+    const users = await Promise.all(rows.map(r => getUserWithStats(r.followerId, viewerId)));
+    res.json(users.filter(Boolean));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/users/:userId/following", async (req, res) => {
+  try {
+    const userId = parseInt(req.params["userId"]!);
+    const viewerId = req.user?.id;
+    const rows = await db.select().from(followsTable).where(eq(followsTable.followerId, userId));
+    const users = await Promise.all(rows.map(r => getUserWithStats(r.followingId, viewerId)));
+    res.json(users.filter(Boolean));
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/users/:userId/questions", async (req, res) => {
+  try {
+    const toUserId = parseInt(req.params["userId"]!);
+    const { question } = req.body;
+    if (!question?.trim()) {
+      res.status(400).json({ error: "Soru boş olamaz" });
+      return;
+    }
+    await db.execute(sql`INSERT INTO questions (to_user_id, question_text) VALUES (${toUserId}, ${question.trim()})`);
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/users/me/questions", requireAuth, async (req, res) => {
+  try {
+    const result = await db.execute(sql`SELECT * FROM questions WHERE to_user_id = ${req.user!.id} ORDER BY created_at DESC`);
+    res.json(result.rows);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -4,12 +4,14 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { StoryRow } from "@/components/shared/StoryRow";
 import { PostCard } from "@/components/shared/PostCard";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft } from "lucide-react";
+import { Plus, TrendingUp, MapPin, Leaf, Sparkles, SlidersHorizontal, Pencil, BarChart2, AlignLeft, MessageSquare } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 
 type FilterType = "trend" | "takipte" | "yeni" | "bulten" | "sana-ozel";
 
@@ -26,6 +28,22 @@ export default function Home() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const [typePickerOpen, setTypePickerOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Anonymous question to self (my inbox)
+  const [myQOpen, setMyQOpen] = useState(false);
+  const [myQuestions, setMyQuestions] = useState<any[]>([]);
+  const [myQLoading, setMyQLoading] = useState(false);
+
+  const openMyQ = async () => {
+    setMyQLoading(true);
+    setMyQOpen(true);
+    try {
+      const r = await fetch("/api/users/me/questions");
+      setMyQuestions(await r.json());
+    } catch { setMyQuestions([]); }
+    finally { setMyQLoading(false); }
+  };
 
   const { data: allPosts, isLoading } = useListPosts(undefined, {
     query: { queryKey: getListPostsQueryKey() }
@@ -90,6 +108,15 @@ export default function Home() {
                 {f.label}
               </button>
             ))}
+            {/* 🤖 Anonim Sorular — Sana Özel'in solunda */}
+            <button
+              onClick={openMyQ}
+              title="Anonim sorularım"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold flex-shrink-0 transition-all text-muted-foreground hover:bg-muted hover:text-foreground border border-dashed border-border"
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Sorular</span>
+            </button>
             <button className="ml-auto flex-shrink-0 text-muted-foreground hover:text-foreground p-1.5">
               <SlidersHorizontal className="w-4 h-4" />
             </button>
@@ -126,6 +153,28 @@ export default function Home() {
           <Pencil className="w-6 h-6" />
         </button>
       )}
+
+      {/* Anonim sorular inbox */}
+      <Dialog open={myQOpen} onOpenChange={setMyQOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><span>🤖</span> Anonim Sorularım</DialogTitle>
+            <DialogDescription>Sana gelen anonim sorular</DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1 space-y-3 py-2">
+            {myQLoading ? (
+              Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)
+            ) : myQuestions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">Henüz anonim soru gelmedi 🤫</p>
+            ) : myQuestions.map((q: any) => (
+              <div key={q.id} className="bg-muted/50 rounded-xl p-3 border border-border">
+                <p className="text-sm font-medium">{q.question_text}</p>
+                <p className="text-xs text-muted-foreground mt-1">{new Date(q.created_at).toLocaleDateString("tr-TR")}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Type picker modal */}
       <Dialog open={typePickerOpen} onOpenChange={setTypePickerOpen}>

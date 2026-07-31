@@ -21,16 +21,14 @@ import { useLocation } from "wouter";
 
 type Tab = "posts" | "reels" | "bulletin" | "liked" | "reposted" | "saved";
 
-// Decorative story highlights
+// Polaroid highlights
 const HIGHLIGHTS = [
-  { label: "geceler", gradient: "from-violet-900 to-purple-600" },
-  { label: "müzik", gradient: "from-purple-700 to-fuchsia-500" },
-  { label: "ben", gradient: "from-indigo-800 to-violet-600" },
-  { label: "favorilerim", gradient: "from-violet-600 to-pink-500" },
-  { label: "anılar", gradient: "from-purple-900 to-indigo-700" },
+  { label: "Yazdıklarım ✏️", gradient: "from-violet-950 via-purple-800 to-indigo-700", rotate: "-rotate-3", tape: "bg-violet-300" },
+  { label: "Anılar 🌙",     gradient: "from-purple-900 via-fuchsia-800 to-violet-600", rotate: "rotate-1",  tape: "bg-fuchsia-300" },
+  { label: "Ben 💜",        gradient: "from-indigo-900 via-purple-700 to-violet-500",  rotate: "-rotate-1", tape: "bg-purple-300" },
+  { label: "İlhamım ✨",    gradient: "from-violet-800 via-purple-600 to-pink-500",    rotate: "rotate-2",  tape: "bg-pink-300" },
+  { label: "Müziğim ♫",    gradient: "from-purple-950 via-violet-800 to-fuchsia-600", rotate: "-rotate-2", tape: "bg-violet-200" },
 ];
-
-const HIGHLIGHT_ICONS = ["🌙", "🎵", "🪞", "💜", "✨"];
 
 export default function Profile() {
   const params = useParams();
@@ -133,6 +131,70 @@ export default function Profile() {
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifyInput, setSpotifyInput] = useState("");
   const [spotifySaving, setSpotifySaving] = useState(false);
+
+  // Followers / Following dialogs
+  const [followersOpen, setFollowersOpen] = useState(false);
+  const [followingOpen, setFollowingOpen] = useState(false);
+  const [followList, setFollowList] = useState<any[]>([]);
+  const [followListLoading, setFollowListLoading] = useState(false);
+
+  const openFollowers = async () => {
+    setFollowListLoading(true);
+    setFollowersOpen(true);
+    try {
+      const r = await fetch(`/api/users/${targetUserId}/followers`);
+      setFollowList(await r.json());
+    } catch { setFollowList([]); }
+    finally { setFollowListLoading(false); }
+  };
+
+  const openFollowing = async () => {
+    setFollowListLoading(true);
+    setFollowingOpen(true);
+    try {
+      const r = await fetch(`/api/users/${targetUserId}/following`);
+      setFollowList(await r.json());
+    } catch { setFollowList([]); }
+    finally { setFollowListLoading(false); }
+  };
+
+  // Anonymous question
+  const [anonQOpen, setAnonQOpen] = useState(false);
+  const [anonQText, setAnonQText] = useState("");
+  const [anonQSaving, setAnonQSaving] = useState(false);
+
+  const handleSendAnonQ = async () => {
+    if (!anonQText.trim()) return;
+    setAnonQSaving(true);
+    try {
+      const res = await fetch(`/api/users/${targetUserId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: anonQText.trim() }),
+      });
+      if (!res.ok) throw new Error("Gönderilemedi");
+      setAnonQOpen(false);
+      setAnonQText("");
+      toast({ title: "Soru gönderildi!", description: "Sorun anonim olarak iletildi." });
+    } catch (err: any) {
+      toast({ title: "Hata", description: err.message, variant: "destructive" });
+    } finally { setAnonQSaving(false); }
+  };
+
+  // My questions inbox
+  const [myQOpen, setMyQOpen] = useState(false);
+  const [myQuestions, setMyQuestions] = useState<any[]>([]);
+  const [myQLoading, setMyQLoading] = useState(false);
+
+  const openMyQuestions = async () => {
+    setMyQLoading(true);
+    setMyQOpen(true);
+    try {
+      const r = await fetch("/api/users/me/questions");
+      setMyQuestions(await r.json());
+    } catch { setMyQuestions([]); }
+    finally { setMyQLoading(false); }
+  };
 
   // Change password
   const [pwOpen, setPwOpen] = useState(false);
@@ -541,20 +603,32 @@ export default function Profile() {
         {/* ── Stats row ── */}
         <div className="mx-4 mt-4 bg-card border border-border rounded-2xl">
           <div className="grid grid-cols-4 divide-x divide-border">
-            {[
-              { value: profile.followerCount, label: "Takipçi", Icon: CheckCircle2 },
-              { value: profile.followingCount, label: "Takip", Icon: Plus },
-              { value: postCount, label: "Gönderi", Icon: LayoutGrid },
-              { value: (profile as any).likeCount ?? 0, label: "Beğeni", Icon: Heart },
-            ].map((stat, i) => (
-              <div key={i} className="flex flex-col items-center py-4 gap-1">
-                <span className="text-2xl font-black text-primary">{stat.value}</span>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <stat.Icon className="w-3 h-3" />
-                  <span>{stat.label}</span>
-                </div>
+            {/* Takipçi — tıklanabilir */}
+            <button onClick={openFollowers} className="flex flex-col items-center py-4 gap-1 hover:bg-muted/40 transition-colors rounded-l-2xl">
+              <span className="text-2xl font-black text-primary">{profile.followerCount}</span>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <CheckCircle2 className="w-3 h-3" /><span>Takipçi</span>
               </div>
-            ))}
+            </button>
+            {/* Takip — tıklanabilir */}
+            <button onClick={openFollowing} className="flex flex-col items-center py-4 gap-1 hover:bg-muted/40 transition-colors">
+              <span className="text-2xl font-black text-primary">{profile.followingCount}</span>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Plus className="w-3 h-3" /><span>Takip</span>
+              </div>
+            </button>
+            <div className="flex flex-col items-center py-4 gap-1">
+              <span className="text-2xl font-black text-primary">{postCount}</span>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <LayoutGrid className="w-3 h-3" /><span>Gönderi</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center py-4 gap-1">
+              <span className="text-2xl font-black text-primary">{(profile as any).likeCount ?? 0}</span>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Heart className="w-3 h-3" /><span>Beğeni</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -637,35 +711,43 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* ── Anılar (Story Highlights) ── */}
-        <div className="mt-4 mx-4 bg-card border border-border rounded-2xl p-4 shadow-sm">
-          {/* Header */}
-          <div className="flex items-center gap-2 mb-3">
-            <Star className="w-5 h-5 text-primary" />
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-sm leading-tight">Anılar</p>
-              <p className="text-xs text-muted-foreground">Anılarını loop diye paylaş.</p>
+        {/* ── Anılar — Polaroid tasarım ── */}
+        <div className="mt-4 mx-4">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-primary" />
+              <span className="font-bold text-sm">Öne Çıkanlar</span>
             </div>
-            <button className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold hover:bg-muted transition-colors flex-shrink-0">
+            <button className="text-sm font-semibold text-primary hover:opacity-70 transition-opacity">
               Tümünü Gör
             </button>
           </div>
-          {/* Rounded-rect cards */}
-          <div className="flex gap-3 overflow-x-auto pb-1 hide-scrollbar">
+          <div className="flex gap-4 overflow-x-auto pb-4 px-1 hide-scrollbar">
             {HIGHLIGHTS.map((h, i) => (
-              <div key={i} className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                <div className={`w-[88px] h-[116px] rounded-[20px] bg-gradient-to-b ${h.gradient} flex items-end justify-center pb-4 shadow-md`}>
-                  <span className="text-3xl">{HIGHLIGHT_ICONS[i]}</span>
+              <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}>
+                {/* Polaroid card */}
+                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 28 }}>
+                  {/* Tape at top */}
+                  <div className="flex justify-center -mt-3 mb-1">
+                    <div className={`${h.tape} opacity-80 rounded-sm`} style={{ width: 28, height: 10 }} />
+                  </div>
+                  {/* Photo */}
+                  <div className={`w-full rounded-sm bg-gradient-to-b ${h.gradient} flex items-end justify-center`} style={{ height: 88 }}>
+                    <span className="text-2xl pb-1">{i === 0 ? "✏️" : i === 1 ? "🌙" : i === 2 ? "💜" : i === 3 ? "✨" : "♫"}</span>
+                  </div>
+                  {/* Label inside white area */}
+                  <p className="text-center text-[9px] font-semibold text-gray-600 mt-2 leading-tight truncate px-1">{h.label}</p>
                 </div>
-                <span className="text-[11px] text-foreground/70 font-medium capitalize">{h.label}</span>
               </div>
             ))}
             {isMe && (
-              <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                <button className="w-[88px] h-[116px] rounded-[20px] border-2 border-dashed border-border flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors">
-                  <Plus className="w-7 h-7 text-muted-foreground" />
+              <div className="flex-shrink-0 flex flex-col items-center gap-1 mt-2">
+                <button
+                  className="bg-white rounded-sm shadow-md border-2 border-dashed border-primary/30 flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors"
+                  style={{ width: 100, height: 132 }}
+                >
+                  <Plus className="w-7 h-7 text-primary/40" />
                 </button>
-                <span className="text-[11px] text-muted-foreground font-medium">Yeni</span>
               </div>
             )}
           </div>
@@ -677,12 +759,24 @@ export default function Profile() {
             <span className="text-2xl">🤖</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold truncate">Anonim bir soru g...</p>
+            <p className="text-sm font-bold">Anonim soru gönder</p>
             <p className="text-xs text-muted-foreground">Sorular anonim kalır.</p>
           </div>
-          <button className="px-4 py-2 rounded-full border border-border text-primary text-sm font-semibold flex-shrink-0 hover:bg-primary/5 transition-colors">
-            Soru Gönder
-          </button>
+          {isMe ? (
+            <button
+              onClick={openMyQuestions}
+              className="px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold flex-shrink-0 hover:bg-primary/20 transition-colors"
+            >
+              Gelen Kutusu
+            </button>
+          ) : (
+            <button
+              onClick={() => { setAnonQText(""); setAnonQOpen(true); }}
+              className="px-4 py-2 rounded-full border border-border text-primary text-sm font-semibold flex-shrink-0 hover:bg-primary/5 transition-colors"
+            >
+              Soru Gönder
+            </button>
+          )}
         </div>
 
         {/* ── Tabs ── */}
@@ -766,6 +860,103 @@ export default function Profile() {
           )}
         </div>
       </div>
+
+      {/* ── Followers Dialog ── */}
+      <Dialog open={followersOpen} onOpenChange={v => { setFollowersOpen(v); if (!v) setFollowList([]); }}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
+          <DialogHeader><DialogTitle>Takipçiler</DialogTitle><DialogDescription>{profile?.followerCount ?? 0} takipçi</DialogDescription></DialogHeader>
+          <div className="overflow-y-auto flex-1 space-y-2 py-2">
+            {followListLoading ? (
+              Array(3).fill(0).map((_, i) => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)
+            ) : followList.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">Henüz takipçi yok</p>
+            ) : followList.map((u: any) => (
+              <div key={u.id} className="flex items-center gap-3 px-1 py-1">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden">
+                  {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-primary font-bold">{u.displayName?.charAt(0)}</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{u.displayName}</p>
+                  <p className="text-xs text-muted-foreground">@{u.username}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Following Dialog ── */}
+      <Dialog open={followingOpen} onOpenChange={v => { setFollowingOpen(v); if (!v) setFollowList([]); }}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
+          <DialogHeader><DialogTitle>Takip Edilenler</DialogTitle><DialogDescription>{profile?.followingCount ?? 0} takip edilen</DialogDescription></DialogHeader>
+          <div className="overflow-y-auto flex-1 space-y-2 py-2">
+            {followListLoading ? (
+              Array(3).fill(0).map((_, i) => <div key={i} className="h-14 bg-muted animate-pulse rounded-xl" />)
+            ) : followList.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">Henüz takip edilmiyor</p>
+            ) : followList.map((u: any) => (
+              <div key={u.id} className="flex items-center gap-3 px-1 py-1">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex-shrink-0 overflow-hidden">
+                  {u.avatarUrl ? <img src={u.avatarUrl} className="w-full h-full object-cover" /> : <span className="w-full h-full flex items-center justify-center text-primary font-bold">{u.displayName?.charAt(0)}</span>}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm truncate">{u.displayName}</p>
+                  <p className="text-xs text-muted-foreground">@{u.username}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Anonymous Q Send Dialog ── */}
+      <Dialog open={anonQOpen} onOpenChange={setAnonQOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><span className="text-xl">🤖</span> Anonim Soru Gönder</DialogTitle>
+            <DialogDescription>Kimliğin gizli kalacak. {profile?.displayName} sorunuzu görecek.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Textarea
+              value={anonQText}
+              onChange={e => setAnonQText(e.target.value)}
+              placeholder="Sorunuzu yazın..."
+              className="resize-none rounded-xl"
+              rows={4}
+              maxLength={300}
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground text-right">{anonQText.length}/300</p>
+            <div className="flex gap-3">
+              <button onClick={() => setAnonQOpen(false)} disabled={anonQSaving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors">İptal</button>
+              <button onClick={handleSendAnonQ} disabled={anonQSaving || !anonQText.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50">
+                {anonQSaving ? "Gönderiliyor..." : "Gönder"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── My Questions Inbox Dialog ── */}
+      <Dialog open={myQOpen} onOpenChange={setMyQOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md max-h-[70vh] flex flex-col">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><span>🤖</span> Gelen Sorular</DialogTitle><DialogDescription>Sana gelen anonim sorular</DialogDescription></DialogHeader>
+          <div className="overflow-y-auto flex-1 space-y-3 py-2">
+            {myQLoading ? (
+              Array(3).fill(0).map((_, i) => <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />)
+            ) : myQuestions.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8 text-sm">Henüz soru yok</p>
+            ) : myQuestions.map((q: any) => (
+              <div key={q.id} className="bg-muted/50 rounded-xl p-3 border border-border">
+                <p className="text-sm font-medium">{q.question_text}</p>
+                <p className="text-xs text-muted-foreground mt-1">{new Date(q.created_at).toLocaleDateString("tr-TR")}</p>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Spotify Dialog ── */}
       <Dialog open={spotifyOpen} onOpenChange={setSpotifyOpen}>
