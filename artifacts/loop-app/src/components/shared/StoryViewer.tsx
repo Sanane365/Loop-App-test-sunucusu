@@ -30,6 +30,10 @@ interface StoryViewerProps {
 const STORY_DURATION = 5000;
 const EMOJI_REACTIONS = ["❤️", "😂", "😮", "🙌", "🔥", "😍", "👏", "💯"];
 
+// Module-level cache — component unmount/remount'tan bağımsız kalır.
+// key: storyId → pinned reply dizisi
+const _pinnedCache: Record<number, any[]> = {};
+
 export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryViewerProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,8 +56,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const [showReplies, setShowReplies] = useState(false);
   const [replies, setReplies] = useState<any[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
-  // Pinned replies per story — key: storyId → replies[]
-  const [pinnedByStory, setPinnedByStory] = useState<Record<number, any[]>>({});
+  // Pinned replies per story — module-level cache'den başlatılır; unmount/remount'a dirençli
+  const [pinnedByStory, setPinnedByStory] = useState<Record<number, any[]>>(() => ({ ..._pinnedCache }));
 
   // Story owner viewers panel
   const [showViewers, setShowViewers] = useState(false);
@@ -70,17 +74,17 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     return () => document.body.classList.remove("story-viewer-open");
   }, []);
 
-  // Hikaye değiştiğinde sabitlenen yanıtları sessizce yükle
-  // isOwnStory beklenmez — backend 403 dönerse catch eder
+  // Hikaye değiştiğinde sabitlenen yanıtları backend'den yükle + cache'e yaz
   useEffect(() => {
     if (!currentStory) return;
-    fetch(`/api/stories/${currentStory.id}/replies`)
+    const sid = currentStory.id;
+    fetch(`/api/stories/${sid}/replies`)
       .then(r => r.ok ? r.json() : null)
       .then((arr: any[]) => {
         if (!Array.isArray(arr)) return;
         const pinned = arr.filter(r => r.pinned);
-        // Her zaman state'i güncelle (boş array da dahil)
-        setPinnedByStory(prev => ({ ...prev, [currentStory.id]: pinned }));
+        _pinnedCache[sid] = pinned;          // module cache güncelle
+        setPinnedByStory(prev => ({ ...prev, [sid]: pinned }));
       })
       .catch(() => {});
   }, [currentStory?.id]);
@@ -217,11 +221,15 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
         setReplies(prev => prev.map(rep => rep.id === replyId ? { ...rep, pinned: updated.pinned } : rep));
         setPinnedByStory(prev => {
           const current = prev[storyId] ?? [];
+          let next: any[];
           if (updated.pinned) {
             const rep = replies.find(x => x.id === replyId);
-            return { ...prev, [storyId]: rep ? [...current.filter(x => x.id !== replyId), { ...rep, pinned: true }] : current };
+            next = rep ? [...current.filter(x => x.id !== replyId), { ...rep, pinned: true }] : current;
+          } else {
+            next = current.filter(x => x.id !== replyId);
           }
-          return { ...prev, [storyId]: current.filter(x => x.id !== replyId) };
+          _pinnedCache[storyId] = next; // module cache güncelle
+          return { ...prev, [storyId]: next };
         });
       }
     } catch { /* sessiz */ }
