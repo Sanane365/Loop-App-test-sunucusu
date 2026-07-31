@@ -1,4 +1,4 @@
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import {
   useGetUser, useListPosts, useFollowUser, useUnfollowUser,
   getGetUserQueryKey, getGetMeQueryKey, getListPostsQueryKey,
@@ -168,6 +168,18 @@ export default function Profile() {
       await fetch(`/api/users/${userId}/remove-follower`, { method: "POST" });
       setFollowersList(prev => prev.filter((u: any) => u.id !== userId));
       toast({ title: "Takipçi kaldırıldı" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+  };
+
+  const handleFollowToggleInList = async (userId: number, currentlyFollowing: boolean) => {
+    const endpoint = currentlyFollowing ? "unfollow" : "follow";
+    try {
+      await fetch(`/api/users/${userId}/${endpoint}`, { method: "POST" });
+      const updateList = (list: any[]) =>
+        list.map((u: any) => u.id === userId ? { ...u, isFollowing: !currentlyFollowing } : u);
+      setFollowersList(prev => updateList(prev));
+      setFollowingList(prev => updateList(prev));
+      toast({ title: currentlyFollowing ? "Takipten çıkıldı" : "Takip edildi" });
     } catch { toast({ title: "Hata", variant: "destructive" }); }
   };
 
@@ -943,6 +955,19 @@ export default function Profile() {
                       Profil
                     </button>
                   </Link>
+                  {/* Takip Et / Takip Ediyorsun — başkasının profilinde veya kendi takipçi listesinde */}
+                  {!isMe && (
+                    <button
+                      onClick={() => handleFollowToggleInList(u.id, !!u.isFollowing)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                        u.isFollowing
+                          ? "border border-border text-muted-foreground hover:bg-muted"
+                          : "bg-primary text-primary-foreground hover:bg-primary/90"
+                      }`}
+                    >
+                      {u.isFollowing ? "Takiptesin" : "Takip Et"}
+                    </button>
+                  )}
                   {/* Takipten Çıkar / Kaldır — sadece kendi profilinde */}
                   {isMe && followTab === "following" && (
                     <button
@@ -953,12 +978,24 @@ export default function Profile() {
                     </button>
                   )}
                   {isMe && followTab === "followers" && (
-                    <button
-                      onClick={() => handleRemoveFollower(u.id)}
-                      className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
-                    >
-                      Kaldır
-                    </button>
+                    <>
+                      <button
+                        onClick={() => handleFollowToggleInList(u.id, !!u.isFollowing)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                          u.isFollowing
+                            ? "border border-border text-muted-foreground hover:bg-muted"
+                            : "bg-primary text-primary-foreground hover:bg-primary/90"
+                        }`}
+                      >
+                        {u.isFollowing ? "Takiptesin" : "Takip Et"}
+                      </button>
+                      <button
+                        onClick={() => handleRemoveFollower(u.id)}
+                        className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Kaldır
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
