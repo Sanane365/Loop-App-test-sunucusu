@@ -100,4 +100,41 @@ router.post("/auth/logout", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/auth/change-password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "Mevcut ve yeni şifre gerekli" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      res.status(400).json({ error: "Yeni şifre en az 6 karakter olmalı" });
+      return;
+    }
+
+    const users = await db.select().from(usersTable)
+      .where(eq(usersTable.id, req.user!.id))
+      .limit(1);
+    const user = users[0];
+    if (!user) {
+      res.status(404).json({ error: "Kullanıcı bulunamadı" });
+      return;
+    }
+
+    const valid = await verifyPassword(currentPassword, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Mevcut şifre hatalı" });
+      return;
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, req.user!.id));
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;

@@ -13,7 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ImagePlus, Pencil, MessageCircle, Plus, MapPin, Calendar,
   CheckCircle2, BadgeCheck, Music2, Heart, Play, ChevronDown,
-  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark, Repeat2,
+  LayoutGrid, Clapperboard, Send, Video, X, Briefcase, Star, Bookmark, Repeat2, Lock,
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
@@ -121,6 +121,39 @@ export default function Profile() {
   const [spotifyOpen, setSpotifyOpen] = useState(false);
   const [spotifyInput, setSpotifyInput] = useState("");
   const [spotifySaving, setSpotifySaving] = useState(false);
+
+  // Change password
+  const [pwOpen, setPwOpen] = useState(false);
+  const [pwCurrent, setPwCurrent] = useState("");
+  const [pwNew, setPwNew] = useState("");
+  const [pwConfirm, setPwConfirm] = useState("");
+  const [pwSaving, setPwSaving] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (pwNew !== pwConfirm) {
+      toast({ title: "Hata", description: "Yeni şifreler eşleşmiyor", variant: "destructive" });
+      return;
+    }
+    if (pwNew.length < 6) {
+      toast({ title: "Hata", description: "Şifre en az 6 karakter olmalı", variant: "destructive" });
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: pwCurrent, newPassword: pwNew }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Şifre değiştirilemedi");
+      setPwOpen(false);
+      setPwCurrent(""); setPwNew(""); setPwConfirm("");
+      toast({ title: "Şifre değiştirildi", description: "Yeni şifreniz kaydedildi." });
+    } catch (err: any) {
+      toast({ title: "Hata", description: err.message, variant: "destructive" });
+    } finally { setPwSaving(false); }
+  };
 
   const extractSpotifyTrackId = (input: string): string | null => {
     // Handle full links: https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh
@@ -484,8 +517,12 @@ export default function Profile() {
                 <MessageCircle className="w-4 h-4" />
                 Mesaj
               </button>
-              <button className="w-12 flex items-center justify-center rounded-2xl border border-border hover:bg-muted transition-colors">
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <button
+                onClick={() => { setPwCurrent(""); setPwNew(""); setPwConfirm(""); setPwOpen(true); }}
+                className="w-12 flex items-center justify-center rounded-2xl border border-border hover:bg-muted transition-colors"
+                title="Şifremi Değiştir"
+              >
+                <Lock className="w-4 h-4 text-muted-foreground" />
               </button>
             </>
           ) : (
@@ -734,6 +771,73 @@ export default function Profile() {
                 className="flex-1 py-2.5 rounded-xl bg-[#1DB954] text-white text-sm font-semibold hover:bg-[#1aa34a] transition-colors disabled:opacity-50"
               >
                 {spotifySaving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Change Password Dialog ── */}
+      <Dialog open={pwOpen} onOpenChange={setPwOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-primary" />
+              Şifremi Değiştir
+            </DialogTitle>
+            <DialogDescription>
+              Mevcut şifreni girerek yeni bir şifre belirle
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Mevcut Şifre</label>
+              <Input
+                type="password"
+                value={pwCurrent}
+                onChange={e => setPwCurrent(e.target.value)}
+                placeholder="Mevcut şifreni gir"
+                className="rounded-xl"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Yeni Şifre</label>
+              <Input
+                type="password"
+                value={pwNew}
+                onChange={e => setPwNew(e.target.value)}
+                placeholder="En az 6 karakter"
+                className="rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-semibold">Yeni Şifre (Tekrar)</label>
+              <Input
+                type="password"
+                value={pwConfirm}
+                onChange={e => setPwConfirm(e.target.value)}
+                placeholder="Yeni şifreyi tekrar gir"
+                className="rounded-xl"
+              />
+              {pwConfirm && pwNew !== pwConfirm && (
+                <p className="text-xs text-destructive">Şifreler eşleşmiyor</p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setPwOpen(false)}
+                disabled={pwSaving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleChangePassword}
+                disabled={pwSaving || !pwCurrent || !pwNew || !pwConfirm || pwNew !== pwConfirm}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {pwSaving ? "Kaydediliyor..." : "Kaydet"}
               </button>
             </div>
           </div>
