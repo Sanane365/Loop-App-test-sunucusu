@@ -31,40 +31,43 @@ export function StoryRow() {
         <Link href="/create?type=story" className="flex flex-col items-center flex-shrink-0 group">
           <div
             className="w-[82px] h-[144px] overflow-hidden relative"
-            style={{ borderRadius: "18px", background: "hsl(var(--background))", border: "1.5px solid hsl(var(--primary) / 0.25)" }}
+            style={{ borderRadius: "18px", border: "1.5px solid hsl(var(--primary) / 0.35)" }}
           >
-            {/* + işareti ortada */}
-            <div className="absolute inset-0 flex items-center justify-center">
+            {/* Bulanık avatar arka plan */}
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: "blur(6px) brightness(0.45)", transform: "scale(1.1)" }}
+              />
+            ) : (
               <div
-                className="w-12 h-12 flex items-center justify-center"
-                style={{ borderRadius: "50%", border: "2px dashed hsl(var(--primary))", background: "hsl(var(--primary) / 0.07)" }}
+                className="absolute inset-0"
+                style={{ background: "linear-gradient(135deg, hsl(var(--primary)/0.4) 0%, hsl(260 60% 35%/0.7) 100%)" }}
+              />
+            )}
+
+            {/* Alt gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+            {/* Ortada + çemberi */}
+            <div className="absolute inset-0 flex items-center justify-center" style={{ marginBottom: 22 }}>
+              <div
+                className="w-11 h-11 flex items-center justify-center bg-primary shadow-lg"
+                style={{ borderRadius: "50%" }}
               >
-                <Plus className="w-5 h-5 text-primary" />
+                <Plus className="w-5 h-5 text-primary-foreground" />
               </div>
             </div>
 
-            {/* Profil avatarı — sol alt */}
-            {user && (
-              <div className="absolute bottom-1.5 left-1.5 flex items-center gap-1">
-                <div
-                  className="w-6 h-6 overflow-hidden border-2 flex-shrink-0"
-                  style={{ borderRadius: "50%", borderColor: "hsl(var(--primary))" }}
-                >
-                  {user.avatarUrl ? (
-                    <img src={user.avatarUrl} alt={user.displayName} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-primary/20 text-[9px] font-bold text-primary">
-                      {user.displayName?.charAt(0)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Alt: "Hikaye Ekle" yazısı */}
+            <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center">
+              <span className="text-white text-[10px] font-bold drop-shadow-sm leading-tight">Hikaye Ekle</span>
+            </div>
           </div>
-          <div className="mt-1.5 text-center">
-            <span className="text-[11px] font-semibold text-foreground leading-tight block">Hikaye Ekle</span>
-            <div className="h-[2px] bg-primary rounded-full mt-0.5 mx-1" />
-          </div>
+          {/* Alt ince çizgi */}
+          <div className="mt-1.5 w-10 h-[2px] bg-primary rounded-full" />
         </Link>
 
         {/* ── Hikaye kartları ── */}

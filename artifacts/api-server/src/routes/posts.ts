@@ -4,7 +4,7 @@ import {
   postsTable, likesTable, repostsTable, bookmarksTable, commentsTable,
   commentLikesTable, pollVotesTable, followsTable, notificationsTable,
 } from "@workspace/db";
-import { eq, and, desc, inArray, sql } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { enrichPost, getUserWithStats } from "../lib/helpers";
 import multer from "multer";
@@ -229,7 +229,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
   try {
     const postId = parseInt(req.params["postId"] as string);
     const viewerId = req.user?.id;
-    const comments = await db.select().from(commentsTable).where(eq(commentsTable.postId, postId)).orderBy(desc(commentsTable.createdAt));
+    const comments = await db.select().from(commentsTable).where(eq(commentsTable.postId, postId)).orderBy(asc(commentsTable.createdAt));
 
     const enriched = await Promise.all(comments.map(async (c) => {
       // Like count for this comment

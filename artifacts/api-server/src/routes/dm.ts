@@ -105,8 +105,12 @@ router.get("/dm/:userId", requireAuth, async (req, res) => {
   }
 });
 
-// POST /dm/:userId — text message
+// POST /dm/:userId — text message (must be AFTER all /dm/groups routes to avoid collision)
 router.post("/dm/:userId", requireAuth, async (req, res) => {
+  // Guard: /dm/groups is a named route — do not handle it here
+  if ((req.params["userId"] as string) === "groups") {
+    res.status(404).json({ error: "Not found" }); return;
+  }
   try {
     const senderId = req.user!.id;
     const receiverId = parseInt(req.params["userId"] as string);

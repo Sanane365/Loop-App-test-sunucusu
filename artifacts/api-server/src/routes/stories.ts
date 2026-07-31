@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { storiesTable, storyViewsTable, followsTable, usersTable } from "@workspace/db";
-import { eq, and, gt, inArray, desc } from "drizzle-orm";
+import { storiesTable, storyViewsTable, followsTable, usersTable, directMessagesTable } from "@workspace/db";
+import { eq, and, gt, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { getUserWithStats } from "../lib/helpers";
 import multer from "multer";
@@ -132,6 +132,83 @@ router.post("/stories/:storyId/view", requireAuth, async (req, res) => {
       .values({ storyId, userId: req.user!.id })
       .onConflictDoNothing();
     res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Ensure story_replies table exists
+db.execute(sql`
+  CREATE TABLE IF NOT EXISTS story_replies (
+    id SERIAL PRIMARY KEY,
+    story_id INTEGER NOT NULL,
+    from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    is_emoji BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+  )
+`).catch(() => {});
+
+// POST /stories/:storyId/reply — send a reply or emoji reaction to a story
+router.post("/stories/:storyId/reply", requireAuth, async (req, res) => {
+  try {
+    const storyId = parseInt(req.params["storyId"]!);
+    const fromUserId = req.user!.id;
+    const { content, isEmoji } = req.body;
+    if (!content?.trim()) { res.status(400).json({ error: "İçerik boş olamaz" }); return; }
+
+    // Get the story to find its owner
+    const [story] = await db.select().from(storiesTable).where(eq(storiesTable.id, storyId)).limit(1);
+    if (!story) { res.status(404).json({ error: "Hikaye bulunamadı" }); return; }
+
+    // Don't allow replying to own stories
+    if (story.userId === fromUserId) { res.status(400).json({ error: "Kendi hikayene yanıt veremezsin" }); return; }
+
+    // Save to story_replies
+    await db.execute(sql`
+      INSERT INTO story_replies (story_id, from_user_id, content, is_emoji)
+      VALUES (${storyId}, ${fromUserId}, ${content.trim()}, ${!!isEmoji})
+    `);
+
+    // Send as DM to story owner with story reply marker
+    const dmContent = isEmoji
+      ? `__STORY_REACTION__:${storyId}:${content.trim()}`
+      : `__STORY_REPLY__:${storyId}:${content.trim()}`;
+
+    await db.insert(directMessagesTable).values({
+      senderId: fromUserId,
+      receiverId: story.userId,
+      content: dmContent,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /stories/:storyId/replies — get all replies (only for story owner)
+router.get("/stories/:storyId/replies", requireAuth, async (req, res) => {
+  try {
+    const storyId = parseInt(req.params["storyId"]!);
+    const userId = req.user!.id;
+
+    const [story] = await db.select().from(storiesTable).where(eq(storiesTable.id, storyId)).limit(1);
+    if (!story) { res.status(404).json({ error: "Hikaye bulunamadı" }); return; }
+    if (story.userId !== userId) { res.status(403).json({ error: "Yetkisiz" }); return; }
+
+    const rows = await db.execute(sql`
+      SELECT sr.id, sr.content, sr.is_emoji, sr.created_at,
+             u.id as user_id, u.display_name, u.username, u.avatar_url
+      FROM story_replies sr
+      JOIN users u ON u.id = sr.from_user_id
+      WHERE sr.story_id = ${storyId}
+      ORDER BY sr.created_at DESC
+    `);
+
+    res.json(rows.rows);
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -996,7 +996,7 @@ export default function Profile() {
                         </button>
                       )}
 
-                      {/* Kendi profilinde: Takip / Çıkar */}
+                      {/* Kendi profilinde: Takip Et / Çıkar */}
                       {isMe && followTab === "following" && (
                         <button
                           onClick={() => handleUnfollow(u.id)}
@@ -1006,12 +1006,28 @@ export default function Profile() {
                         </button>
                       )}
                       {isMe && followTab === "followers" && (
-                        <button
-                          onClick={() => handleRemoveFollower(u.id)}
-                          className="px-3 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
-                        >
-                          Kaldır
-                        </button>
+                        <>
+                          {/* Karşılıklı takip yoksa "Sende Takip Et" göster */}
+                          {!u.isFollowing && (
+                            <button
+                              onClick={() => handleFollowToggleInList(u.id, false)}
+                              className="px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-colors"
+                            >
+                              Sende Takip Et
+                            </button>
+                          )}
+                          {u.isFollowing && (
+                            <span className="px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground text-[10px] font-medium">
+                              Karşılıklı
+                            </span>
+                          )}
+                          <button
+                            onClick={() => handleRemoveFollower(u.id)}
+                            className="px-2.5 py-1.5 rounded-full border border-border text-xs font-semibold text-muted-foreground hover:bg-muted transition-colors"
+                          >
+                            Kaldır
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
