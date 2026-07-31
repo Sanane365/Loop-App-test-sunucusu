@@ -82,6 +82,25 @@ function CommentBottomSheet({
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
   const [pinnedCommentIds, setPinnedCommentIds] = useState<Record<number, boolean>>({});
   const isPostOwner = !!user && user.id === postOwnerId;
+  // Yorum görseli
+  const [commentMediaUrl, setCommentMediaUrl] = useState<string | null>(null);
+  const [commentMediaUploading, setCommentMediaUploading] = useState(false);
+  const commentMediaRef = useRef<HTMLInputElement>(null);
+
+  const handleCommentMediaSelect = async (file: File) => {
+    setCommentMediaUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const r = await fetch("/api/upload", { method: "POST", body: fd, credentials: "include" });
+      if (!r.ok) throw new Error();
+      const { url } = await r.json();
+      setCommentMediaUrl(url);
+    } catch {
+      // ignore
+    }
+    setCommentMediaUploading(false);
+  };
 
   const handlePinComment = async (commentId: number, currentlyPinned: boolean) => {
     setPinnedCommentIds(prev => ({ ...prev, [commentId]: !currentlyPinned }));
@@ -140,13 +159,14 @@ function CommentBottomSheet({
   };
 
   const handleAddComment = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() && !commentMediaUrl) return;
     createCommentMutation.mutate(
-      { postId, data: { content: newComment, replyToId: replyingToId ?? undefined } as any },
+      { postId, data: { content: newComment, replyToId: replyingToId ?? undefined, mediaUrl: commentMediaUrl, mediaType: "image" } as any },
       {
         onSuccess: () => {
           setNewComment("");
           setReplyingToId(null);
+          setCommentMediaUrl(null);
           queryClient.invalidateQueries({ queryKey: getListCommentsQueryKey(postId) });
           queryClient.invalidateQueries({ queryKey: getListPostsQueryKey() });
         }
@@ -289,9 +309,19 @@ function CommentBottomSheet({
                             · {formatDistanceToNow(new Date(comment.createdAt), { locale: tr, addSuffix: true })}
                           </span>
                         </div>
-                        <p className={`text-foreground leading-[1.45] break-words whitespace-pre-wrap ${isReply ? "text-[13px]" : "text-[14px]"}`}>
-                          {comment.content}
-                        </p>
+                        {comment.content && (
+                          <p className={`text-foreground leading-[1.45] break-words whitespace-pre-wrap ${isReply ? "text-[13px]" : "text-[14px]"}`}>
+                            {comment.content}
+                          </p>
+                        )}
+                        {comment.mediaUrl && (
+                          <img
+                            src={comment.mediaUrl}
+                            alt=""
+                            className="mt-1.5 max-w-[200px] rounded-xl object-cover border border-border cursor-pointer"
+                            onClick={() => window.open(comment.mediaUrl, "_blank")}
+                          />
+                        )}
                         <div className="flex items-center gap-3 mt-1">
                           <button
                             onClick={() => handleReply(comment)}
@@ -383,6 +413,13 @@ function CommentBottomSheet({
               {user?.displayName?.charAt(0) ?? "?"}
             </AvatarFallback>
           </Avatar>
+          <input
+            ref={commentMediaRef}
+            type="file"
+            accept="image/*,image/gif"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleCommentMediaSelect(f); e.target.value = ""; }}
+          />
           <div className="flex-1 flex flex-col bg-muted/60 rounded-2xl px-4 py-2 border border-border/30 gap-1">
             {replyingToId && (
               <div className="flex items-center justify-between">
@@ -392,11 +429,22 @@ function CommentBottomSheet({
                 </button>
               </div>
             )}
+            {commentMediaUrl && (
+              <div className="relative w-fit mt-0.5">
+                <img src={commentMediaUrl} alt="" className="max-h-24 max-w-[160px] rounded-lg object-cover border border-border" />
+                <button
+                  onClick={() => setCommentMediaUrl(null)}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-background border border-border rounded-full flex items-center justify-center shadow"
+                >
+                  <X className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </div>
+            )}
             <input
               ref={inputRef}
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
-              placeholder="Yorumunuz..."
+              placeholder={commentMediaUrl ? "Açıklama ekle..." : "Yorumunuz..."}
               className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none h-6"
               onKeyDown={e => e.key === "Enter" && handleAddComment()}
             />
@@ -404,12 +452,20 @@ function CommentBottomSheet({
           <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground flex-shrink-0">
             <Smile className="w-5 h-5" />
           </button>
-          <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground flex-shrink-0">
-            <ImagePlus className="w-5 h-5" />
+          <button
+            onClick={() => commentMediaRef.current?.click()}
+            disabled={commentMediaUploading}
+            className={`w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors flex-shrink-0 ${commentMediaUrl ? "text-primary" : "text-muted-foreground"}`}
+          >
+            {commentMediaUploading ? (
+              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <ImagePlus className="w-5 h-5" />
+            )}
           </button>
           <button
             onClick={handleAddComment}
-            disabled={!newComment.trim() || createCommentMutation.isPending}
+            disabled={(!newComment.trim() && !commentMediaUrl) || createCommentMutation.isPending}
             className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-primary/90 transition-colors shadow"
           >
             <Send className="w-4 h-4 text-primary-foreground" />
@@ -719,7 +775,7 @@ export function PostCard({ post: postRaw }: { post: Post }) {
     const wasReposted = isReposted;
     setIsReposted(!wasReposted);
     setRepostCount(prev => wasReposted ? prev - 1 : prev + 1);
-    fetch(`/api/posts/${post.id}/repost`, { method: wasReposted ? "DELETE" : "POST" })
+    fetch(`/api/posts/${post.id}/repost`, { method: wasReposted ? "DELETE" : "POST", credentials: "include" })
       .then(r => {
         if (!r.ok) throw new Error();
         toast({ title: wasReposted ? "Paylaşım geri alındı" : "Yeniden paylaşıldı ✓" });

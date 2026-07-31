@@ -105,6 +105,19 @@ router.patch("/users/me/profile", requireAuth, async (req, res) => {
   }
 });
 
+// Genel dosya yükleme — yorum görselleri vb. için
+router.post("/upload", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
+    const url = `/api/uploads/${req.file.filename}`;
+    const mediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
+    res.json({ url, mediaType });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/users/me/avatar", requireAuth, upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {

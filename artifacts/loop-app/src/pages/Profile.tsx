@@ -262,6 +262,53 @@ export default function Profile() {
   const [pwConfirm, setPwConfirm] = useState("");
   const [pwSaving, setPwSaving] = useState(false);
 
+  // Pano mesajı (thought)
+  const [thoughtOpen, setThoughtOpen] = useState(false);
+  const [thoughtText, setThoughtText] = useState("");
+  const [thoughtSaving, setThoughtSaving] = useState(false);
+  const [lockMenuOpen, setLockMenuOpen] = useState(false);
+
+  const handleSaveThought = async () => {
+    setThoughtSaving(true);
+    try {
+      await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thought: thoughtText }),
+      });
+      queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
+      setThoughtOpen(false);
+      toast({ title: "Pano mesajı güncellendi" });
+    } catch { toast({ title: "Hata", variant: "destructive" }); }
+    setThoughtSaving(false);
+  };
+
+  // Profil fotoğrafı önizleme (uzun basış)
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+  const avatarLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startAvatarPress = () => {
+    avatarLongPressRef.current = setTimeout(() => { if (profile?.avatarUrl) setAvatarPreviewOpen(true); }, 500);
+  };
+  const cancelAvatarPress = () => {
+    if (avatarLongPressRef.current) { clearTimeout(avatarLongPressRef.current); avatarLongPressRef.current = null; }
+  };
+
+  // Öne çıkanlar (highlights) — localStorage kalıcı
+  const [highlightAddOpen, setHighlightAddOpen] = useState(false);
+  const [highlightLabel, setHighlightLabel] = useState("");
+  const [customHighlights, setCustomHighlights] = useState<Array<{ label: string }>>(() => {
+    try { return JSON.parse(localStorage.getItem("loop_highlights") || "[]"); } catch { return []; }
+  });
+  const addHighlight = () => {
+    if (!highlightLabel.trim()) return;
+    const updated = [...customHighlights, { label: highlightLabel.trim() }];
+    setCustomHighlights(updated);
+    localStorage.setItem("loop_highlights", JSON.stringify(updated));
+    setHighlightLabel("");
+    setHighlightAddOpen(false);
+    toast({ title: "Öne çıkan eklendi" });
+  };
+
   const handleChangePassword = async () => {
     if (pwNew !== pwConfirm) {
       toast({ title: "Hata", description: "Yeni şifreler eşleşmiyor", variant: "destructive" });
@@ -528,9 +575,17 @@ export default function Profile() {
               <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />
             )}
-            <div className="w-36 h-36 rounded-full border-[5px] border-background shadow-2xl overflow-hidden bg-muted">
+            <div
+              className="w-36 h-36 rounded-full border-[5px] border-background shadow-2xl overflow-hidden bg-muted cursor-pointer select-none"
+              onTouchStart={startAvatarPress}
+              onTouchEnd={cancelAvatarPress}
+              onTouchMove={cancelAvatarPress}
+              onMouseDown={startAvatarPress}
+              onMouseUp={cancelAvatarPress}
+              onMouseLeave={cancelAvatarPress}
+            >
               {profile.avatarUrl ? (
-                <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover" />
+                <img src={profile.avatarUrl} alt={profile.displayName} className="w-full h-full object-cover pointer-events-none" />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary/20 to-violet-400/30 flex items-center justify-center">
                   <span className="text-5xl font-black text-primary">{profile.displayName.charAt(0)}</span>
@@ -708,13 +763,38 @@ export default function Profile() {
                 <MessageCircle className="w-4 h-4" />
                 Mesaj
               </button>
-              <button
-                onClick={() => { setPwCurrent(""); setPwNew(""); setPwConfirm(""); setPwOpen(true); }}
-                className="w-12 flex items-center justify-center rounded-2xl border border-border hover:bg-muted transition-colors"
-                title="Şifremi Değiştir"
-              >
-                <Lock className="w-4 h-4 text-muted-foreground" />
-              </button>
+              {/* Lock / Pano dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setLockMenuOpen(p => !p)}
+                  className="w-12 flex items-center justify-center gap-0.5 rounded-2xl border border-border hover:bg-muted transition-colors h-full py-3"
+                  title="Ayarlar"
+                >
+                  <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+                  <ChevronDown className={`w-3 h-3 text-muted-foreground transition-transform duration-200 ${lockMenuOpen ? "rotate-180" : ""}`} />
+                </button>
+                {lockMenuOpen && (
+                  <div
+                    className="absolute right-0 top-full mt-1.5 bg-card border border-border rounded-2xl shadow-xl z-50 w-48 py-1.5 text-sm overflow-hidden"
+                    onMouseLeave={() => setLockMenuOpen(false)}
+                  >
+                    <button
+                      onClick={() => { setLockMenuOpen(false); setPwCurrent(""); setPwNew(""); setPwConfirm(""); setPwOpen(true); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-muted/70 transition-colors"
+                    >
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                      <span>Şifremi Değiştir</span>
+                    </button>
+                    <button
+                      onClick={() => { setLockMenuOpen(false); setThoughtText((profile as any)?.thought ?? ""); setThoughtOpen(true); }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-muted/70 transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4 text-primary/70" />
+                      <span>Pano Mesajı</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <>
@@ -786,6 +866,7 @@ export default function Profile() {
             {isMe && (
               <div className="flex-shrink-0 flex flex-col items-center gap-1 mt-2">
                 <button
+                  onClick={() => { setHighlightLabel(""); setHighlightAddOpen(true); }}
                   className="bg-white rounded-sm shadow-md border-2 border-dashed border-primary/30 flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors"
                   style={{ width: 100, height: 132 }}
                 >
@@ -793,6 +874,19 @@ export default function Profile() {
                 </button>
               </div>
             )}
+            {customHighlights.map((h, i) => (
+              <div key={`custom-${i}`} className="flex-shrink-0 flex flex-col items-center gap-1 transition-transform hover:scale-105 cursor-pointer">
+                <div className="bg-white rounded-sm shadow-lg" style={{ width: 100, padding: 6, paddingBottom: 28 }}>
+                  <div className="flex justify-center -mt-3 mb-1">
+                    <div className="bg-violet-300 opacity-80 rounded-sm" style={{ width: 28, height: 10 }} />
+                  </div>
+                  <div className="w-full rounded-sm bg-gradient-to-b from-violet-900 via-purple-700 to-indigo-600 flex items-end justify-center" style={{ height: 88 }}>
+                    <span className="text-2xl pb-1">✨</span>
+                  </div>
+                  <p className="text-center text-[9px] font-semibold text-gray-600 mt-2 leading-tight truncate px-1">{h.label}</p>
+                </div>
+              </div>
+            ))}
             {HIGHLIGHTS.map((h, i) => (
               <div key={i} className={`flex-shrink-0 flex flex-col items-center gap-1 ${h.rotate} transition-transform hover:scale-105 hover:rotate-0 cursor-pointer`}>
                 {/* Polaroid card */}
@@ -1356,6 +1450,111 @@ export default function Profile() {
                 className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
               >
                 {pwSaving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Avatar Önizleme (uzun basış) ── */}
+      {avatarPreviewOpen && (
+        <div
+          className="fixed inset-0 z-[999] bg-black/90 flex items-center justify-center"
+          onClick={() => setAvatarPreviewOpen(false)}
+        >
+          <div className="relative max-w-sm w-full px-6">
+            <img
+              src={profile.avatarUrl ?? ""}
+              alt={profile.displayName}
+              className="w-full aspect-square object-cover rounded-full shadow-2xl border-4 border-white/20"
+            />
+            <button
+              className="absolute top-2 right-8 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center text-white"
+              onClick={() => setAvatarPreviewOpen(false)}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pano Mesajı Dialogu ── */}
+      <Dialog open={thoughtOpen} onOpenChange={setThoughtOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageCircle className="w-5 h-5 text-primary" />
+              Pano Mesajı
+            </DialogTitle>
+            <DialogDescription>
+              Profilinde görünecek kısa bir durum mesajı yaz
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Input
+              value={thoughtText}
+              onChange={e => setThoughtText(e.target.value)}
+              placeholder="Şu an ne düşünüyorsun? ✨"
+              maxLength={80}
+              className="rounded-xl"
+              autoFocus
+            />
+            <p className="text-xs text-muted-foreground text-right">{thoughtText.length}/80</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setThoughtOpen(false)}
+                disabled={thoughtSaving}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={handleSaveThought}
+                disabled={thoughtSaving}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {thoughtSaving ? "Kaydediliyor..." : "Kaydet"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Öne Çıkan Ekle Dialogu ── */}
+      <Dialog open={highlightAddOpen} onOpenChange={setHighlightAddOpen}>
+        <DialogContent className="rounded-3xl w-[90vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-primary" />
+              Öne Çıkan Ekle
+            </DialogTitle>
+            <DialogDescription>
+              Profilinde polaroid kartı olarak gösterilecek
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <Input
+              value={highlightLabel}
+              onChange={e => setHighlightLabel(e.target.value)}
+              placeholder="Başlık (örn: Anılarım 🌙)"
+              maxLength={30}
+              className="rounded-xl"
+              autoFocus
+              onKeyDown={e => e.key === "Enter" && addHighlight()}
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setHighlightAddOpen(false)}
+                className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold hover:bg-muted transition-colors"
+              >
+                İptal
+              </button>
+              <button
+                onClick={addHighlight}
+                disabled={!highlightLabel.trim()}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                Ekle
               </button>
             </div>
           </div>

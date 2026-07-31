@@ -14,8 +14,10 @@ import fs from "fs";
 
 const router = Router();
 
-// Comments tablosuna pinned sütunu ekle (yoksa)
+// Comments tablosuna gerekli sütunları ekle (yoksa)
 db.execute(sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
+db.execute(sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS media_url TEXT`).catch(() => {});
+db.execute(sql`ALTER TABLE comments ADD COLUMN IF NOT EXISTS media_type TEXT`).catch(() => {});
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -256,7 +258,7 @@ router.get("/posts/:postId/comments", async (req, res) => {
           .where(and(eq(commentLikesTable.userId, viewerId), eq(commentLikesTable.commentId, c.id))).limit(1);
         isLiked = like.length > 0;
       }
-      const [pinnedRow] = await db.execute(sql`SELECT pinned FROM comments WHERE id = ${c.id}`);
+      const [extraRow] = await db.execute(sql`SELECT pinned, media_url, media_type FROM comments WHERE id = ${c.id}`);
       return {
         id: c.id,
         postId: c.postId,
@@ -264,7 +266,9 @@ router.get("/posts/:postId/comments", async (req, res) => {
         user: await getUserWithStats(c.userId, viewerId),
         content: c.content,
         replyToId: c.replyToId,
-        pinned: (pinnedRow as any)?.pinned ?? false,
+        pinned: (extraRow as any)?.pinned ?? false,
+        mediaUrl: (extraRow as any)?.media_url ?? null,
+        mediaType: (extraRow as any)?.media_type ?? null,
         likeCount: likeCount?.count ?? 0,
         isLiked,
         createdAt: c.createdAt.toISOString(),
@@ -290,12 +294,16 @@ router.get("/posts/:postId/comments", async (req, res) => {
 router.post("/posts/:postId/comments", requireAuth, async (req, res) => {
   try {
     const postId = parseInt(req.params["postId"] as string);
-    const { content, replyToId } = req.body;
-    if (!content) { res.status(400).json({ error: "Content required" }); return; }
+    const { content, replyToId, mediaUrl, mediaType } = req.body;
+    if (!content && !mediaUrl) { res.status(400).json({ error: "Content or media required" }); return; }
 
     const [comment] = await db.insert(commentsTable)
-      .values({ postId, userId: req.user!.id, content, replyToId: replyToId ?? null })
+      .values({ postId, userId: req.user!.id, content: content || "", replyToId: replyToId ?? null })
       .returning();
+
+    if (mediaUrl) {
+      await db.execute(sql`UPDATE comments SET media_url = ${mediaUrl}, media_type = ${mediaType ?? "image"} WHERE id = ${comment.id}`);
+    }
 
     const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
     if (post[0] && post[0].userId !== req.user!.id) {
