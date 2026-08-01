@@ -257,15 +257,24 @@ export default function Profile() {
     } catch { toast({ title: "Hata", variant: "destructive" }); }
   };
 
-  // Neon kalp butonu
+  // Neon kalp butonu — profil beğeni (gönderi beğenilerinden bağımsız)
   const [neonBtnVisible, setNeonBtnVisible] = useState(true);
   const [neonCountVisible, setNeonCountVisible] = useState(false);
+  const [profileLikeCount, setProfileLikeCount] = useState<number | null>(null);
   const neonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!targetUserId) return;
+    fetch(`/api/users/${targetUserId}/profile-like-count`)
+      .then(r => r.json())
+      .then(d => setProfileLikeCount(d.count ?? 0))
+      .catch(() => setProfileLikeCount(0));
+  }, [targetUserId]);
+
   const handleNeonHeart = () => {
-    if (neonCountVisible) return;
     setNeonCountVisible(true);
     if (neonTimerRef.current) clearTimeout(neonTimerRef.current);
-    neonTimerRef.current = setTimeout(() => setNeonCountVisible(false), 4000);
+    neonTimerRef.current = setTimeout(() => setNeonCountVisible(false), 4500);
   };
 
   // Change password
@@ -2002,83 +2011,91 @@ export default function Profile() {
           </div>
         </div>
       )}
-      {/* ── Neon kalp butonu (sağ alta sabit) ── */}
+      {/* ── Profil kalp butonu (sağ alta sabit) ── */}
       {neonBtnVisible && profile && (
-        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
-          {/* Hologram sayaç */}
+        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-center gap-1.5 pointer-events-none">
+
+          {/* Hologram sayaç — neon, ekranın soluna doğru açılır */}
           <div
-            className="pointer-events-none select-none transition-all duration-700"
+            className="pointer-events-none select-none self-end transition-all duration-600"
             style={{
               opacity: neonCountVisible ? 1 : 0,
-              transform: neonCountVisible ? "translateY(0) scale(1)" : "translateY(12px) scale(0.85)",
+              transform: neonCountVisible ? "translateX(0) scale(1)" : "translateX(20px) scale(0.88)",
             }}
           >
             <div
-              className="relative flex flex-col items-center px-5 py-3 rounded-2xl"
+              className="relative flex flex-col items-center px-5 py-3 rounded-2xl overflow-hidden"
               style={{
-                background: "rgba(10,4,30,0.72)",
-                border: "1.5px solid rgba(168,85,247,0.55)",
-                boxShadow: "0 0 18px 4px rgba(168,85,247,0.35), 0 0 40px 8px rgba(139,92,246,0.18), inset 0 0 16px rgba(168,85,247,0.10)",
-                backdropFilter: "blur(12px)",
+                background: "rgba(8,3,22,0.78)",
+                border: "1.5px solid rgba(168,85,247,0.6)",
+                boxShadow: "0 0 22px 6px rgba(168,85,247,0.38), 0 0 50px 10px rgba(139,92,246,0.18), inset 0 0 20px rgba(168,85,247,0.08)",
+                backdropFilter: "blur(14px)",
               }}
             >
-              {/* Tarama çizgileri efekti */}
-              <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none"
-                style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(168,85,247,0.04) 3px, rgba(168,85,247,0.04) 4px)" }} />
+              {/* Tarama çizgileri */}
+              <div className="absolute inset-0 pointer-events-none"
+                style={{ background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(168,85,247,0.05) 2px,rgba(168,85,247,0.05) 3px)" }} />
+              {/* Üst ışık yansıması */}
+              <div className="absolute top-0 left-0 right-0 h-px"
+                style={{ background: "linear-gradient(90deg,transparent,rgba(232,121,249,0.7),transparent)" }} />
               <span
                 className="text-3xl font-black tabular-nums relative z-10"
                 style={{
-                  color: "#e879f9",
-                  textShadow: "0 0 8px #e879f9, 0 0 20px #a855f7, 0 0 40px #7c3aed, 0 0 2px #fff",
-                  letterSpacing: "0.04em",
+                  color: "#f0abfc",
+                  textShadow: "0 0 6px #f0abfc, 0 0 18px #e879f9, 0 0 36px #a855f7, 0 0 2px #fff",
+                  letterSpacing: "0.06em",
+                  fontVariantNumeric: "tabular-nums",
                 }}
               >
-                {((profile as any).likeCount ?? 0).toLocaleString("tr-TR")}
+                {(profileLikeCount ?? 0).toLocaleString("tr-TR")}
               </span>
               <span
-                className="text-[11px] font-semibold mt-0.5 relative z-10"
-                style={{ color: "#c084fc", textShadow: "0 0 6px #a855f7" }}
+                className="text-[10px] font-semibold mt-0.5 uppercase tracking-widest relative z-10"
+                style={{ color: "#c084fc", textShadow: "0 0 8px #a855f7" }}
               >
-                toplam beğeni
+                profil beğeni
               </span>
             </div>
           </div>
 
-          {/* Kalp butonu + kapat */}
-          <div className="pointer-events-auto flex items-center gap-1.5">
-            {/* Kapat (x) */}
+          {/* Kapat — üstte */}
+          <div className="pointer-events-auto self-center">
             <button
               onClick={() => { setNeonBtnVisible(false); setNeonCountVisible(false); }}
-              className="w-6 h-6 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(10,4,30,0.7)", border: "1px solid rgba(168,85,247,0.4)", color: "#c084fc" }}
+              className="w-5 h-5 rounded-full flex items-center justify-center"
+              style={{
+                background: "rgba(240,240,245,0.18)",
+                border: "1px solid rgba(200,200,220,0.35)",
+                backdropFilter: "blur(8px)",
+                color: "rgba(180,180,200,0.85)",
+              }}
             >
-              <X className="w-3 h-3" />
+              <X className="w-2.5 h-2.5" />
             </button>
-            {/* Kalp */}
+          </div>
+
+          {/* Kalp butonu — gri bulanık cam */}
+          <div className="pointer-events-auto">
             <button
               onClick={handleNeonHeart}
               className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90"
               style={{
-                background: "rgba(10,4,30,0.80)",
-                border: "2px solid rgba(232,121,249,0.7)",
-                boxShadow: "0 0 16px 4px rgba(232,121,249,0.5), 0 0 32px 8px rgba(168,85,247,0.3)",
+                background: "rgba(220,220,230,0.14)",
+                border: "1.5px solid rgba(200,200,220,0.30)",
+                backdropFilter: "blur(16px)",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.15)",
               }}
             >
-              {/* Nabız halkası */}
-              <span
-                className="absolute inset-0 rounded-full animate-ping"
-                style={{ border: "2px solid rgba(232,121,249,0.3)", animationDuration: "2.2s" }}
-              />
               <Heart
-                className="w-7 h-7 relative z-10"
+                className="w-6 h-6 relative z-10"
                 style={{
-                  color: "#e879f9",
-                  filter: "drop-shadow(0 0 6px #e879f9) drop-shadow(0 0 14px #a855f7)",
-                  fill: "rgba(232,121,249,0.25)",
+                  color: "rgba(220,210,235,0.92)",
+                  filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))",
                 }}
               />
             </button>
           </div>
+
         </div>
       )}
     </AppLayout>

@@ -427,6 +427,22 @@ router.post("/questions/:id/comments", requireAuth, async (req, res) => {
   } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
+// Profil beğeni sayısını getir (notifications tablosundaki profile_like kayıtları)
+router.get("/users/:userId/profile-like-count", async (req, res) => {
+  try {
+    const targetId = parseInt(req.params["userId"]!);
+    const result = await db.execute(
+      sql`SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ${targetId} AND type = 'profile_like'`
+    );
+    const row = (result as any).rows?.[0] ?? result[0] ?? {};
+    const cnt = Number(row?.cnt ?? row?.count ?? 0);
+    res.json({ count: cnt });
+  } catch (err) {
+    req.log.error(err);
+    res.json({ count: 0 });
+  }
+});
+
 // Profili beğen → bildirim gönder
 router.post("/users/:userId/like-profile", requireAuth, async (req, res) => {
   try {
