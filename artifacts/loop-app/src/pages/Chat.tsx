@@ -249,7 +249,12 @@ export default function Chat() {
     }
   };
 
+  const recordingStartRef = useRef<number>(0);
+  const isStartingRecordingRef = useRef(false);
+
   const startRecording = async () => {
+    if (isRecording || isStartingRecordingRef.current) return;
+    isStartingRecordingRef.current = true;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
@@ -272,11 +277,18 @@ export default function Chat() {
         } catch { /* ignore */ }
       };
       recorder.start(200);
-      setIsRecording(true);
+      // Use wall-clock elapsed time — immune to stale/duplicate intervals
+      recordingStartRef.current = Date.now();
+      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds(Math.floor((Date.now() - recordingStartRef.current) / 1000));
+      }, 500);
       setRecordingSeconds(0);
-      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000);
+      setIsRecording(true);
     } catch {
       toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından mikrofon iznini etkinleştir.", variant: "destructive" });
+    } finally {
+      isStartingRecordingRef.current = false;
     }
   };
 

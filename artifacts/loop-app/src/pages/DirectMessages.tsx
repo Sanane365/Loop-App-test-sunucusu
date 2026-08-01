@@ -353,6 +353,10 @@ export default function DirectMessages() {
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
+  const prevMsgCountRef = useRef(0);
+  const isAtGroupBottomRef = useRef(true);
+  const prevGroupMsgCountRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Grup ayarları paneli ──
@@ -853,12 +857,30 @@ export default function DirectMessages() {
     return undefined;
   }, [groupId]);
 
+  // DM: scroll to bottom only when user is already there OR new messages arrived
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const newCount = messages.length;
+    const wasAtBottom = isAtBottomRef.current;
+    const hasNewMessages = newCount > prevMsgCountRef.current;
+    prevMsgCountRef.current = newCount;
+    if (wasAtBottom || hasNewMessages) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [messages]);
 
+  // Group: same logic
   useEffect(() => {
-    if (groupScrollRef.current) groupScrollRef.current.scrollTop = groupScrollRef.current.scrollHeight;
+    const el = groupScrollRef.current;
+    if (!el) return;
+    const newCount = groupMessages.length;
+    const wasAtBottom = isAtGroupBottomRef.current;
+    const hasNewMessages = newCount > prevGroupMsgCountRef.current;
+    prevGroupMsgCountRef.current = newCount;
+    if (wasAtBottom || hasNewMessages) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [groupMessages]);
 
   // ── Arama başlat (header'daki telefon/video butonları) ──────────────────
@@ -1237,7 +1259,15 @@ export default function DirectMessages() {
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto bg-background px-3 py-2" ref={groupScrollRef}>
+          <div
+            className="flex-1 overflow-y-auto bg-background px-3 py-2"
+            ref={groupScrollRef}
+            onScroll={() => {
+              const el = groupScrollRef.current;
+              if (!el) return;
+              isAtGroupBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            }}
+          >
             {groupMessages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1574,7 +1604,15 @@ export default function DirectMessages() {
           </div>
 
           {/* ── Mesajlar ── */}
-          <div className="flex-1 overflow-y-auto bg-background" ref={scrollRef}>
+          <div
+            className="flex-1 overflow-y-auto bg-background"
+            ref={scrollRef}
+            onScroll={() => {
+              const el = scrollRef.current;
+              if (!el) return;
+              isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+            }}
+          >
             <div className="px-3 py-2">
 
               {messages.length === 0 && (
@@ -2134,19 +2172,14 @@ export default function DirectMessages() {
                   <button onClick={openThought} className="w-full group text-left">
                     <ThoughtBubble text={thought || thoughtPlaceholder} isEmpty={!thought} color="primary" />
                   </button>
-                  {/* Beni beğenenler — balon sağ üstünde küçük avatarlar */}
+                  {/* Beni beğenenler — balonun alt çizgisinde ortalı */}
                   {myThoughtLikers.length > 0 && (
-                    <div className="absolute -top-1 -right-1 flex -space-x-1 z-10">
-                      {myThoughtLikers.slice(0, 2).map(l => (
-                        <div key={l.id} className="relative">
-                          <Avatar className="ring-1 ring-white" style={{ width: 16, height: 16 }}>
-                            <AvatarImage src={l.avatarUrl || ""} />
-                            <AvatarFallback className="bg-primary text-white text-[6px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
-                          </Avatar>
-                          <div className="absolute -top-1.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
-                            <Heart className="w-1.5 h-1.5 text-white fill-white" />
-                          </div>
-                        </div>
+                    <div className="absolute -bottom-2 left-0 right-0 flex justify-center gap-0.5 z-10 pointer-events-none">
+                      {myThoughtLikers.slice(0, 3).map(l => (
+                        <Avatar key={l.id} className="ring-1 ring-white" style={{ width: 14, height: 14 }}>
+                          <AvatarImage src={l.avatarUrl || ""} />
+                          <AvatarFallback className="bg-primary text-white text-[5px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
+                        </Avatar>
                       ))}
                     </div>
                   )}
@@ -2198,19 +2231,14 @@ export default function DirectMessages() {
                           <ThoughtBubble text={friendThought} color={p.color} />
                         </button>
                       ) : null}
-                      {/* Beğenenler — balon sağ üstünde */}
+                      {/* Beğenenler — balonun alt çizgisinde ortalı */}
                       {likers.length > 0 && (
-                        <div className="absolute -top-1 -right-1 flex -space-x-1 z-10 pointer-events-none">
-                          {likers.slice(0, 2).map(l => (
-                            <div key={l.id} className="relative">
-                              <Avatar className="ring-1 ring-white" style={{ width: 16, height: 16 }}>
-                                <AvatarImage src={l.avatarUrl || ""} />
-                                <AvatarFallback className="bg-violet-500 text-white text-[6px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
-                              </Avatar>
-                              <div className="absolute -top-1.5 -right-0.5 w-3 h-3 bg-rose-500 rounded-full flex items-center justify-center shadow-sm">
-                                <Heart className="w-1.5 h-1.5 text-white fill-white" />
-                              </div>
-                            </div>
+                        <div className="absolute -bottom-2 left-0 right-0 flex justify-center gap-0.5 z-10 pointer-events-none">
+                          {likers.slice(0, 3).map(l => (
+                            <Avatar key={l.id} className="ring-1 ring-white" style={{ width: 14, height: 14 }}>
+                              <AvatarImage src={l.avatarUrl || ""} />
+                              <AvatarFallback className="bg-violet-500 text-white text-[5px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
+                            </Avatar>
                           ))}
                         </div>
                       )}
