@@ -258,7 +258,8 @@ router.get("/posts/:postId/comments", async (req, res) => {
           .where(and(eq(commentLikesTable.userId, viewerId), eq(commentLikesTable.commentId, c.id))).limit(1);
         isLiked = like.length > 0;
       }
-      const [extraRow] = await db.execute(sql`SELECT pinned, media_url, media_type FROM comments WHERE id = ${c.id}`);
+      const extraResult = await db.execute(sql`SELECT pinned, media_url, media_type FROM comments WHERE id = ${c.id}`);
+      const extraRow = (extraResult as any).rows?.[0] ?? null;
       return {
         id: c.id,
         postId: c.postId,
@@ -326,7 +327,8 @@ router.post("/posts/:postId/comments/:commentId/pin", requireAuth, async (req, r
     const post = await db.select().from(postsTable).where(eq(postsTable.id, postId)).limit(1);
     if (!post[0] || post[0].userId !== req.user!.id) { res.status(403).json({ error: "Yetkisiz" }); return; }
     // Toggle
-    const [current] = await db.execute(sql`SELECT pinned FROM comments WHERE id = ${commentId} AND post_id = ${postId}`);
+    const currentResult = await db.execute(sql`SELECT pinned FROM comments WHERE id = ${commentId} AND post_id = ${postId}`);
+    const current = (currentResult as any).rows?.[0] ?? null;
     const nowPinned = !(current as any)?.pinned;
     await db.execute(sql`UPDATE comments SET pinned = ${nowPinned} WHERE id = ${commentId} AND post_id = ${postId}`);
     res.json({ pinned: nowPinned });

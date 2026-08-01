@@ -89,6 +89,7 @@ function CommentBottomSheet({
   const commentMediaRef = useRef<HTMLInputElement>(null);
   // GIF panel
   const [gifPanelOpen, setGifPanelOpen] = useState(false);
+  const [plusMenuOpen, setPlusMenuOpen] = useState(false);
 
   const handleCommentMediaSelect = async (file: File) => {
     setCommentMediaUploading(true);
@@ -417,7 +418,7 @@ function CommentBottomSheet({
         )}
 
         {/* Input bar */}
-        <div className="border-t border-border/60 px-3 py-3 flex items-center gap-2.5 bg-background">
+        <div className="border-t border-border/60 px-3 py-3 flex items-center gap-2 bg-background relative">
           <Avatar className="w-8 h-8 flex-shrink-0">
             <AvatarImage src={user?.avatarUrl || ""} />
             <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
@@ -431,6 +432,37 @@ function CommentBottomSheet({
             className="hidden"
             onChange={e => { const f = e.target.files?.[0]; if (f) handleCommentMediaSelect(f); e.target.value = ""; }}
           />
+          {/* Plus button + popup */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => { setPlusMenuOpen(p => !p); setGifPanelOpen(false); }}
+              className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${plusMenuOpen ? "bg-primary/10 text-primary" : "hover:bg-muted text-muted-foreground"}`}
+            >
+              <Plus className="w-5 h-5" />
+            </button>
+            {plusMenuOpen && (
+              <div className="absolute bottom-full left-0 mb-2 bg-popover border border-border rounded-2xl shadow-xl overflow-hidden z-20 min-w-[160px]">
+                <button
+                  onClick={() => { commentMediaRef.current?.click(); setPlusMenuOpen(false); }}
+                  disabled={commentMediaUploading}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-sm"
+                >
+                  {commentMediaUploading
+                    ? <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    : <ImagePlus className="w-4 h-4 text-muted-foreground" />}
+                  <span>Fotoğraf</span>
+                </button>
+                <div className="h-px bg-border/60 mx-3" />
+                <button
+                  onClick={() => { setGifPanelOpen(p => !p); setPlusMenuOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 hover:bg-accent transition-colors text-sm"
+                >
+                  <span className="text-[13px] font-bold text-muted-foreground w-4 text-center leading-none">GIF</span>
+                  <span>GIF</span>
+                </button>
+              </div>
+            )}
+          </div>
           <div className="flex-1 flex flex-col bg-muted/60 rounded-2xl px-4 py-2 border border-border/30 gap-1">
             {replyingToId && (
               <div className="flex items-center justify-between">
@@ -457,35 +489,18 @@ function CommentBottomSheet({
               onChange={e => setNewComment(e.target.value)}
               placeholder={commentMediaUrl ? "Açıklama ekle..." : "Yorumunuz..."}
               className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none h-6"
-              onKeyDown={e => e.key === "Enter" && handleAddComment()}
+              onKeyDown={e => { if (e.key === "Enter") { handleAddComment(); } }}
+              onFocus={() => setPlusMenuOpen(false)}
             />
           </div>
-          <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground flex-shrink-0">
-            <Smile className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => commentMediaRef.current?.click()}
-            disabled={commentMediaUploading}
-            className={`w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors flex-shrink-0 ${commentMediaUrl ? "text-primary" : "text-muted-foreground"}`}
-          >
-            {commentMediaUploading ? (
-              <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <ImagePlus className="w-5 h-5" />
-            )}
-          </button>
-          <button
-            onClick={() => setGifPanelOpen(p => !p)}
-            className={`h-9 px-2.5 flex items-center justify-center rounded-full hover:bg-muted transition-colors flex-shrink-0 font-bold text-[11px] tracking-wider ${gifPanelOpen ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
-          >
-            GIF
-          </button>
           <button
             onClick={handleAddComment}
             disabled={(!newComment.trim() && !commentMediaUrl) || createCommentMutation.isPending}
             className="w-9 h-9 rounded-full bg-primary flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:bg-primary/90 transition-colors shadow"
           >
-            <Send className="w-4 h-4 text-primary-foreground" />
+            {createCommentMutation.isPending
+              ? <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              : <Send className="w-4 h-4 text-primary-foreground" />}
           </button>
         </div>
 

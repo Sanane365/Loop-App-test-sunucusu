@@ -140,6 +140,7 @@ export default function Chat() {
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
+    if (gifOpen) { touchStartX.current = null; touchStartY.current = null; return; }
     if (touchStartX.current === null || touchStartY.current === null) return;
     const t = e.changedTouches[0];
     const dx = touchStartX.current - t.clientX;   // positive = swipe left
