@@ -2094,6 +2094,26 @@ export default function DirectMessages() {
             <button className="w-10 h-10 flex items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground hover:text-foreground flex-shrink-0 transition-colors">
               <SlidersHorizontal className="w-4 h-4" />
             </button>
+
+            {/* ── Polaroid Kamera — filtre butonunun sağına taşındı ── */}
+            <button
+              onClick={openLoopViewer}
+              className="relative w-10 h-10 flex items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground hover:text-foreground flex-shrink-0 transition-colors"
+            >
+              {/* Kamera gövdesi */}
+              <div className="relative w-6 h-5 rounded-t-lg overflow-hidden bg-zinc-700 flex items-center justify-center">
+                <div className="w-3 h-3 rounded-full bg-zinc-900 border border-zinc-500 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                </div>
+                <div className="absolute top-0.5 right-1 w-1 h-0.5 bg-amber-300/80 rounded-full" />
+              </div>
+              {/* Okunmamış rozet */}
+              {unviewedPhotos.length > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-primary rounded-full text-[9px] font-bold text-primary-foreground flex items-center justify-center px-0.5 shadow-sm z-10">
+                  {unviewedPhotos.length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -2101,69 +2121,7 @@ export default function DirectMessages() {
           {/* Friend profile cards — horizontal scroll, square card style */}
           <div className="pt-4 pb-3 border-b border-border/40 relative">
 
-            {/* ── Polaroid Kamera Widget — sağ köşe ── */}
-            <button
-              onClick={openLoopViewer}
-              className="absolute right-0 top-0 z-10 flex flex-col items-center pt-1 pr-1 pointer-events-auto focus:outline-none"
-              style={{ width: 52 }}
-            >
-              {/* Polaroid fotoğraflar kameradan çıkıyor */}
-              <div className="relative w-10 mb-0.5" style={{ height: unviewedPhotos.length > 0 ? 48 : 0, transition: "height 0.3s" }}>
-                {unviewedPhotos.slice(0, 3).map((photo, i) => {
-                  const rotations = [-14, 8, -5];
-                  const translateY = [0, -6, -12];
-                  const gradients = ["from-violet-400 to-purple-500", "from-pink-400 to-rose-500", "from-sky-400 to-blue-500"];
-                  return (
-                    <div
-                      key={photo.id}
-                      className="absolute bottom-0 left-0 right-0"
-                      style={{
-                        transform: `rotate(${rotations[i % 3]}deg) translateY(${translateY[i % 3]}px)`,
-                        zIndex: 3 - i,
-                      }}
-                    >
-                      {/* Polaroid çerçeve */}
-                      <div className="bg-white shadow-lg rounded-[3px] p-0.5 pb-2.5 w-10">
-                        {photo.mediaUrl ? (
-                          <img src={`/api${photo.mediaUrl}`} alt="" className="w-9 h-9 object-cover rounded-[2px]" />
-                        ) : (
-                          <div className={`w-9 h-9 bg-gradient-to-br ${gradients[i % 3]} rounded-[2px] flex items-center justify-center`}>
-                            <span className="text-white font-bold text-xs drop-shadow">
-                              {photo.sender?.displayName?.charAt(0) ?? "?"}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Kamera gövdesi — sadece üst kısmı görünür */}
-              <div className="relative w-10 overflow-hidden rounded-t-xl" style={{ height: 28 }}>
-                {/* Gövde */}
-                <div className="absolute inset-0 bg-zinc-800 rounded-t-xl" />
-                {/* Tepe çıkıntısı (vizör) */}
-                <div className="absolute top-0 left-1.5 right-1.5 h-1.5 bg-zinc-700 rounded-t-sm" />
-                {/* Lens */}
-                <div className="absolute inset-0 flex items-center justify-center mt-2">
-                  <div className="w-4 h-4 rounded-full bg-zinc-900 border-[1.5px] border-zinc-500 flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-700 border border-zinc-500/60" />
-                  </div>
-                </div>
-                {/* Flash */}
-                <div className="absolute top-2 right-1.5 w-1.5 h-1 bg-amber-300/80 rounded-full" />
-              </div>
-
-              {/* Okunmamış rozet */}
-              {unviewedPhotos.length > 0 && (
-                <span className="absolute top-0 right-0 w-4 h-4 bg-primary rounded-full text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm z-20">
-                  {unviewedPhotos.length}
-                </span>
-              )}
-            </button>
-
-            <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1 pr-14">
+            <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
 
               {/* ── My own card ── */}
               <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>

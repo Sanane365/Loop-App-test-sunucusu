@@ -56,9 +56,9 @@ export default function Chat() {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  // Timer — RAF ile DOM'a doğrudan yaz, React state hiç kullanma
+  // Timer — doğrudan DOM güncellemesi, React state/effect yok
   const timerDisplayRef = useRef<HTMLSpanElement>(null);
-  const animFrameRef = useRef<number | null>(null);
+  const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
 
   // Active users panel
@@ -253,33 +253,13 @@ export default function Chat() {
 
   const isStartingRecordingRef = useRef(false);
 
-  // Timer — RAF ile doğrudan DOM güncelleme (React state yok, re-render yok)
-  useEffect(() => {
-    if (!isRecording) {
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (timerDisplayRef.current) timerDisplayRef.current.textContent = "0:00";
-      return;
+  const stopTimer = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
     }
-    const startTime = Date.now();
-    const tick = () => {
-      const secs = Math.floor((Date.now() - startTime) / 1000);
-      if (timerDisplayRef.current) {
-        timerDisplayRef.current.textContent =
-          `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
-      }
-      animFrameRef.current = requestAnimationFrame(tick);
-    };
-    animFrameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-    };
-  }, [isRecording]);
+    if (timerDisplayRef.current) timerDisplayRef.current.textContent = "0:00";
+  };
 
   const startRecording = async () => {
     if (isRecording || isStartingRecordingRef.current) return;
@@ -306,8 +286,19 @@ export default function Chat() {
         } catch { /* ignore */ }
       };
       recorder.start(200);
-      setIsRecording(true); // useEffect timer bu state değişimiyle başlar
+      // Timer: t0 sabitlenir, interval yalnızca burada başlar — React hook'u yok
+      stopTimer(); // önceki varsa temizle
+      const t0 = Date.now();
+      timerIntervalRef.current = setInterval(() => {
+        const s = Math.floor((Date.now() - t0) / 1000);
+        if (timerDisplayRef.current) {
+          timerDisplayRef.current.textContent =
+            `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+        }
+      }, 200);
+      setIsRecording(true);
     } catch {
+      stopTimer();
       toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından mikrofon iznini etkinleştir.", variant: "destructive" });
     } finally {
       isStartingRecordingRef.current = false;
@@ -315,6 +306,7 @@ export default function Chat() {
   };
 
   const cancelRecording = () => {
+    stopTimer();
     const mr = mediaRecorderRef.current;
     if (mr) {
       mediaRecorderRef.current = null;
@@ -326,13 +318,14 @@ export default function Chat() {
       } catch {}
     }
     audioChunksRef.current = [];
-    setIsRecording(false); // useEffect timer'ı temizler
+    setIsRecording(false);
   };
 
   const stopRecording = () => {
+    stopTimer();
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false); // useEffect timer'ı temizler
+      setIsRecording(false);
     }
   };
 
