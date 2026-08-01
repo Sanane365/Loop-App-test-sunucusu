@@ -24,6 +24,13 @@ export async function getUserWithStats(userId: number, viewerId?: number) {
     .from(postsTable)
     .where(eq(postsTable.userId, userId));
 
+  // Toplam beğeni — kullanıcının tüm gönderilerindeki beğeni sayısı
+  const [likeCount] = await db
+    .select({ count: sql<number>`cast(count(*) as int)` })
+    .from(likesTable)
+    .innerJoin(postsTable, eq(likesTable.postId, postsTable.id))
+    .where(eq(postsTable.userId, userId));
+
   let isFollowing = false;
   if (viewerId && viewerId !== userId) {
     const follow = await db
@@ -48,6 +55,7 @@ export async function getUserWithStats(userId: number, viewerId?: number) {
     followerCount: followerCount?.count ?? 0,
     followingCount: followingCount?.count ?? 0,
     postCount: postCount?.count ?? 0,
+    likeCount: likeCount?.count ?? 0,
     isFollowing,
     createdAt: user[0].createdAt.toISOString(),
   };

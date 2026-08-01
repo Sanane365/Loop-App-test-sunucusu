@@ -257,6 +257,17 @@ export default function Profile() {
     } catch { toast({ title: "Hata", variant: "destructive" }); }
   };
 
+  // Neon kalp butonu
+  const [neonBtnVisible, setNeonBtnVisible] = useState(true);
+  const [neonCountVisible, setNeonCountVisible] = useState(false);
+  const neonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleNeonHeart = () => {
+    if (neonCountVisible) return;
+    setNeonCountVisible(true);
+    if (neonTimerRef.current) clearTimeout(neonTimerRef.current);
+    neonTimerRef.current = setTimeout(() => setNeonCountVisible(false), 4000);
+  };
+
   // Change password
   const [pwOpen, setPwOpen] = useState(false);
   const [pwCurrent, setPwCurrent] = useState("");
@@ -1988,6 +1999,85 @@ export default function Profile() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* ── Neon kalp butonu (sağ alta sabit) ── */}
+      {neonBtnVisible && profile && (
+        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-end gap-2 pointer-events-none">
+          {/* Hologram sayaç */}
+          <div
+            className="pointer-events-none select-none transition-all duration-700"
+            style={{
+              opacity: neonCountVisible ? 1 : 0,
+              transform: neonCountVisible ? "translateY(0) scale(1)" : "translateY(12px) scale(0.85)",
+            }}
+          >
+            <div
+              className="relative flex flex-col items-center px-5 py-3 rounded-2xl"
+              style={{
+                background: "rgba(10,4,30,0.72)",
+                border: "1.5px solid rgba(168,85,247,0.55)",
+                boxShadow: "0 0 18px 4px rgba(168,85,247,0.35), 0 0 40px 8px rgba(139,92,246,0.18), inset 0 0 16px rgba(168,85,247,0.10)",
+                backdropFilter: "blur(12px)",
+              }}
+            >
+              {/* Tarama çizgileri efekti */}
+              <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none"
+                style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(168,85,247,0.04) 3px, rgba(168,85,247,0.04) 4px)" }} />
+              <span
+                className="text-3xl font-black tabular-nums relative z-10"
+                style={{
+                  color: "#e879f9",
+                  textShadow: "0 0 8px #e879f9, 0 0 20px #a855f7, 0 0 40px #7c3aed, 0 0 2px #fff",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {((profile as any).likeCount ?? 0).toLocaleString("tr-TR")}
+              </span>
+              <span
+                className="text-[11px] font-semibold mt-0.5 relative z-10"
+                style={{ color: "#c084fc", textShadow: "0 0 6px #a855f7" }}
+              >
+                toplam beğeni
+              </span>
+            </div>
+          </div>
+
+          {/* Kalp butonu + kapat */}
+          <div className="pointer-events-auto flex items-center gap-1.5">
+            {/* Kapat (x) */}
+            <button
+              onClick={() => { setNeonBtnVisible(false); setNeonCountVisible(false); }}
+              className="w-6 h-6 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(10,4,30,0.7)", border: "1px solid rgba(168,85,247,0.4)", color: "#c084fc" }}
+            >
+              <X className="w-3 h-3" />
+            </button>
+            {/* Kalp */}
+            <button
+              onClick={handleNeonHeart}
+              className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90"
+              style={{
+                background: "rgba(10,4,30,0.80)",
+                border: "2px solid rgba(232,121,249,0.7)",
+                boxShadow: "0 0 16px 4px rgba(232,121,249,0.5), 0 0 32px 8px rgba(168,85,247,0.3)",
+              }}
+            >
+              {/* Nabız halkası */}
+              <span
+                className="absolute inset-0 rounded-full animate-ping"
+                style={{ border: "2px solid rgba(232,121,249,0.3)", animationDuration: "2.2s" }}
+              />
+              <Heart
+                className="w-7 h-7 relative z-10"
+                style={{
+                  color: "#e879f9",
+                  filter: "drop-shadow(0 0 6px #e879f9) drop-shadow(0 0 14px #a855f7)",
+                  fill: "rgba(232,121,249,0.25)",
+                }}
+              />
+            </button>
           </div>
         </div>
       )}
