@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Search, Mic, Send, SquareSquare, X, Users, ImagePlus,
+  Mic, Send, SquareSquare, X, Users, ImagePlus,
   StopCircle, Plus, Smile, ArrowRight, MessageCircle, Reply,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -18,8 +18,7 @@ import { tr } from "date-fns/locale";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-
-const GIPHY_KEY = "dc6zaTOxFJmzC";
+import GifPicker from "@/components/shared/GifPicker";
 
 interface ActiveUser {
   id: number;
@@ -51,10 +50,7 @@ export default function Chat() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // GIF state
-  const [gifSearch, setGifSearch] = useState("");
-  const [gifs, setGifs] = useState<{ url: string; preview: string }[]>([]);
   const [gifOpen, setGifOpen] = useState(false);
-  const [gifLoading, setGifLoading] = useState(false);
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
@@ -213,25 +209,7 @@ export default function Chat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  const searchGifs = async (q?: string) => {
-    setGifLoading(true);
-    try {
-      const query = (q ?? gifSearch).trim();
-      const endpoint = !query
-        ? `https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`
-        : `https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=g`;
-      const res = await fetch(endpoint);
-      const json = await res.json();
-      const mapped = (json.data ?? []).map((g: any) => ({
-        url: g.images?.original?.url ?? g.images?.fixed_height?.url ?? "",
-        preview: g.images?.fixed_height_still?.url ?? g.images?.fixed_height?.url ?? "",
-      })).filter((g: any) => g.url);
-      setGifs(mapped);
-    } catch { setGifs([]); }
-    finally { setGifLoading(false); }
-  };
-
-  const openGifPicker = () => { setGifOpen(true); if (gifs.length === 0) searchGifs(""); };
+  const openGifPicker = () => { setGifOpen(true); };
 
   const handleSend = () => {
     const text = content.trim();
@@ -556,9 +534,9 @@ export default function Chat() {
                               const refSnippet = colon !== -1 ? header.slice(colon + 1) : "";
                               return (
                                 <>
-                                  <div className={`border-l-2 border-primary/60 pl-2 py-0.5 mb-2 rounded-sm ${isMe ? "bg-primary/10" : "bg-muted/50"}`}>
-                                    <p className="text-[11px] font-bold text-primary leading-tight">{refName}</p>
-                                    <p className="text-[11px] text-muted-foreground truncate leading-tight">{refSnippet}</p>
+                                  <div className={`border-l-2 border-primary/60 pl-2 py-0.5 mb-2 rounded-sm overflow-hidden ${isMe ? "bg-primary/10" : "bg-muted/50"}`} style={{ maxWidth: "100%" }}>
+                                    <p className="text-[11px] font-bold text-primary leading-none truncate">{refName}</p>
+                                    <p className="text-[11px] text-muted-foreground leading-snug mt-0.5 overflow-hidden" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{refSnippet}</p>
                                   </div>
                                   {renderMessage(actual)}
                                 </>
@@ -666,35 +644,12 @@ export default function Chat() {
           </div>
         )}
 
-        {/* GIF picker panel */}
+        {/* GIF picker */}
         {gifOpen && (
-          <div className="border-t border-border bg-background p-3">
-            <div className="flex gap-2 mb-2 items-center">
-              <Input
-                value={gifSearch}
-                onChange={e => setGifSearch(e.target.value)}
-                placeholder="GIF ara... (Tenor)"
-                onKeyDown={e => e.key === "Enter" && searchGifs()}
-                className="flex-1 h-8"
-                autoFocus
-              />
-              <Button size="sm" className="h-8 px-3" onClick={() => searchGifs()}><Search className="w-3.5 h-3.5" /></Button>
-              <Button size="sm" variant="ghost" className="h-8 px-2" onClick={() => setGifOpen(false)}><X className="w-4 h-4" /></Button>
-            </div>
-            <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto">
-              {gifLoading
-                ? Array(8).fill(0).map((_, i) => <div key={i} className="aspect-square bg-muted rounded animate-pulse" />)
-                : gifs.length === 0
-                  ? <p className="col-span-4 text-center text-xs text-muted-foreground py-4">Sonuç bulunamadı</p>
-                  : gifs.map((gif, i) => (
-                    <button key={i} onClick={() => handleSendGif(gif.url)} className="aspect-square rounded overflow-hidden hover:opacity-80 bg-muted">
-                      <img src={gif.preview} alt="GIF" className="w-full h-full object-cover" loading="lazy" />
-                    </button>
-                  ))
-              }
-            </div>
-            <p className="text-[10px] text-muted-foreground text-right mt-1">Giphy tarafından desteklenmektedir</p>
-          </div>
+          <GifPicker
+            onSelect={(url) => { handleSendGif(url); setGifOpen(false); }}
+            onClose={() => setGifOpen(false)}
+          />
         )}
 
         {/* ── Input bar ── */}
