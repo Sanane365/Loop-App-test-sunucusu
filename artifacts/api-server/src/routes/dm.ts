@@ -327,6 +327,23 @@ router.post("/dm/:userId/media", requireAuth, upload.single("file"), async (req,
   }
 });
 
+// POST /dm/groups/:groupId/voice — group voice message
+router.post("/dm/groups/:groupId/voice", requireAuth, upload.single("file"), async (req, res) => {
+  try {
+    const groupId = parseInt(req.params["groupId"] as string);
+    if (!req.file) { res.status(400).json({ error: "No file" }); return; }
+    const voiceUrl = `/api/uploads/${req.file.filename}`;
+    const voiceDuration = req.body.duration ? parseInt(req.body.duration) : null;
+    const [msg] = await db.insert(dmGroupMessagesTable).values({
+      groupId, senderId: req.user!.id, voiceUrl, voiceDuration,
+    }).returning();
+    res.status(201).json(msg);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /dm/:userId/voice — voice message
 router.post("/dm/:userId/voice", requireAuth, upload.single("file"), async (req, res) => {
   try {

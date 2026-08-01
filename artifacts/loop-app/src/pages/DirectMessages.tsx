@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Send, ImagePlus, ArrowLeft, MessageCircle,
-  Search, SlidersHorizontal, Mic, Pin,
+  Search, SlidersHorizontal, Mic, StopCircle, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
   Camera, Users, Phone, Video, Info, Smile, BadgeCheck, Reply,
@@ -930,6 +930,23 @@ export default function DirectMessages() {
     audio.onended = () => setPlayingVoiceId(null);
   };
 
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    const mr = mediaRecorderRef.current;
+    if (mr) {
+      mediaRecorderRef.current = null;
+      try {
+        mr.ondataavailable = null;
+        mr.onstop = null;
+        if (mr.state !== "inactive") mr.stop();
+        mr.stream.getTracks().forEach(t => t.stop());
+      } catch {}
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
   const stopRecording = async () => {
     if (!mediaRecorderRef.current || !userId) return;
     setIsRecording(false);
@@ -937,10 +954,11 @@ export default function DirectMessages() {
     const mr = mediaRecorderRef.current;
     const duration = recordingSeconds;
     mediaRecorderRef.current = null;
-    mr.stop();
-    mr.stream.getTracks().forEach(t => t.stop());
+    const mimeType = mr.mimeType || "audio/webm";
     mr.onstop = async () => {
-      const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      mr.stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      if (blob.size < 100) return;
       const formData = new FormData();
       formData.append("file", blob, "voice.webm");
       formData.append("duration", String(duration));
@@ -956,6 +974,34 @@ export default function DirectMessages() {
         toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
       }
     };
+    if (mr.state !== "inactive") mr.stop();
+  };
+
+  const stopGroupRecording = async () => {
+    if (!mediaRecorderRef.current || !groupId) return;
+    setIsRecording(false);
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    const mr = mediaRecorderRef.current;
+    const duration = recordingSeconds;
+    const currentGroupId = groupId;
+    mediaRecorderRef.current = null;
+    const mimeType = mr.mimeType || "audio/webm";
+    mr.onstop = async () => {
+      mr.stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(audioChunksRef.current, { type: mimeType });
+      if (blob.size < 100) return;
+      const formData = new FormData();
+      formData.append("file", blob, "voice.webm");
+      formData.append("duration", String(duration));
+      try {
+        const res = await fetch(`/api/dm/groups/${currentGroupId}/voice`, { method: "POST", body: formData });
+        if (res.ok) fetchGroupMessages(parseInt(currentGroupId));
+        else toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
+      } catch {
+        toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
+      }
+    };
+    if (mr.state !== "inactive") mr.stop();
   };
 
   const handleSendGif = async (url: string) => {
@@ -1369,29 +1415,81 @@ export default function DirectMessages() {
               <input ref={groupFileInputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleGroupFileUpload(f); e.target.value = ""; }} />
               <div className="flex items-center gap-2">
-                {/* + butonu */}
-                <button
-                  onClick={() => { setGroupShowPlusMenu(v => !v); setGroupGifOpen(false); }}
-                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
-                >
-                  <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
-                </button>
-                <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
-                  <input
-                    value={groupContent}
-                    onChange={e => { setGroupContent(e.target.value); if (groupShowPlusMenu) setGroupShowPlusMenu(false); }}
-                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); } }}
-                    placeholder="Mesaj yaz…"
-                    className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  />
-                </div>
-                <button
-                  onClick={sendGroupMessage}
-                  disabled={!groupContent.trim() || groupSending}
-                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
-                >
-                  <Send className="w-4 h-4 text-white" />
-                </button>
+                {isRecording ? (
+                  /* ── Grup kayıt modu ── */
+                  <>
+                    <button
+                      onClick={cancelRecording}
+                      className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 hover:bg-muted/70 active:scale-95 transition-all"
+                    >
+                      <X className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                    <div className="flex-1 flex items-center gap-3 bg-red-500/8 border border-red-500/25 rounded-full px-4 h-10">
+                      <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
+                      <span className="text-sm font-semibold text-red-500 tabular-nums min-w-[2.2rem]">
+                        {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")}
+                      </span>
+                      <div className="flex items-center gap-[3px] flex-1">
+                        {[0.6,1,0.75,1,0.5,0.85,1,0.65,0.9,0.7].map((h, i) => (
+                          <span key={i} className="rounded-full bg-red-400/70 flex-shrink-0 animate-pulse"
+                            style={{ width: 3, height: `${h * 18}px`, animationDelay: `${i * 80}ms` }} />
+                        ))}
+                      </div>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">Kayıt yapılıyor</span>
+                    </div>
+                    <button
+                      onClick={stopGroupRecording}
+                      className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+                    >
+                      <Send className="w-4 h-4 text-white" />
+                    </button>
+                  </>
+                ) : (
+                  /* ── Normal grup modu ── */
+                  <>
+                    {/* + butonu */}
+                    <button
+                      onClick={() => { setGroupShowPlusMenu(v => !v); setGroupGifOpen(false); }}
+                      className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+                    >
+                      <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
+                    </button>
+                    <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
+                      <input
+                        value={groupContent}
+                        onChange={e => { setGroupContent(e.target.value); if (groupShowPlusMenu) setGroupShowPlusMenu(false); }}
+                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendGroupMessage(); } }}
+                        placeholder="Mesaj yaz…"
+                        className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+                      />
+                    </div>
+                    {groupContent.trim() ? (
+                      <button
+                        onClick={sendGroupMessage}
+                        disabled={!groupContent.trim() || groupSending}
+                        className="w-10 h-10 rounded-full bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
+                      >
+                        <Send className="w-4 h-4 text-white" />
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-0.5 flex-shrink-0">
+                        <button
+                          onClick={startRecording}
+                          className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground transition-colors"
+                        >
+                          <Mic className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={sendGroupMessage}
+                          disabled={!groupContent.trim() || groupSending}
+                          className="w-10 h-10 rounded-full bg-primary flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 active:scale-95 transition-all flex-shrink-0"
+                        >
+                          <Send className="w-4 h-4 text-white" />
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1799,50 +1897,86 @@ export default function DirectMessages() {
               <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
 
-              {/* + butonu */}
-              <button
-                onClick={() => setShowPlusMenu(v => !v)}
-                className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
-              >
-                <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
-              </button>
-
-              {/* Yazı alanı */}
-              <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
-                <input
-                  value={content}
-                  onChange={e => { setContent(e.target.value); if (showPlusMenu) setShowPlusMenu(false); }}
-                  onKeyDown={e => e.key === "Enter" && handleSend()}
-                  placeholder="Mesaj yaz..."
-                  className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
-                />
-              </div>
-
-              {/* Sağ butonlar */}
-              {content.trim() ? (
-                <button
-                  onClick={handleSend}
-                  disabled={sending}
-                  className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4 text-primary-foreground" />
-                </button>
-              ) : (
-                <div className="flex items-center gap-0.5 flex-shrink-0">
-                  <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                    <Smile className="w-5 h-5" />
-                  </button>
+              {isRecording ? (
+                /* ── Kayıt modu — tam input bar'ı kaplar ── */
+                <>
+                  {/* İptal */}
                   <button
-                    onPointerDown={startRecording}
-                    onPointerUp={stopRecording}
-                    className={`w-9 h-9 flex items-center justify-center rounded-full transition-colors ${isRecording ? "bg-red-500 text-white animate-pulse" : "hover:bg-muted text-muted-foreground"}`}
+                    onClick={cancelRecording}
+                    className="w-10 h-10 rounded-full bg-muted flex items-center justify-center flex-shrink-0 hover:bg-muted/70 active:scale-95 transition-all"
                   >
-                    <Mic className="w-5 h-5" />
+                    <X className="w-4 h-4 text-muted-foreground" />
                   </button>
-                  {isRecording && (
-                    <span className="text-[11px] text-red-500 font-semibold animate-pulse">{recordingSeconds}s</span>
+
+                  {/* Kayıt göstergesi */}
+                  <div className="flex-1 flex items-center gap-3 bg-red-500/8 border border-red-500/25 rounded-full px-4 h-10">
+                    <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
+                    <span className="text-sm font-semibold text-red-500 tabular-nums min-w-[2.2rem]">
+                      {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")}
+                    </span>
+                    {/* Dalga animasyonu */}
+                    <div className="flex items-center gap-[3px] flex-1">
+                      {[0.6,1,0.75,1,0.5,0.85,1,0.65,0.9,0.7].map((h, i) => (
+                        <span key={i} className="rounded-full bg-red-400/70 flex-shrink-0 animate-pulse"
+                          style={{ width: 3, height: `${h * 18}px`, animationDelay: `${i * 80}ms` }} />
+                      ))}
+                    </div>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">Kayıt yapılıyor</span>
+                  </div>
+
+                  {/* Gönder */}
+                  <button
+                    onClick={stopRecording}
+                    className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+                  >
+                    <Send className="w-4 h-4 text-primary-foreground" />
+                  </button>
+                </>
+              ) : (
+                /* ── Normal mod ── */
+                <>
+                  {/* + butonu */}
+                  <button
+                    onClick={() => setShowPlusMenu(v => !v)}
+                    className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
+                  >
+                    <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
+                  </button>
+
+                  {/* Yazı alanı */}
+                  <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
+                    <input
+                      value={content}
+                      onChange={e => { setContent(e.target.value); if (showPlusMenu) setShowPlusMenu(false); }}
+                      onKeyDown={e => e.key === "Enter" && handleSend()}
+                      placeholder="Mesaj yaz..."
+                      className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Sağ butonlar */}
+                  {content.trim() ? (
+                    <button
+                      onClick={handleSend}
+                      disabled={sending}
+                      className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4 text-primary-foreground" />
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                      <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
+                        <Smile className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={startRecording}
+                        className="w-9 h-9 flex items-center justify-center rounded-full transition-colors hover:bg-muted text-muted-foreground"
+                      >
+                        <Mic className="w-5 h-5" />
+                      </button>
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

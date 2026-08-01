@@ -280,6 +280,23 @@ export default function Chat() {
     }
   };
 
+  const cancelRecording = () => {
+    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
+    const mr = mediaRecorderRef.current;
+    if (mr) {
+      mediaRecorderRef.current = null;
+      try {
+        mr.ondataavailable = null;
+        mr.onstop = null;
+        if (mr.state !== "inactive") mr.stop();
+        mr.stream.getTracks().forEach(t => t.stop());
+      } catch {}
+    }
+    audioChunksRef.current = [];
+    setIsRecording(false);
+    setRecordingSeconds(0);
+  };
+
   const stopRecording = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     if (mediaRecorderRef.current && isRecording) {
@@ -675,15 +692,6 @@ export default function Chat() {
             </div>
           )}
 
-          {/* Recording indicator */}
-          {isRecording && (
-            <div className="flex items-center gap-2 px-1 pb-2">
-              <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
-              <span className="text-xs text-destructive font-medium">Kaydediliyor... {recordingSeconds}s</span>
-              <span className="text-xs text-muted-foreground ml-auto">Dur butonuna bas</span>
-            </div>
-          )}
-
           <input
             ref={fileInputRef}
             type="file"
@@ -693,59 +701,92 @@ export default function Chat() {
           />
 
           <div className="flex items-center gap-2">
-            {/* + button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors flex-shrink-0"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
+            {isRecording ? (
+              /* ── Kayıt modu ── */
+              <>
+                {/* İptal */}
+                <button
+                  onClick={cancelRecording}
+                  className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:bg-muted transition-colors flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
 
-            {/* Emoji / GIF */}
-            <button
-              onClick={openGifPicker}
-              className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors flex-shrink-0 ${gifOpen ? "border-primary bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted"}`}
-            >
-              <Smile className="w-5 h-5" />
-            </button>
+                {/* Kayıt göstergesi */}
+                <div className="flex-1 flex items-center gap-3 bg-red-500/8 border border-red-500/25 rounded-full px-4 h-11">
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
+                  <span className="text-sm font-semibold text-red-500 tabular-nums min-w-[2.4rem]">
+                    {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")}
+                  </span>
+                  {/* Dalga animasyonu */}
+                  <div className="flex items-center gap-[3px] flex-1">
+                    {[0.5,0.9,0.65,1,0.75,0.55,1,0.8,0.6,0.95,0.7].map((h, i) => (
+                      <span key={i} className="rounded-full bg-red-400/70 flex-shrink-0 animate-pulse"
+                        style={{ width: 3, height: `${h * 20}px`, animationDelay: `${i * 70}ms` }} />
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">Kayıt yapılıyor</span>
+                </div>
 
-            {/* Text input */}
-            <div className="flex-1 relative">
-              <Input
-                ref={inputRef}
-                placeholder={isRecording ? "Kaydediliyor..." : "Mesajını yaz..."}
-                value={content}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                className="rounded-full h-11 bg-muted/60 border-transparent focus-visible:ring-1 focus-visible:ring-primary/30 pr-4 pl-5 text-sm"
-                disabled={isRecording}
-              />
-            </div>
-
-            {/* Send / Mic / Stop */}
-            {content.trim() ? (
-              <Button
-                size="icon"
-                className="rounded-full w-11 h-11 flex-shrink-0 bg-primary hover:bg-primary/90 shadow-md"
-                onClick={handleSend}
-                disabled={sendMutation.isPending}
-              >
-                <Send className="w-5 h-5" />
-              </Button>
-            ) : isRecording ? (
-              <button
-                onClick={stopRecording}
-                className="w-11 h-11 rounded-full flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-md flex-shrink-0 transition-colors"
-              >
-                <StopCircle className="w-5 h-5" />
-              </button>
+                {/* Gönder */}
+                <Button
+                  size="icon"
+                  className="rounded-full w-11 h-11 flex-shrink-0 bg-primary hover:bg-primary/90 shadow-md"
+                  onClick={stopRecording}
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </>
             ) : (
-              <button
-                onClick={startRecording}
-                className="w-11 h-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-md flex-shrink-0 transition-colors"
-              >
-                <Mic className="w-5 h-5" />
-              </button>
+              /* ── Normal mod ── */
+              <>
+                {/* + button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-foreground hover:bg-muted transition-colors flex-shrink-0"
+                >
+                  <Plus className="w-5 h-5" />
+                </button>
+
+                {/* Emoji / GIF */}
+                <button
+                  onClick={openGifPicker}
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors flex-shrink-0 ${gifOpen ? "border-primary bg-primary/10 text-primary" : "border-border text-foreground hover:bg-muted"}`}
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
+
+                {/* Text input */}
+                <div className="flex-1 relative">
+                  <Input
+                    ref={inputRef}
+                    placeholder="Mesajını yaz..."
+                    value={content}
+                    onChange={handleInputChange}
+                    onKeyDown={handleKeyDown}
+                    className="rounded-full h-11 bg-muted/60 border-transparent focus-visible:ring-1 focus-visible:ring-primary/30 pr-4 pl-5 text-sm"
+                  />
+                </div>
+
+                {/* Send / Mic */}
+                {content.trim() ? (
+                  <Button
+                    size="icon"
+                    className="rounded-full w-11 h-11 flex-shrink-0 bg-primary hover:bg-primary/90 shadow-md"
+                    onClick={handleSend}
+                    disabled={sendMutation.isPending}
+                  >
+                    <Send className="w-5 h-5" />
+                  </Button>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    className="w-11 h-11 rounded-full flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 shadow-md flex-shrink-0 transition-colors"
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
