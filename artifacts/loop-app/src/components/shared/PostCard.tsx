@@ -1,6 +1,7 @@
 import { Post, useLikePost, useUnlikePost, useRepostPost, useBookmarkPost, getListPostsQueryKey, useListComments, useCreateComment, getListCommentsQueryKey } from "@workspace/api-client-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Heart, MessageCircle, Bookmark, Send, MoreHorizontal, Music2, Plus, Repeat2, X, Smile, ImagePlus, Search, Pin } from "lucide-react";
+import GifPicker from "@/components/shared/GifPicker";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -88,39 +89,6 @@ function CommentBottomSheet({
   const commentMediaRef = useRef<HTMLInputElement>(null);
   // GIF panel
   const [gifPanelOpen, setGifPanelOpen] = useState(false);
-  const [gifQuery, setGifQuery] = useState("");
-  const [gifResults, setGifResults] = useState<any[]>([]);
-  const [gifLoading, setGifLoading] = useState(false);
-  const [trendingGifs, setTrendingGifs] = useState<any[]>([]);
-
-  const GIPHY_KEY = "dc6zaTOxFJmzC";
-  const mapGiphyResults = (data: any[]) =>
-    (data ?? []).map((g: any) => ({
-      id: g.id,
-      url: g.images?.original?.url ?? g.images?.fixed_height?.url ?? "",
-      preview: g.images?.fixed_height_still?.url ?? g.images?.downsized_still?.url ?? g.images?.fixed_height?.url ?? "",
-      title: g.title ?? "",
-    })).filter((g: any) => g.url);
-
-  useEffect(() => {
-    if (gifPanelOpen && trendingGifs.length === 0) {
-      fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`)
-        .then(r => r.json())
-        .then(data => setTrendingGifs(mapGiphyResults(data.data ?? [])))
-        .catch(() => {});
-    }
-  }, [gifPanelOpen]);
-
-  const searchGifs = useCallback(async (q: string) => {
-    setGifQuery(q);
-    if (!q.trim()) { setGifResults([]); return; }
-    setGifLoading(true);
-    try {
-      const r = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(q)}&limit=24&rating=g`);
-      const data = await r.json();
-      setGifResults(mapGiphyResults(data.data ?? []));
-    } finally { setGifLoading(false); }
-  }, []);
 
   const handleCommentMediaSelect = async (file: File) => {
     setCommentMediaUploading(true);
@@ -442,58 +410,10 @@ function CommentBottomSheet({
 
         {/* GIF Panel */}
         {gifPanelOpen && (
-          <div className="border-t border-border/60 bg-background flex flex-col" style={{ height: 280 }}>
-            {/* GIF Search header */}
-            <div className="px-3 py-2 flex items-center gap-2">
-              <div className="flex-1 flex items-center gap-2 bg-muted rounded-full px-3 py-1.5">
-                <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                <input
-                  autoFocus
-                  value={gifQuery}
-                  onChange={e => searchGifs(e.target.value)}
-                  placeholder="GIF ara..."
-                  className="flex-1 bg-transparent text-sm focus:outline-none"
-                />
-                {gifQuery && (
-                  <button onClick={() => searchGifs("")} className="text-muted-foreground">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-              <button onClick={() => { setGifPanelOpen(false); setGifQuery(""); setGifResults([]); }}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground flex-shrink-0">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            {/* GIF Results grid */}
-            <div className="flex-1 overflow-y-auto px-3 pb-2">
-              {gifLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : (() => {
-                const displayGifs = gifQuery ? gifResults : trendingGifs;
-                if (displayGifs.length === 0) return (
-                  <p className="text-center text-muted-foreground text-sm py-8">
-                    {gifQuery ? "GIF bulunamadı" : "Yükleniyor..."}
-                  </p>
-                );
-                return (
-                  <div className="grid grid-cols-3 gap-1">
-                    {displayGifs.map((gif: any) => (
-                      <button
-                        key={gif.id}
-                        onClick={() => { setCommentMediaUrl(gif.url); setGifPanelOpen(false); setGifQuery(""); setGifResults([]); }}
-                        className="aspect-video rounded-lg overflow-hidden bg-muted hover:opacity-90 transition-opacity"
-                      >
-                        <img src={gif.preview || gif.url} alt={gif.title} className="w-full h-full object-cover" loading="lazy" />
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
+          <GifPicker
+            onSelect={(url) => { setCommentMediaUrl(url); setGifPanelOpen(false); }}
+            onClose={() => setGifPanelOpen(false)}
+          />
         )}
 
         {/* Input bar */}

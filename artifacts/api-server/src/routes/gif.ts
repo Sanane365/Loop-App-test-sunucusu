@@ -2,8 +2,7 @@ import { Router } from "express";
 
 interface GifEntry { id: string; tags: string[] }
 
-// Curated GIFs collected via real web search — verified Giphy IDs
-// CDN access: media.giphy.com/media/{id}/giphy.gif (no API key needed)
+// 409 curated GIFs — Giphy CDN (no API key needed)
 const GIF_DB: GifEntry[] = [
   { id: "tQRqcmNZGioi0FSsSE", tags: ["güldüm"] },
   { id: "jR6093wTUVjGOyy6ky", tags: ["alkış"] },
@@ -12,36 +11,36 @@ const GIF_DB: GifEntry[] = [
   { id: "72Wls01w3r0CQ", tags: ["alkış"] },
   { id: "ZUyWobgQuK2LC", tags: ["alkış"] },
   { id: "2Ap4K8iVUpbpmbj5oV", tags: ["şaşırdım"] },
-  { id: "139jOF4Yp757QA", tags: ["şaşırdım"] },
-  { id: "l3ih6qeGrTfPO", tags: ["şaşırdım"] },
-  { id: "m86JBzYYVTOCDdt9NG", tags: ["şaşırdım"] },
-  { id: "htdvFspxfRKZCUfnkd", tags: ["şaşırdım"] },
-  { id: "xfQk67w5fRRx6", tags: ["şaşırdım"] },
+  { id: "139jOF4Yp757QA", tags: ["şaşırdım","wow","omg","surprised"] },
+  { id: "l3ih6qeGrTfPO", tags: ["şaşırdım","wow","omg","shocked","mind blown"] },
+  { id: "m86JBzYYVTOCDdt9NG", tags: ["şaşırdım","wow","omg","shocked","mind blown","surprised"] },
+  { id: "htdvFspxfRKZCUfnkd", tags: ["şaşırdım","wow","omg","shocked","mind blown","surprised"] },
+  { id: "xfQk67w5fRRx6", tags: ["şaşırdım","wow","omg","shocked","mind blown"] },
   { id: "vV81KcJ9Eu15m", tags: ["şaşırdım"] },
   { id: "3rbgfDhejdvCjdwZ5z", tags: ["sinirli"] },
   { id: "qkSizynazBx8c9XBHk", tags: ["sinirli"] },
   { id: "eGmgBsEd4om2vdv1wj", tags: ["sinirli"] },
   { id: "yVAFa8MvMfttDVmueT", tags: ["sinirli"] },
-  { id: "l2QDSXX9La8fefayk", tags: ["sinirli"] },
+  { id: "l2QDSXX9La8fefayk", tags: ["sinirli","kızgın","angry","mad","rage"] },
   { id: "HK5OYOd5kARVShtvOH", tags: ["sinirli"] },
   { id: "cOFCcLpvXq4wUVIS98", tags: ["sinirli"] },
   { id: "lmjH3ZuG6VzZ6CGedg", tags: ["sinirli"] },
   { id: "hoJ7PzwaNWig5CNAiB", tags: ["sinirli"] },
-  { id: "KeAz2VFEfSuytSgt3X", tags: ["sinirli"] },
-  { id: "je1y5TjM8mJEJZWaVK", tags: ["sinirli"] },
-  { id: "h3jKokL0e34nta0Q4e", tags: ["sinirli"] },
+  { id: "KeAz2VFEfSuytSgt3X", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "je1y5TjM8mJEJZWaVK", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "h3jKokL0e34nta0Q4e", tags: ["sinirli","kızgın","angry","mad","rage"] },
   { id: "kQEORUrXRjhp5fBdSa", tags: ["üzgün"] },
   { id: "dTTt9Oeomo02KlfZAA", tags: ["üzgün"] },
   { id: "G6Ni6DOjzSx6VXv5tu", tags: ["evet"] },
-  { id: "VDZmkSjlLuGEouluyf", tags: ["evet"] },
-  { id: "tIijMNDQNOCIUzpLHX", tags: ["evet"] },
+  { id: "VDZmkSjlLuGEouluyf", tags: ["evet","tamam","yes","nodding","agree","ok"] },
+  { id: "tIijMNDQNOCIUzpLHX", tags: ["evet","tamam","yes","nodding","agree","ok"] },
   { id: "26gR0oDUX1iiOrX8s", tags: ["evet"] },
-  { id: "tU6lnCZ5ykOIfT7OnH", tags: ["evet"] },
+  { id: "tU6lnCZ5ykOIfT7OnH", tags: ["evet","tamam","yes","nodding","agree","ok"] },
   { id: "9kOYL9PCwGVMDlJLNB", tags: ["evet"] },
   { id: "11ZAUfeJHojWlW", tags: ["evet"] },
-  { id: "L5WTptHVTYJW2VSEkY", tags: ["evet"] },
+  { id: "L5WTptHVTYJW2VSEkY", tags: ["evet","tamam","yes","nodding","agree","ok"] },
   { id: "nuc8iVsOfVKWfI5nRF", tags: ["evet"] },
-  { id: "Wmixi1SxGaDa5uQHwN", tags: ["hayır"] },
+  { id: "Wmixi1SxGaDa5uQHwN", tags: ["hayır","ret","no","nope","shaking head"] },
   { id: "kv7WCzUhMtHrudV4Pa", tags: ["hayır"] },
   { id: "gdjyA2uDwyt1pJEbt0", tags: ["hayır"] },
   { id: "CHC4hgk4jsTwoE4rvU", tags: ["hayır"] },
@@ -70,30 +69,30 @@ const GIF_DB: GifEntry[] = [
   { id: "lXCQNy6VTwmk0", tags: ["kedi"] },
   { id: "S0Nokl7V0t4mfoYkLF", tags: ["kedi"] },
   { id: "69yrZWuu7clVYvmtJi", tags: ["kedi"] },
-  { id: "v3Rb7dGuvkmaRi6qei", tags: ["kedi"] },
+  { id: "v3Rb7dGuvkmaRi6qei", tags: ["kedi","cat","funny cat","cute cat"] },
   { id: "Qs5khBKll3CazwLauS", tags: ["kedi"] },
   { id: "xjQBgPt47ri0AwiktC", tags: ["kedi"] },
   { id: "WaugJpjO79kDm", tags: ["kedi"] },
-  { id: "kqdQrMWPlNhsc", tags: ["köpek"] },
-  { id: "VzLR6oO6MzybC", tags: ["köpek"] },
-  { id: "S2S0ZDytY6yDm", tags: ["köpek"] },
-  { id: "WhCYptDg5hgIg", tags: ["köpek"] },
-  { id: "GSsTZNQjPvl1m", tags: ["köpek"] },
-  { id: "TAuI4vAYY3DMs", tags: ["köpek"] },
-  { id: "bswGDO7Rh1ONO", tags: ["köpek"] },
-  { id: "AtwrcuevjPsys", tags: ["köpek"] },
+  { id: "kqdQrMWPlNhsc", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "VzLR6oO6MzybC", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "S2S0ZDytY6yDm", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "WhCYptDg5hgIg", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "GSsTZNQjPvl1m", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "TAuI4vAYY3DMs", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "bswGDO7Rh1ONO", tags: ["köpek","dog","dog dance","doggo"] },
+  { id: "AtwrcuevjPsys", tags: ["köpek","dog","dog dance","doggo"] },
   { id: "1qXjpdPzz3aWHlnz1t", tags: ["harika"] },
   { id: "mIyXvKYv6kC0RlNQTz", tags: ["harika"] },
   { id: "AFXocrxzQelfKknViC", tags: ["harika"] },
   { id: "l3mZgExbJ2UO5iYve", tags: ["harika"] },
   { id: "3o7TKU0L1SunX1osRa", tags: ["yüzüstü"] },
   { id: "jHtCucEdYCvoubazGV", tags: ["yüzüstü"] },
-  { id: "113RhN1oBm1yCc", tags: ["yüzüstü"] },
-  { id: "YmszCwM1FV7zCI8sgL", tags: ["yüzüstü"] },
+  { id: "113RhN1oBm1yCc", tags: ["yüzüstü","facepalm","embarrassed","cringe"] },
+  { id: "YmszCwM1FV7zCI8sgL", tags: ["yüzüstü","facepalm","embarrassed","cringe"] },
   { id: "Q87R3mHsLb76hz316R", tags: ["yüzüstü"] },
   { id: "WrP4rFrWxu4IE", tags: ["yüzüstü"] },
   { id: "y1p8hsBerk4zDH6ZkP", tags: ["yüzüstü"] },
-  { id: "5P08a98uUAblPogXDh", tags: ["düşünüyor"] },
+  { id: "5P08a98uUAblPogXDh", tags: ["düşünüyor","hmm","thinking","considering"] },
   { id: "diTkQJ2u8eb9EfC1g0", tags: ["komik"] },
   { id: "6HkVXyGlEENu6jc3zl", tags: ["komik"] },
   { id: "qOdPEpFbhiDApOifkf", tags: ["komik"] },
@@ -104,11 +103,11 @@ const GIF_DB: GifEntry[] = [
   { id: "ROUsJFxUvhIc04idnS", tags: ["bekliyorum"] },
   { id: "sct1vVwuu5ezTCEvZM", tags: ["bekliyorum"] },
   { id: "tPLWcqyFWxsJsEwXbF", tags: ["bekliyorum"] },
-  { id: "lP4jmO461gq9uLzzYc", tags: ["bekliyorum"] },
+  { id: "lP4jmO461gq9uLzzYc", tags: ["bekliyorum","waiting","patience","still waiting"] },
   { id: "oTTzBnha8IPzLz9LQm", tags: ["güldüm"] },
   { id: "iGMgyPBVEle2qx2WTd", tags: ["güldüm"] },
   { id: "6A7syj9zCRCNHEMCbs", tags: ["güldüm"] },
-  { id: "XZg7QTxeAkX7kWaqHj", tags: ["alkış"] },
+  { id: "XZg7QTxeAkX7kWaqHj", tags: ["alkış","bravo","clap","applause","well done"] },
   { id: "t8qMjPqpf4cdKvIsu0", tags: ["alkış"] },
   { id: "cir6HswNwNaYGpP2h6", tags: ["alkış"] },
   { id: "1UZ7RmGtCXTAeMX3Fo", tags: ["alkış"] },
@@ -121,15 +120,15 @@ const GIF_DB: GifEntry[] = [
   { id: "RJTFOm5rmmzIuiqSBB", tags: ["şaşırdım"] },
   { id: "tLOJY4o0sbDMcT50D3", tags: ["şaşırdım"] },
   { id: "McJS9pPeiaD9aKeUOV", tags: ["şaşırdım"] },
-  { id: "wpb0EGffFtjz415M11", tags: ["sinirli"] },
-  { id: "egAFSxBaTdfarrVQkD", tags: ["sinirli"] },
-  { id: "JHL3Afuumaoq4", tags: ["sinirli"] },
-  { id: "1fmBxX0HfpTKNtpWAf", tags: ["sinirli"] },
-  { id: "JEVYf4g2ePr6o", tags: ["sinirli"] },
-  { id: "xUNda1PU3BKwQVo2nm", tags: ["sinirli"] },
+  { id: "wpb0EGffFtjz415M11", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "egAFSxBaTdfarrVQkD", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "JHL3Afuumaoq4", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "1fmBxX0HfpTKNtpWAf", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "JEVYf4g2ePr6o", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "xUNda1PU3BKwQVo2nm", tags: ["sinirli","kızgın","frustrated","annoyed"] },
   { id: "oz7tyUbBs5SH6", tags: ["sinirli"] },
-  { id: "SwlzysgueUzei1jsHs", tags: ["sinirli"] },
-  { id: "ql4LidslabKpi", tags: ["sinirli"] },
+  { id: "SwlzysgueUzei1jsHs", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "ql4LidslabKpi", tags: ["sinirli","kızgın","frustrated","annoyed"] },
   { id: "D07KTyMvnhYf6WQF2N", tags: ["sinirli"] },
   { id: "m4L2xe2qgTVzq", tags: ["sinirli"] },
   { id: "8NKutBxqvZGOH7KWxs", tags: ["üzgün"] },
@@ -182,12 +181,12 @@ const GIF_DB: GifEntry[] = [
   { id: "H4DjXQXamtTiIuCcRU", tags: ["kedi"] },
   { id: "kOEYOwSaKbFra", tags: ["köpek"] },
   { id: "nLkYoleEY5iJW", tags: ["köpek"] },
-  { id: "z0GxIl4nsWBB39WU46", tags: ["köpek"] },
-  { id: "wyxDfsIVXtjkoOjX9o", tags: ["köpek"] },
+  { id: "z0GxIl4nsWBB39WU46", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "wyxDfsIVXtjkoOjX9o", tags: ["köpek","dog","cute dog","puppy"] },
   { id: "uYV7xN7U8EbXa", tags: ["köpek"] },
   { id: "lXyIjwxAC1RPxpJXJ5", tags: ["köpek"] },
   { id: "gWkCsQZ4YlU1a", tags: ["köpek"] },
-  { id: "14MjVpzfpuzqE", tags: ["köpek"] },
+  { id: "14MjVpzfpuzqE", tags: ["köpek","dog","cute dog","puppy"] },
   { id: "jp2KXzsPtoKFG", tags: ["köpek"] },
   { id: "moMd5EntFglTG", tags: ["köpek"] },
   { id: "3o72EZy5UgQhF2hvZ6", tags: ["köpek"] },
@@ -218,11 +217,11 @@ const GIF_DB: GifEntry[] = [
   { id: "CF8Lh2sE1r0zFWVCWf", tags: ["düşünüyor"] },
   { id: "ehcOA2WtivMSBmZaH2", tags: ["düşünüyor"] },
   { id: "5FoxedYWNVmO4", tags: ["düşünüyor"] },
-  { id: "yxJY6QwwaNFJuZmVJ4", tags: ["ateş"] },
-  { id: "IygqIaVn3ISRjPqjA3", tags: ["ateş"] },
-  { id: "DSgpE3HA3rtIJHpyCp", tags: ["ateş"] },
-  { id: "mjjXtyaoQJ6BlhkpWp", tags: ["ateş"] },
-  { id: "LavaqctMFvQlsPSjjd", tags: ["ateş"] },
+  { id: "yxJY6QwwaNFJuZmVJ4", tags: ["ateş","evet","tamam","yes","deal","perfect"] },
+  { id: "IygqIaVn3ISRjPqjA3", tags: ["ateş","evet","tamam","yes","deal","perfect"] },
+  { id: "DSgpE3HA3rtIJHpyCp", tags: ["ateş","evet","tamam","yes","deal","perfect","fire","hot","this is fine"] },
+  { id: "mjjXtyaoQJ6BlhkpWp", tags: ["ateş","evet","tamam","yes","deal","perfect","fire","hot","this is fine"] },
+  { id: "LavaqctMFvQlsPSjjd", tags: ["ateş","fire","hot","this is fine"] },
   { id: "KaBZrQq6gZFL8zZ75t", tags: ["bekliyorum"] },
   { id: "utBcMmLp056Tu", tags: ["güldüm"] },
   { id: "RJys0b93KSKYz6M7B1", tags: ["güldüm"] },
@@ -238,81 +237,289 @@ const GIF_DB: GifEntry[] = [
   { id: "WT8pzD8MgX2cPgzejY", tags: ["şaşırdım"] },
   { id: "l0HUkpFVvr3yBQjFm", tags: ["şaşırdım"] },
   { id: "NFrtVQoZ6EPJ80hqbG", tags: ["evet"] },
-  { id: "3RTwofMK6batOxnSKL", tags: ["evet"] }
+  { id: "3RTwofMK6batOxnSKL", tags: ["evet"] },
+  { id: "l22ysLe54hZP0wubek", tags: ["güldüm","komik","funny","hilarious","cracking up"] },
+  { id: "3oEdv0LJmhh8Yb7sti", tags: ["güldüm","komik","funny","rofl"] },
+  { id: "la0TIMBCoSuwq6iXaS", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "SWrUcFhRL4HGU", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "sAUOYi6YYfKgw", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "At2UrCZFTNxmw", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "ZgSsqSMG2qJNsBB1gd", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "WigoI4GdrDEcw", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "4ag5eh5D2KKcnXiVTk", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "XaO0MRvwS19DFNSLau", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "db4KHETg0lezS", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "m6MGRRtflkvLvLLzgx", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "jqarbfe3zU0Ja", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "l41Yxy7jKreOwXpMk", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "HPShpPmC1KTd63niRa", tags: ["güldüm","komik","funny","giggle"] },
+  { id: "cDQxtmx1Eur7AujV3g", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "dVtGcobFMRXO0", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "MqqZykfPyrKeY", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "ZcMBXFs59jQ210kVQ9", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "MfIGtdhq6Q9aM", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "98pZs1ZVaWb1C", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "lgPbzbqOnNDYUb96St", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "Tx31SO2uptOpuBoPyu", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "BnJNRAWA2LRn9vFM67", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "CF1PeWOAv68la", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "Dj20lTIsMnKnVgzrgN", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "sQQCDrIIsJjFY8qEPN", tags: ["güldüm","komik","trolled","prank"] },
+  { id: "2QT7HDNIWhq0uQZvEY", tags: ["alkış","bravo","clap","applause","well done"] },
+  { id: "Tt4FF5T2BCULZuMMy8", tags: ["alkış","bravo","clap","applause","well done"] },
+  { id: "71v8rVRnN9KUCFufnA", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "wIJeKlge5gbpXcPprk", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "l4KhY4yWGATiaopC8", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "c9P5fG3rIaZw6YW6uf", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "3kFiSd6q9cHbFH3DeA", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "7DTiCFyTZQVZlj7AJD", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "26BRseBUy22Acsy2s", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "QakGl9G79ZL3VeGmuo", tags: ["alkış","bravo","standing ovation","clap"] },
+  { id: "LpLd2NGvpaiys", tags: ["şaşırdım","wow","omg","shocked","mind blown"] },
+  { id: "aWPGuTlDqq2yc", tags: ["şaşırdım","wow","omg","shocked","mind blown","surprised"] },
+  { id: "ZK92FCOPbY8JaFhiMM", tags: ["şaşırdım","wow","omg","shocked","mind blown"] },
+  { id: "3OSo3PPaXdw0U", tags: ["şaşırdım","wow","omg","shocked","mind blown"] },
+  { id: "3o6gDPXMNxFhvHdcf6", tags: ["şaşırdım","wow","omg","surprised"] },
+  { id: "aOtJcoqnRK1uU", tags: ["şaşırdım","jaw drop","amazed","unbelievable"] },
+  { id: "LAPgyvIKblMyY", tags: ["şaşırdım","jaw drop","amazed","unbelievable"] },
+  { id: "22Veov81ca3Tj4Lric", tags: ["şaşırdım","jaw drop","amazed","unbelievable"] },
+  { id: "l0HlSn7erUO84nSpi", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "XB9xGaYesaA2Irgm7r", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "D4O39qBrWRPCE", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "hJUHoFaWf4MTSTuKmK", tags: ["sinirli","kızgın","angry","mad","rage"] },
+  { id: "jRrBSb1AtDXkQ4Ggcf", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "VudtXOXsLbdWEQbN7h", tags: ["sinirli","kızgın","frustrated","annoyed"] },
+  { id: "AzdZrT9OGEIyQ", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "ohQVnNtbazaTE8pnmO", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "iVWZdpRwUmssXcjY1q", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "gpSFX1H4Y73ciMEWAf", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "ntjBjvfnakKJ2", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "vHcCevWbWkzwk", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "JpYcxYYbozSiJjPMg6", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "XZOLSRM10XjJ9Zjrvh", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "m8fyrgnXwXV5EHw6Lm", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "MLhIi4DoxeUjC", tags: ["sinirli","kızgın","furious","angry"] },
+  { id: "k3CgGXptphB1ijjSoM", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "RoWncp3HioSBd6ubrt", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "3zeyFPkdzl8J1uch4Q", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "8MMSy2jaQj7RiSn3I7", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "U97UpCZaRQr4txXqn7", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "G32DEBQfGiZTa", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "kzs3OEZTltXVSUQm7G", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "1a0bXIep4jrY4", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "Dv3T3WPnQheWA", tags: ["üzgün","ağlıyorum","heartbroken","sad"] },
+  { id: "HpHQW7kfWguyT8oqnO", tags: ["evet","tamam","yes","nodding","agree","ok"] },
+  { id: "5BvUHySgi3G3FdKHyl", tags: ["evet","tamam","yes","nodding","agree","ok"] },
+  { id: "3ohhwG6fLYEvymSjLy", tags: ["evet","tamam","yes","nodding","agree","ok"] },
+  { id: "J7sux4qgTWbwqLVj7W", tags: ["evet","tamam","yes","deal","perfect"] },
+  { id: "xZdDI3uPtqujTE8usj", tags: ["evet","tamam","yes","deal","perfect"] },
+  { id: "wJPou1dis1l2OENxGZ", tags: ["evet","tamam","yes","deal","perfect"] },
+  { id: "k0j7F48ySCcri4vm6E", tags: ["evet","tamam","yes","deal","perfect"] },
+  { id: "szk8XT0YXd1fsX26ZJ", tags: ["evet","tamam","yes","deal","perfect"] },
+  { id: "qbP4VCFis1I0c5CCwW", tags: ["hayır","ret","no","nope","shaking head"] },
+  { id: "GXI5WRfFs3TQV6p1cv", tags: ["dans","dance","dancing","party","groove"] },
+  { id: "ulmAxfaz9JGzgJVHBa", tags: ["dans","dance","dancing","party","groove"] },
+  { id: "Dhs8qM3AB3s0DxtjtH", tags: ["dans","dance","dancing","moves"] },
+  { id: "9YlhdI9SSP0Qw", tags: ["dans","dance","dancing","moves"] },
+  { id: "2Fazg78fL1pycJnnW", tags: ["dans","dance","dancing","moves"] },
+  { id: "kFNmWrwrxkkMe511rL", tags: ["dans","dance","dancing","twerk"] },
+  { id: "ujTVMASREzuRbH6zy5", tags: ["dans","dance","dancing","twerk"] },
+  { id: "eEySgoykJgnkaMzb7M", tags: ["dans","dance","dancing","twerk"] },
+  { id: "chQjM2hPlZcc545RfN", tags: ["dans","dance","dancing","twerk"] },
+  { id: "cMiTkdUNSyH8FeMz6A", tags: ["dans","dance","dancing","twerk"] },
+  { id: "98aH6L2KmB901mMEox", tags: ["dans","dance","dancing","twerk"] },
+  { id: "GgikfA7T6qCCX6L0vt", tags: ["dans","dance","dancing","twerk"] },
+  { id: "YbXtbKoi2ZUOc", tags: ["dans","dance","dancing","twerk"] },
+  { id: "0eMLDAv9hsmX5ZDkxk", tags: ["dans","dance","dancing","twerk"] },
+  { id: "12uhzw7y9aB8v6", tags: ["dans","dance","dancing","twerk"] },
+  { id: "LppbKgWOmkfvl9pSuE", tags: ["dans","dance","dancing","twerk"] },
+  { id: "RLPfQJD9FMylvaGGe3", tags: ["kutlama","tebrikler","congrats","celebrate"] },
+  { id: "0ksns8g525Jg5t7aTM", tags: ["kutlama","tebrikler","congrats","celebrate"] },
+  { id: "sc0oS256ZRnjl1CIaX", tags: ["kutlama","tebrikler","birthday","happy birthday"] },
+  { id: "l0K4gzSzP3ZNtQ0da", tags: ["aşk","sevgi","love","hug","cuddle"] },
+  { id: "hJioaFkX7sjSe7Tkd1", tags: ["aşk","sevgi","kiss","love"] },
+  { id: "vhteAnlzV4XYEwSqkf", tags: ["aşk","sevgi","kiss","love"] },
+  { id: "oYIfRmGWWlpIMjJEB5", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "rPTz4rCwEy4Oa1XFXQ", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "CK5gKBdBXdGtVv6AfG", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "SHaEVN9cmuFYSMHnea", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "WpfsKsTXfFG3ZyUx53", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "umxRbhpV3joNMeS4Xx", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "bgmyhLRXlc9tBmpDxp", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "hECJDGJs4hQjjWLqRV", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "oGlg0oQJ6yiRO", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "8sylDk7OAYpILGzazN", tags: ["kedi","cat","funny cat","cute cat"] },
+  { id: "WNTnNwVIpVsKYCwweJ", tags: ["kedi","cat","cat meme","grumpy cat"] },
+  { id: "xd4gsriuz5UgiSwGkR", tags: ["kedi","cat","cat meme","grumpy cat"] },
+  { id: "NxwRDSUNzXshW", tags: ["kedi","cat","cat meme","grumpy cat"] },
+  { id: "EU2mR9AQs3AEo", tags: ["kedi","cat","cat meme","grumpy cat"] },
+  { id: "ClDNwhJ1xPm1SbcJp8", tags: ["kedi","cat","cat meme","grumpy cat"] },
+  { id: "dNLrXbRlB5wKNB3z57", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "dsMFrxB2agKf6", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "6v1v8O3go6r0uLI1xT", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "PdKTOwHgOASGY", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "3oEjHP8ELRNNlnlLGM", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "33OrjzUFwkwEg", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "71Z7q5j6WyCuk", tags: ["kedi","cat","cat dancing","cat dance"] },
+  { id: "jfBztvV4pLPws", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "7Jkv02RLFYj6M", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "bgWp3ZsJX25RC1MWhj", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "rmvMh6rmX3x7O", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "FqZahqOhExCJfNempi", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "p81seLXHzRWE", tags: ["köpek","dog","cute dog","puppy"] },
+  { id: "wCWwjKFNsix4zqpyQe", tags: ["harika","süper","awesome","amazing","cool","fire"] },
+  { id: "mbhseRYedlG5W", tags: ["harika","süper","awesome","amazing","cool","fire"] },
+  { id: "bYZfoLqyRz5OEata0e", tags: ["harika","süper","awesome","amazing","cool","fire"] },
+  { id: "Y4bVkhm7RX98onFEgj", tags: ["harika","süper","awesome","amazing","cool","fire"] },
+  { id: "UyRBUarXgKocV8e83u", tags: ["harika","süper","awesome","amazing","cool","fire"] },
+  { id: "2QGEZJpnUXXJvzNPbK", tags: ["harika","süper","cool","deal with it","sunglass"] },
+  { id: "2SYc7mttUnWWaqvWz8", tags: ["harika","süper","cool","deal with it","sunglass"] },
+  { id: "pK4olTi2PD7v9r8VDf", tags: ["harika","süper","cool","deal with it","sunglass"] },
+  { id: "WunIzl2EUpkFhVSPmJ", tags: ["harika","süper","cool","deal with it","sunglass"] },
+  { id: "g9gaLEBSf8jWbuezHd", tags: ["yüzüstü","facepalm","embarrassed","cringe"] },
+  { id: "jUZZ0daHgWTqGXwRdc", tags: ["bekliyorum","waiting","patience","still waiting"] },
+  { id: "2DmUALwfq6AiSq1KQg", tags: ["bekliyorum","waiting","patience","still waiting"] },
+  { id: "fYqXFcHnFeNLFbTpQv", tags: ["bekliyorum","waiting","patience","still waiting"] },
+  { id: "3o7btUXp7xSaOcGwo0", tags: ["ateş","fire","hot","this is fine"] },
+  { id: "Ha3tlduYkS7gm1wKv5", tags: ["ateş","fire","hot","this is fine"] },
+  { id: "465yxl2KmGyMoJesPX", tags: ["ateş","fire","hot","this is fine"] },
+  { id: "QUF7EEaIAJYPF9QZoa", tags: ["ateş","fire","hot","this is fine"] },
+  { id: "Pt0FTbZZvkFwI", tags: ["güldüm","komik","spongebob","meme"] },
+  { id: "BY5tPZNL68V29cVfuz", tags: ["güldüm","komik","spongebob","meme"] },
+  { id: "Xd9lAvsJ50pPi", tags: ["güldüm","komik","spongebob","meme"] },
+  { id: "xT3i13lKLumfOejFiU", tags: ["güldüm","komik","spongebob","meme"] },
+  { id: "LnKa2WLkd6eAM", tags: ["güldüm","komik","spongebob","meme"] },
+  { id: "6BZaFXBVPBtok", tags: ["güldüm","komik","tom and jerry","cartoon"] },
+  { id: "n1RENjIzHtveU", tags: ["güldüm","komik","minion","funny"] },
+  { id: "vpuw0AlB79yViOU5vd", tags: ["güldüm","komik","minion","funny"] },
+  { id: "c2uk5s0d1uhvckPqOB", tags: ["güldüm","komik","minion","funny"] },
+  { id: "TW5RIonnbxx2Lgn0i1", tags: ["güldüm","komik","minion","funny"] },
+  { id: "XJMf9ULj0vmC1qXiud", tags: ["güldüm","komik","minion","funny"] },
+  { id: "ltIFdjNAasOwVvKhvx", tags: ["güldüm","komik","minion","funny"] },
+  { id: "8ylRWCsBTWK9q", tags: ["güldüm","komik","minion","funny"] },
+  { id: "l2uBT8acwa8Npa4XAp", tags: ["güldüm","laugh emoji","lmao","emoji"] },
+  { id: "mOY97EXNisstZqJht9", tags: ["güldüm","laugh emoji","lmao","emoji"] },
+  { id: "3o6ZsZnC6iGUMTwiWY", tags: ["aşk","heart eyes","love emoji"] },
+  { id: "MTOjtx4An1kbx7xx6b", tags: ["aşk","heart eyes","love emoji"] },
+  { id: "8Ek3GohDruBZ4wVi5H", tags: ["aşk","heart eyes","love emoji"] },
+  { id: "Gk0hKDUViknFIJMENf", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "IOP9xNxxlYlbtGBFNV", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "LLiVyERXcGQKEeRY2O", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "VsJLhCJ9BeyzZCWnTP", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "etRtou0PJOPJh1ozvd", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "lSbRLoUIo8708v7PFf", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "3og0IDOsGSroXvDgc0", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "9LNF1Mw9pLSDSlsc0h", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "OkodYkCMBr44UVsVi8", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "Wm36NxYZuZWTFWTXck", tags: ["şaşırdım","shocked emoji","wow","omg"] },
+  { id: "fTp4hdqNoVgYgJqnVi", tags: ["şaşırdım","shocked emoji","wow","omg"] }
 ];
 
-const ALL_TAGS = [...new Set(GIF_DB.flatMap(g => g.tags))];
+// Cross-language synonym map — maps search terms to canonical tags
+const SYNONYMS: Record<string, string[]> = {
+  // English → Turkish category tags
+  funny: ["güldüm","komik"], laugh: ["güldüm","komik"], lol: ["güldüm","komik"],
+  hilarious: ["güldüm","komik"], rofl: ["güldüm","komik"], haha: ["güldüm","komik"],
+  sad: ["üzgün"], crying: ["üzgün","ağlıyorum"], cry: ["üzgün"],
+  heartbroken: ["üzgün"], tears: ["üzgün"],
+  angry: ["sinirli","kızgın"], mad: ["sinirli"], rage: ["sinirli"],
+  frustrated: ["sinirli"], annoyed: ["sinirli"], furious: ["sinirli"],
+  shocked: ["şaşırdım"], surprised: ["şaşırdım"], wow: ["şaşırdım"],
+  omg: ["şaşırdım"], "mind blown": ["şaşırdım"], amazed: ["şaşırdım"],
+  clap: ["alkış"], applause: ["alkış"], bravo: ["alkış"],
+  "well done": ["alkış"], "standing ovation": ["alkış"],
+  dance: ["dans"], dancing: ["dans"], groove: ["dans"],
+  celebrate: ["kutlama"], party: ["kutlama"], confetti: ["kutlama"],
+  congrats: ["kutlama"], birthday: ["kutlama"],
+  love: ["aşk"], heart: ["aşk"], romantic: ["aşk"], hug: ["aşk"], kiss: ["aşk"],
+  yes: ["evet"], nod: ["evet"], agree: ["evet"], ok: ["evet"], thumbs: ["evet"],
+  no: ["hayır"], nope: ["hayır"], "shaking head": ["hayır"],
+  cat: ["kedi"], kitten: ["kedi"], meow: ["kedi"],
+  dog: ["köpek"], puppy: ["köpek"], doggo: ["köpek"],
+  awesome: ["harika"], amazing: ["harika"], cool: ["harika"], fire: ["harika"],
+  facepalm: ["yüzüstü"], embarrassed: ["yüzüstü"], cringe: ["yüzüstü"],
+  think: ["düşünüyor"], hmm: ["düşünüyor"], thinking: ["düşünüyor"],
+  wait: ["bekliyorum"], waiting: ["bekliyorum"], patience: ["bekliyorum"],
+  // Turkish → tags
+  "güldüm": ["güldüm","komik"], "komik": ["güldüm","komik"],
+  "sinirli": ["sinirli","kızgın"], "kızgın": ["sinirli","kızgın"],
+  "üzgün": ["üzgün","ağlıyorum"], "ağlıyorum": ["üzgün","ağlıyorum"],
+  "şaşırdım": ["şaşırdım","wow"], "alkış": ["alkış","bravo"],
+  "dans": ["dans","dance"], "kutlama": ["kutlama","celebrate"],
+  "aşk": ["aşk","love"], "sevgi": ["aşk","love"],
+  "evet": ["evet","yes"], "hayır": ["hayır","no"],
+  "kedi": ["kedi","cat"], "köpek": ["köpek","dog"],
+  "harika": ["harika","awesome"], "süper": ["harika","awesome"],
+  "yüzüstü": ["yüzüstü","facepalm"], "düşünüyor": ["düşünüyor","think"],
+  "bekliyorum": ["bekliyorum","wait"],
+};
 
 function gifUrl(id: string) { return `https://media.giphy.com/media/${id}/giphy.gif`; }
 function gifPreview(id: string) { return `https://media.giphy.com/media/${id}/200.gif`; }
+function fmt(g: GifEntry) { return { id: g.id, url: gifUrl(g.id), preview: gifPreview(g.id), tags: g.tags }; }
 
-function formatGif(g: GifEntry) {
-  return { id: g.id, url: gifUrl(g.id), preview: gifPreview(g.id), tags: g.tags };
+function expandQuery(q: string): string[] {
+  const terms = new Set<string>([q]);
+  // Direct synonym lookup
+  for (const [key, vals] of Object.entries(SYNONYMS)) {
+    if (q === key || q.includes(key) || key.includes(q)) {
+      vals.forEach(v => terms.add(v));
+    }
+  }
+  return [...terms];
 }
 
-// Shuffle deterministically-ish so "trending" feels fresh each server boot
-const seed = Date.now();
-const shuffled = [...GIF_DB].sort(() => Math.sin(seed + GIF_DB.indexOf(GIF_DB[0])) - 0.5);
+function searchDb(q: string, limit: number) {
+  if (!q) return GIF_DB.slice(0, limit).map(fmt);
+  const needle = q.toLowerCase().trim();
+  const expanded = expandQuery(needle);
 
-const router = Router();
-
-// GET /gif/trending?limit=24
-router.get("/gif/trending", (_req, res) => {
-  const limit = Math.min(Number(_req.query["limit"] ?? 24), 60);
-  // Return a rotating selection of popular GIFs
-  const start = Math.floor(Date.now() / 300000) % GIF_DB.length; // changes every 5 min
-  const result: GifEntry[] = [];
-  for (let i = 0; i < limit && result.length < limit; i++) {
-    result.push(GIF_DB[(start + i) % GIF_DB.length]);
-  }
-  res.json(result.map(formatGif));
-});
-
-// GET /gif/search?q=...&limit=24
-router.get("/gif/search", (req, res) => {
-  const q = String(req.query["q"] ?? "").toLowerCase().trim();
-  const limit = Math.min(Number(req.query["limit"] ?? 24), 60);
-
-  if (!q) {
-    // Return trending when no query
-    const gifs = GIF_DB.slice(0, limit).map(formatGif);
-    return res.json(gifs);
-  }
-
-  // Score each GIF: exact tag match = 2pts, partial match = 1pt
   const scored = GIF_DB.map(g => {
     let score = 0;
     for (const tag of g.tags) {
-      if (tag === q) score += 2;
-      else if (tag.includes(q) || q.includes(tag)) score += 1;
+      for (const term of expanded) {
+        if (tag === term) score += 3;
+        else if (tag.startsWith(term) || term.startsWith(tag)) score += 2;
+        else if (tag.includes(term) || term.includes(tag)) score += 1;
+      }
     }
     return { g, score };
   }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
 
-  let results = scored.slice(0, limit).map(x => formatGif(x.g));
+  let results = scored.slice(0, limit).map(x => fmt(x.g));
 
-  // Pad with trending if not enough results
+  // Pad with rotating trending when results are sparse
   if (results.length < 8) {
-    const usedIds = new Set(results.map(r => r.id));
-    const extra = GIF_DB.filter(g => !usedIds.has(g.id)).slice(0, limit - results.length).map(formatGif);
-    results = [...results, ...extra];
+    const used = new Set(results.map(r => r.id));
+    const pad = GIF_DB.filter(g => !used.has(g.id)).slice(0, limit - results.length).map(fmt);
+    results = [...results, ...pad];
   }
+  return results;
+}
 
-  res.json(results);
+const router = Router();
+
+// GET /gif/trending?limit=28
+router.get("/gif/trending", (req, res) => {
+  const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
+  const offset = Math.floor(Date.now() / 600000) % Math.max(1, GIF_DB.length - limit);
+  const slice: GifEntry[] = [];
+  for (let i = 0; i < limit; i++) slice.push(GIF_DB[(offset + i) % GIF_DB.length]);
+  res.json(slice.map(fmt));
 });
 
-// GET /gif/category/:tag?limit=24
+// GET /gif/search?q=...&limit=28
+router.get("/gif/search", (req, res) => {
+  const q = String(req.query["q"] ?? "").toLowerCase().trim();
+  const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
+  res.json(searchDb(q, limit));
+});
+
+// GET /gif/category/:tag?limit=28
 router.get("/gif/category/:tag", (req, res) => {
   const tag = req.params["tag"].toLowerCase();
-  const limit = Math.min(Number(req.query["limit"] ?? 24), 60);
-  const matches = GIF_DB.filter(g => g.tags.includes(tag));
-  const result = matches.length > 0 ? matches : GIF_DB.slice(0, limit);
-  res.json(result.slice(0, limit).map(formatGif));
-});
-
-// GET /gif/tags — list all available tags
-router.get("/gif/tags", (_req, res) => {
-  res.json(ALL_TAGS);
+  const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
+  res.json(searchDb(tag, limit));
 });
 
 export default router;
