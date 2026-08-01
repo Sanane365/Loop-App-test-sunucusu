@@ -2172,11 +2172,12 @@ export default function DirectMessages() {
                   <button onClick={openThought} className="w-full group text-left">
                     <ThoughtBubble text={thought || thoughtPlaceholder} isEmpty={!thought} color="primary" />
                   </button>
-                  {/* Beni beğenenler — balonun alt çizgisinde ortalı */}
+                  {/* Beni beğenenler — kuyruğun (üçgenin) yanında */}
                   {myThoughtLikers.length > 0 && (
-                    <div className="absolute -bottom-2 left-0 right-0 flex justify-center gap-0.5 z-10 pointer-events-none">
+                    <div className="absolute bottom-0 left-[4px] flex items-center gap-[2px] z-10 pointer-events-none">
+                      <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500 flex-shrink-0" />
                       {myThoughtLikers.slice(0, 3).map(l => (
-                        <Avatar key={l.id} className="ring-1 ring-white" style={{ width: 14, height: 14 }}>
+                        <Avatar key={l.id} className="ring-1 ring-white flex-shrink-0" style={{ width: 13, height: 13 }}>
                           <AvatarImage src={l.avatarUrl || ""} />
                           <AvatarFallback className="bg-primary text-white text-[5px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
                         </Avatar>
@@ -2231,11 +2232,12 @@ export default function DirectMessages() {
                           <ThoughtBubble text={friendThought} color={p.color} />
                         </button>
                       ) : null}
-                      {/* Beğenenler — balonun alt çizgisinde ortalı */}
+                      {/* Beğenenler — kuyruğun (üçgenin) yanında */}
                       {likers.length > 0 && (
-                        <div className="absolute -bottom-2 left-0 right-0 flex justify-center gap-0.5 z-10 pointer-events-none">
+                        <div className="absolute bottom-0 left-[4px] flex items-center gap-[2px] z-10 pointer-events-none">
+                          <Heart className="w-2.5 h-2.5 fill-rose-500 text-rose-500 flex-shrink-0" />
                           {likers.slice(0, 3).map(l => (
-                            <Avatar key={l.id} className="ring-1 ring-white" style={{ width: 14, height: 14 }}>
+                            <Avatar key={l.id} className="ring-1 ring-white flex-shrink-0" style={{ width: 13, height: 13 }}>
                               <AvatarImage src={l.avatarUrl || ""} />
                               <AvatarFallback className="bg-violet-500 text-white text-[5px] font-bold">{l.displayName.charAt(0)}</AvatarFallback>
                             </Avatar>

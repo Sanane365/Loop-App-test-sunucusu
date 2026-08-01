@@ -57,7 +57,7 @@ export default function Chat() {
   const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
 
   // Active users panel
   const [activeUsers, setActiveUsers] = useState<ActiveUser[]>([]);
@@ -252,6 +252,20 @@ export default function Chat() {
   const recordingStartRef = useRef<number>(0);
   const isStartingRecordingRef = useRef(false);
 
+  // Timer — useEffect ile yönetilir, isRecording true olunca başlar
+  useEffect(() => {
+    if (!isRecording) {
+      setRecordingSeconds(0);
+      return;
+    }
+    recordingStartRef.current = Date.now();
+    setRecordingSeconds(0);
+    const id = setInterval(() => {
+      setRecordingSeconds(Math.floor((Date.now() - recordingStartRef.current) / 1000));
+    }, 500);
+    return () => clearInterval(id);
+  }, [isRecording]);
+
   const startRecording = async () => {
     if (isRecording || isStartingRecordingRef.current) return;
     isStartingRecordingRef.current = true;
@@ -277,14 +291,7 @@ export default function Chat() {
         } catch { /* ignore */ }
       };
       recorder.start(200);
-      // Use wall-clock elapsed time — immune to stale/duplicate intervals
-      recordingStartRef.current = Date.now();
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds(Math.floor((Date.now() - recordingStartRef.current) / 1000));
-      }, 500);
-      setRecordingSeconds(0);
-      setIsRecording(true);
+      setIsRecording(true); // useEffect timer bu state değişimiyle başlar
     } catch {
       toast({ title: "Mikrofon erişimi reddedildi", description: "Tarayıcı ayarlarından mikrofon iznini etkinleştir.", variant: "destructive" });
     } finally {
@@ -293,7 +300,6 @@ export default function Chat() {
   };
 
   const cancelRecording = () => {
-    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     const mr = mediaRecorderRef.current;
     if (mr) {
       mediaRecorderRef.current = null;
@@ -305,16 +311,13 @@ export default function Chat() {
       } catch {}
     }
     audioChunksRef.current = [];
-    setIsRecording(false);
-    setRecordingSeconds(0);
+    setIsRecording(false); // useEffect timer'ı temizler
   };
 
   const stopRecording = () => {
-    if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingSeconds(0);
+      setIsRecording(false); // useEffect timer'ı temizler
     }
   };
 
