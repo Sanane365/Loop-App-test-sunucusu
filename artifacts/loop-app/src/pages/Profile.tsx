@@ -247,34 +247,44 @@ export default function Profile() {
     finally { setMyQLoading(false); }
   };
 
-  // Profili beğen
-  const [profileLiked, setProfileLiked] = useState(false);
-  const handleLikeProfile = async (userId: number) => {
-    try {
-      await fetch(`/api/users/${userId}/like-profile`, { method: "POST" });
-      setProfileLiked(true);
-      toast({ title: "Profil beğenildi 💜", description: "Bildirim gönderildi." });
-    } catch { toast({ title: "Hata", variant: "destructive" }); }
-  };
-
-  // Neon kalp butonu — profil beğeni (gönderi beğenilerinden bağımsız)
-  const [neonBtnVisible, setNeonBtnVisible] = useState(true);
-  const [neonCountVisible, setNeonCountVisible] = useState(false);
-  const [profileLikeCount, setProfileLikeCount] = useState<number | null>(null);
-  const neonTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // PB butonu — sol üst banner köşesi
+  const [pbPressed, setPbPressed] = useState(false);
+  const [pbLoading, setPbLoading] = useState(false);
+  const [pbCount, setPbCount] = useState<number | null>(null);
+  const [pbHologramVisible, setPbHologramVisible] = useState(false);
+  const pbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!targetUserId) return;
     fetch(`/api/users/${targetUserId}/profile-like-count`)
       .then(r => r.json())
-      .then(d => setProfileLikeCount(d.count ?? 0))
-      .catch(() => setProfileLikeCount(0));
+      .then(d => setPbCount(d.count ?? 0))
+      .catch(() => setPbCount(0));
+    fetch(`/api/users/${targetUserId}/pb-status`)
+      .then(r => r.json())
+      .then(d => setPbPressed(d.pressed ?? false))
+      .catch(() => {});
   }, [targetUserId]);
 
-  const handleNeonHeart = () => {
-    setNeonCountVisible(true);
-    if (neonTimerRef.current) clearTimeout(neonTimerRef.current);
-    neonTimerRef.current = setTimeout(() => setNeonCountVisible(false), 4500);
+  const showPbHologram = () => {
+    setPbHologramVisible(true);
+    if (pbTimerRef.current) clearTimeout(pbTimerRef.current);
+    pbTimerRef.current = setTimeout(() => setPbHologramVisible(false), 4500);
+  };
+
+  const handlePBClick = async () => {
+    if (pbLoading) return;
+    if (pbPressed) { showPbHologram(); return; }
+    setPbLoading(true);
+    try {
+      const r = await fetch(`/api/users/${targetUserId}/like-profile`, { method: "POST" });
+      if (r.ok) {
+        setPbPressed(true);
+        setPbCount(c => (c ?? 0) + 1);
+      }
+    } catch {}
+    finally { setPbLoading(false); }
+    showPbHologram();
   };
 
   // Change password
@@ -713,6 +723,43 @@ export default function Profile() {
                 <span className="text-white text-sm font-semibold">Fotoğraf veya video ekle</span>
               </div>
             </div>
+          )}
+
+          {/* PB butonu — sol üst köşe */}
+          {!isMe && profile && (
+            <button
+              onClick={e => { e.stopPropagation(); handlePBClick(); }}
+              disabled={pbLoading}
+              className="absolute top-4 left-4 z-20 active:scale-90 transition-transform select-none"
+              style={{
+                width: 48, height: 48,
+                borderRadius: 13,
+                background: pbPressed
+                  ? "rgba(34,211,238,0.14)"
+                  : "rgba(255,255,255,0.13)",
+                backdropFilter: "blur(18px)",
+                WebkitBackdropFilter: "blur(18px)",
+                border: pbPressed
+                  ? "1.5px solid rgba(34,211,238,0.55)"
+                  : "1.5px solid rgba(255,255,255,0.30)",
+                boxShadow: pbPressed
+                  ? "0 0 12px rgba(34,211,238,0.30), 0 4px 18px rgba(0,0,0,0.22)"
+                  : "0 4px 18px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.18)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: pbLoading ? "wait" : "pointer",
+              }}
+            >
+              <span style={{
+                fontWeight: 900,
+                fontSize: 14,
+                letterSpacing: "0.05em",
+                color: pbPressed ? "#67e8f9" : "rgba(255,255,255,0.93)",
+                textShadow: pbPressed
+                  ? "0 0 8px #22d3ee"
+                  : "0 1px 4px rgba(0,0,0,0.45)",
+                userSelect: "none",
+              }}>PB</span>
+            </button>
           )}
         </div>
 
@@ -1248,15 +1295,6 @@ export default function Profile() {
 
                     {/* Aksiyon butonları */}
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      {/* Profili Beğen */}
-                      <button
-                        onClick={() => handleLikeProfile(u.id)}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition-colors"
-                      >
-                        <Heart className="w-3.5 h-3.5" />
-                        Beğen
-                      </button>
-
                       {/* Takip Et / Takiptesin — başkasının profilinde */}
                       {!isMe && (
                         <button
@@ -2011,91 +2049,50 @@ export default function Profile() {
           </div>
         </div>
       )}
-      {/* ── Profil kalp butonu (sağ alta sabit) ── */}
-      {neonBtnVisible && profile && (
-        <div className="fixed bottom-24 right-4 z-50 flex flex-col items-center gap-1.5 pointer-events-none">
-
-          {/* Hologram sayaç — neon, ekranın soluna doğru açılır */}
+      {/* ── PB hologram sayaç (fixed, banner dışında) ── */}
+      {pbHologramVisible && !isMe && profile && (
+        <div
+          className="fixed top-16 left-4 z-50 pointer-events-none select-none"
+          style={{
+            opacity: pbHologramVisible ? 1 : 0,
+            transform: pbHologramVisible ? "translateY(0) scale(1)" : "translateY(-8px) scale(0.92)",
+            transition: "opacity 0.35s ease, transform 0.35s ease",
+          }}
+        >
           <div
-            className="pointer-events-none select-none self-end transition-all duration-600"
+            className="relative flex flex-col items-center px-5 py-3 rounded-2xl overflow-hidden"
             style={{
-              opacity: neonCountVisible ? 1 : 0,
-              transform: neonCountVisible ? "translateX(0) scale(1)" : "translateX(20px) scale(0.88)",
+              background: "rgba(2,18,24,0.82)",
+              border: "1.5px solid rgba(34,211,238,0.55)",
+              boxShadow: "0 0 22px 6px rgba(34,211,238,0.32), 0 0 50px 10px rgba(6,182,212,0.16), inset 0 0 20px rgba(34,211,238,0.06)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
             }}
           >
-            <div
-              className="relative flex flex-col items-center px-5 py-3 rounded-2xl overflow-hidden"
+            {/* Tarama çizgileri */}
+            <div className="absolute inset-0 pointer-events-none"
+              style={{ background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(34,211,238,0.05) 2px,rgba(34,211,238,0.05) 3px)" }} />
+            {/* Üst ışık yansıması */}
+            <div className="absolute top-0 left-0 right-0 h-px"
+              style={{ background: "linear-gradient(90deg,transparent,rgba(34,211,238,0.7),transparent)" }} />
+            <span
+              className="text-3xl font-black tabular-nums relative z-10"
               style={{
-                background: "rgba(8,3,22,0.78)",
-                border: "1.5px solid rgba(168,85,247,0.6)",
-                boxShadow: "0 0 22px 6px rgba(168,85,247,0.38), 0 0 50px 10px rgba(139,92,246,0.18), inset 0 0 20px rgba(168,85,247,0.08)",
-                backdropFilter: "blur(14px)",
+                color: "#22d3ee",
+                textShadow: "0 0 6px #22d3ee, 0 0 18px #06b6d4, 0 0 36px #0e7490, 0 0 2px #fff",
+                letterSpacing: "0.06em",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
-              {/* Tarama çizgileri */}
-              <div className="absolute inset-0 pointer-events-none"
-                style={{ background: "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(168,85,247,0.05) 2px,rgba(168,85,247,0.05) 3px)" }} />
-              {/* Üst ışık yansıması */}
-              <div className="absolute top-0 left-0 right-0 h-px"
-                style={{ background: "linear-gradient(90deg,transparent,rgba(232,121,249,0.7),transparent)" }} />
-              <span
-                className="text-3xl font-black tabular-nums relative z-10"
-                style={{
-                  color: "#f0abfc",
-                  textShadow: "0 0 6px #f0abfc, 0 0 18px #e879f9, 0 0 36px #a855f7, 0 0 2px #fff",
-                  letterSpacing: "0.06em",
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {(profileLikeCount ?? 0).toLocaleString("tr-TR")}
-              </span>
-              <span
-                className="text-[10px] font-semibold mt-0.5 uppercase tracking-widest relative z-10"
-                style={{ color: "#c084fc", textShadow: "0 0 8px #a855f7" }}
-              >
-                profil beğeni
-              </span>
-            </div>
-          </div>
-
-          {/* Kapat — üstte */}
-          <div className="pointer-events-auto self-center">
-            <button
-              onClick={() => { setNeonBtnVisible(false); setNeonCountVisible(false); }}
-              className="w-5 h-5 rounded-full flex items-center justify-center"
-              style={{
-                background: "rgba(240,240,245,0.18)",
-                border: "1px solid rgba(200,200,220,0.35)",
-                backdropFilter: "blur(8px)",
-                color: "rgba(180,180,200,0.85)",
-              }}
+              {(pbCount ?? 0).toLocaleString("tr-TR")}
+            </span>
+            <span
+              className="text-[10px] font-semibold mt-0.5 uppercase tracking-widest relative z-10"
+              style={{ color: "#67e8f9", textShadow: "0 0 8px #06b6d4" }}
             >
-              <X className="w-2.5 h-2.5" />
-            </button>
+              PB
+            </span>
           </div>
-
-          {/* Kalp butonu — gri bulanık cam */}
-          <div className="pointer-events-auto">
-            <button
-              onClick={handleNeonHeart}
-              className="relative w-14 h-14 rounded-full flex items-center justify-center transition-transform active:scale-90"
-              style={{
-                background: "rgba(220,220,230,0.14)",
-                border: "1.5px solid rgba(200,200,220,0.30)",
-                backdropFilter: "blur(16px)",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.15)",
-              }}
-            >
-              <Heart
-                className="w-6 h-6 relative z-10"
-                style={{
-                  color: "rgba(220,210,235,0.92)",
-                  filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.3))",
-                }}
-              />
-            </button>
-          </div>
-
         </div>
       )}
     </AppLayout>

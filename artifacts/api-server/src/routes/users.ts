@@ -427,7 +427,7 @@ router.post("/questions/:id/comments", requireAuth, async (req, res) => {
   } catch (err) { req.log.error(err); res.status(500).json({ error: "Internal server error" }); }
 });
 
-// Profil beğeni sayısını getir (notifications tablosundaki profile_like kayıtları)
+// PB sayısını getir (notifications tablosundaki profile_like kayıtları)
 router.get("/users/:userId/profile-like-count", async (req, res) => {
   try {
     const targetId = parseInt(req.params["userId"]!);
@@ -443,11 +443,26 @@ router.get("/users/:userId/profile-like-count", async (req, res) => {
   }
 });
 
-// Profili beğen → bildirim gönder
+// Mevcut kullanıcı PB basıp basmadığını sorgula
+router.get("/users/:userId/pb-status", requireAuth, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params["userId"]!);
+    const result = await db.execute(
+      sql`SELECT 1 FROM notifications WHERE user_id = ${targetId} AND from_user_id = ${req.user!.id} AND type = 'profile_like' LIMIT 1`
+    );
+    const pressed = ((result as any).rows?.length ?? 0) > 0;
+    res.json({ pressed });
+  } catch (err) {
+    req.log.error(err);
+    res.json({ pressed: false });
+  }
+});
+
+// PB bas → bildirim gönder (1 kişi 1 kez)
 router.post("/users/:userId/like-profile", requireAuth, async (req, res) => {
   try {
     const targetId = parseInt(req.params["userId"]!);
-    if (targetId === req.user!.id) { res.status(400).json({ error: "Kendinizi beğenemezsiniz" }); return; }
+    if (targetId === req.user!.id) { res.status(400).json({ error: "Kendinize PB yapamazsınız" }); return; }
     await db.insert(notificationsTable).values({
       userId: targetId,
       fromUserId: req.user!.id,
