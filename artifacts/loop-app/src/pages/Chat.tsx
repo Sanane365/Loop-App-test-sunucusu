@@ -54,9 +54,11 @@ export default function Chat() {
 
   // Voice recording
   const [isRecording, setIsRecording] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // Timer — RAF ile DOM'a doğrudan yaz, React state hiç kullanma
+  const timerDisplayRef = useRef<HTMLSpanElement>(null);
+  const animFrameRef = useRef<number | null>(null);
 
 
   // Active users panel
@@ -249,21 +251,34 @@ export default function Chat() {
     }
   };
 
-  const recordingStartRef = useRef<number>(0);
   const isStartingRecordingRef = useRef(false);
 
-  // Timer — useEffect ile yönetilir, isRecording true olunca başlar
+  // Timer — RAF ile doğrudan DOM güncelleme (React state yok, re-render yok)
   useEffect(() => {
     if (!isRecording) {
-      setRecordingSeconds(0);
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (timerDisplayRef.current) timerDisplayRef.current.textContent = "0:00";
       return;
     }
-    recordingStartRef.current = Date.now();
-    setRecordingSeconds(0);
-    const id = setInterval(() => {
-      setRecordingSeconds(Math.floor((Date.now() - recordingStartRef.current) / 1000));
-    }, 500);
-    return () => clearInterval(id);
+    const startTime = Date.now();
+    const tick = () => {
+      const secs = Math.floor((Date.now() - startTime) / 1000);
+      if (timerDisplayRef.current) {
+        timerDisplayRef.current.textContent =
+          `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+      }
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (animFrameRef.current !== null) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+    };
   }, [isRecording]);
 
   const startRecording = async () => {
@@ -730,9 +745,7 @@ export default function Chat() {
                 {/* Kayıt göstergesi */}
                 <div className="flex-1 flex items-center gap-3 bg-red-500/8 border border-red-500/25 rounded-full px-4 h-11">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 flex-shrink-0 animate-pulse" />
-                  <span className="text-sm font-semibold text-red-500 tabular-nums min-w-[2.4rem]">
-                    {Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")}
-                  </span>
+                  <span ref={timerDisplayRef} className="text-sm font-semibold text-red-500 tabular-nums min-w-[2.4rem]">0:00</span>
                   {/* Dalga animasyonu */}
                   <div className="flex items-center gap-[3px] flex-1">
                     {[0.5,0.9,0.65,1,0.75,0.55,1,0.8,0.6,0.95,0.7].map((h, i) => (
