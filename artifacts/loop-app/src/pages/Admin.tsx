@@ -34,6 +34,9 @@ import {
   Crown,
   Gavel,
   KeyRound,
+  PawPrint,
+  Upload,
+  Plus,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -103,6 +106,45 @@ export default function Admin() {
   const [resetPassUser, setResetPassUser] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
 
+  // Yoldaş yönetimi
+  interface CompanionRow { id: number; slug: string; name: string; description: string | null; imageUrl: string; }
+  const [companions, setCompanions] = useState<CompanionRow[]>([]);
+  const [compName, setCompName] = useState("");
+  const [compDesc, setCompDesc] = useState("");
+  const [compFile, setCompFile] = useState<File | null>(null);
+  const [compUploading, setCompUploading] = useState(false);
+
+  const fetchCompanions = async () => {
+    const r = await fetch("/api/companions");
+    if (r.ok) setCompanions(await r.json());
+  };
+
+  const handleUploadCompanion = async () => {
+    if (!compFile || !compName.trim()) return;
+    setCompUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("name", compName.trim());
+      fd.append("description", compDesc.trim());
+      fd.append("image", compFile);
+      const r = await fetch("/api/admin/companions", { method: "POST", body: fd });
+      if (r.ok) {
+        toast({ title: "✅ Yoldaş eklendi!", duration: 2000 });
+        setCompName(""); setCompDesc(""); setCompFile(null);
+        fetchCompanions();
+      } else {
+        const e = await r.json();
+        toast({ title: "Hata", description: e.error, variant: "destructive" });
+      }
+    } finally { setCompUploading(false); }
+  };
+
+  const handleDeleteCompanion = async (id: number) => {
+    if (!confirm("Bu yoldaşı silmek istediğine emin misin?")) return;
+    const r = await fetch(`/api/admin/companions/${id}`, { method: "DELETE" });
+    if (r.ok) { toast({ title: "Silindi", duration: 1500 }); fetchCompanions(); }
+  };
+
   // Kurucu ve Admin Yetkisine Sahip E-postalar Listesi
   const adminEmails = [
     "copoglumihammetyasin@gmail.com",
@@ -144,7 +186,7 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (isMod) fetchAll();
+    if (isMod) { fetchAll(); fetchCompanions(); }
   }, [isMod]);
 
   const fetchUsers = async () => {
@@ -341,9 +383,12 @@ export default function Admin() {
         )}
 
         <Tabs defaultValue="users">
-          <TabsList className="w-full grid grid-cols-2">
+          <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
             <TabsTrigger value="bans">Yasaklar</TabsTrigger>
+            <TabsTrigger value="companions" className="flex items-center gap-1">
+              <PawPrint className="w-3.5 h-3.5" />Yoldaşlar
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-3 mt-4">
@@ -586,6 +631,80 @@ export default function Admin() {
                   Yasak kaydı yok
                 </p>
               )}
+            </div>
+          </TabsContent>
+
+          {/* ── Yoldaşlar Tab ── */}
+          <TabsContent value="companions" className="space-y-4 mt-4">
+            {/* Upload formu */}
+            <div className="rounded-2xl border border-border/60 p-4 space-y-3 bg-muted/20">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                <Plus className="w-4 h-4 text-primary" /> Yeni Yoldaş Ekle
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  placeholder="İsim (örn. Tilki)"
+                  value={compName}
+                  onChange={e => setCompName(e.target.value)}
+                />
+                <Input
+                  placeholder="Açıklama (örn. Neşeli & Hızlı)"
+                  value={compDesc}
+                  onChange={e => setCompDesc(e.target.value)}
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer w-fit">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-border/80 hover:border-primary/60 transition-colors text-sm text-muted-foreground">
+                  <Upload className="w-4 h-4" />
+                  {compFile ? compFile.name : "PNG seç…"}
+                </div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={e => setCompFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              <Button
+                size="sm"
+                disabled={!compFile || !compName.trim() || compUploading}
+                onClick={handleUploadCompanion}
+                className="gap-1.5"
+              >
+                <PawPrint className="w-3.5 h-3.5" />
+                {compUploading ? "Yükleniyor…" : "Yoldaş Ekle"}
+              </Button>
+            </div>
+
+            {/* Mevcut yoldaşlar */}
+            <div className="space-y-2">
+              {companions.length === 0 && (
+                <p className="text-center text-muted-foreground py-6 text-sm">Henüz yoldaş yok</p>
+              )}
+              {companions.map(c => (
+                <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card">
+                  <img
+                    src={c.imageUrl}
+                    alt={c.name}
+                    className="w-12 h-12 object-contain rounded-xl bg-muted/30"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate">{c.name}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{c.description ?? "—"}</p>
+                    <p className="text-[10px] text-muted-foreground/60 font-mono">slug: {c.slug}</p>
+                  </div>
+                  {c.slug !== "bear" && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="w-8 h-8 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => handleDeleteCompanion(c.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
             </div>
           </TabsContent>
         </Tabs>

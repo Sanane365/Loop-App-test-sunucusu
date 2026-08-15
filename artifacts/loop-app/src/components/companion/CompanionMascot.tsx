@@ -15,15 +15,14 @@ import { Check, Moon, Pencil, X } from "lucide-react";
 type AnimState = "idle" | "walk-right" | "walk-left" | "peek" | "wave" | "happy" | "sleep";
 
 interface Props {
-  companionId:   string;
+  imgUrl:        string;   // direct URL to companion image (from API or static)
   name:          string;
   isTyping:      boolean;
   onMessageSent: boolean;
   onRename:      (n: string) => void;
 }
 
-/* ── assets ──────────────────────────────────────────────────────────── */
-const ASSETS: Record<string, string> = { bear: "/companion-bear.png" };
+/* ASSETS map removed — imgUrl is now passed directly as a prop */
 
 /* ── timing ──────────────────────────────────────────────────────────── */
 const WALK_MIN       = 12_000;
@@ -150,9 +149,9 @@ const ANIM_CFG: Record<AnimState, { name: string; dur: string; iter: string; eas
 
 /* ══════════════════════════════════════════════════════════════════════ */
 export default function CompanionMascot({
-  companionId, name, isTyping, onMessageSent, onRename,
+  imgUrl, name, isTyping, onMessageSent, onRename,
 }: Props) {
-  const rawSrc = ASSETS[companionId] ?? ASSETS.bear;
+  const rawSrc = imgUrl;
 
   const [src,        setSrc]        = useState<string | null>(null);
   const [posX,       setPosX]       = useState(14);

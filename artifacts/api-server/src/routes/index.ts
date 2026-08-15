@@ -14,6 +14,10 @@ import dmRouter from "./dm";
 import loopRouter from "./loop";
 import callsRouter from "./calls";
 import gifRouter from "./gif";
+import companionsRouter, { seedBuiltinCompanions } from "./companions";
+
+// Yerleşik yoldaşları ilk açılışta DB'ye ekle
+seedBuiltinCompanions();
 
 const router: IRouter = Router();
 
@@ -31,6 +35,7 @@ router.use(dmRouter);
 router.use(loopRouter);
 router.use(callsRouter);
 router.use(gifRouter);
+router.use(companionsRouter);
 
 // ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
 // Bu dosya sadece API'yi yönetmeli.

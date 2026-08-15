@@ -331,12 +331,17 @@ export default function DirectMessages() {
 
   // Companion (Yoldaş) state
   const [showCompanionPicker, setShowCompanionPicker] = useState(false);
-  const [companion, setCompanion] = useState<string | null>(null); // "bear" | null
+  const [companion, setCompanion] = useState<string | null>(null); // slug e.g. "bear"
   const companionKey = userId ? `dm_companion_${userId}` : null;
   const [companionName, setCompanionName] = useState("Yoldaşım");
   const companionNameKey = userId ? `dm_companion_name_${userId}` : null;
   // toggled each time user sends a message → CompanionMascot triggers happy anim
   const [msgSentToggle, setMsgSentToggle] = useState(false);
+  // API-fetched companion list
+  interface CompanionData { id: number; slug: string; name: string; description: string | null; imageUrl: string; }
+  const [companions, setCompanions] = useState<CompanionData[]>([]);
+  // resolved imgUrl for active companion
+  const companionImgUrl = companions.find(c => c.slug === companion)?.imageUrl ?? null;
 
   // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -976,6 +981,14 @@ export default function DirectMessages() {
       el.scrollTop = el.scrollHeight;
     }
   }, [groupMessages]);
+
+  // Fetch companions list from API
+  useEffect(() => {
+    fetch("/api/companions")
+      .then(r => r.json())
+      .then(setCompanions)
+      .catch(() => {});
+  }, []);
 
   // Friendship + companion localStorage sync
   useEffect(() => {
@@ -1791,9 +1804,9 @@ export default function DirectMessages() {
           {/* ── Mesajlar + Floating Companion ── */}
           <div className="relative flex-1 min-h-0">
           {/* Floating yoldaş maskotu */}
-          {companion && (
+          {companion && companionImgUrl && (
             <CompanionMascot
-              companionId={companion}
+              imgUrl={companionImgUrl}
               name={companionName}
               isTyping={content.length > 0}
               onMessageSent={msgSentToggle}
@@ -2341,63 +2354,49 @@ export default function DirectMessages() {
                 <p className="text-sm text-white/50 mt-1">Sohbette seninle birlikte olacak</p>
               </div>
 
-              {/* Hayvan kartları */}
+              {/* Hayvan kartları — API'den dinamik */}
               <div className="relative px-5 pb-6 pt-4">
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Ayı — mevcut */}
-                  <button
-                    className="group relative flex flex-col items-center rounded-3xl overflow-hidden transition-all active:scale-95 duration-200"
-                    style={{ background: "linear-gradient(145deg,#2d1a4a,#1e1035)", border: "2px solid rgba(139,92,246,0.4)", boxShadow: "0 0 24px rgba(139,92,246,0.2)" }}
-                    onClick={() => selectCompanion("bear")}
-                  >
-                    {/* Seçilmiş rozeti */}
-                    {companion === "bear" && (
-                      <div className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-emerald-400 flex items-center justify-center">
-                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                      </div>
-                    )}
-                    {/* Parlayan arka plan */}
-                    <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: "radial-gradient(circle at 50% 60%,rgba(251,191,36,0.15) 0%,transparent 70%)" }} />
-                    <img
-                      src="/companion-bear.png"
-                      alt="Ayı Yoldaş"
-                      className="w-36 h-36 object-contain drop-shadow-2xl mt-3 group-active:scale-105 transition-transform duration-200"
-                      style={{ filter: "drop-shadow(0 12px 20px rgba(251,191,36,0.3))" }}
-                    />
-                    <div className="w-full px-3 pb-3 pt-1 text-center">
-                      <p className="text-sm font-black text-white">Ayı</p>
-                      <p className="text-[10px] text-purple-300/70 font-medium">Sevimli & Sadık</p>
-                      <div className="mt-1.5 px-3 py-1 rounded-full inline-block text-[10px] font-bold" style={{ background: "rgba(139,92,246,0.3)", color: "#c4b5fd" }}>
-                        {companion === "bear" ? "✓ Seçili" : "Seç"}
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Yakında — kilitli slot */}
-                  {(["🦊","🐧","🐱","🐰"] as const).slice(0, 1).map(emoji => (
-                    <div
-                      key={emoji}
-                      className="relative flex flex-col items-center rounded-3xl overflow-hidden"
-                      style={{ background: "linear-gradient(145deg,#1a1a2e,#12121e)", border: "2px solid rgba(255,255,255,0.06)" }}
-                    >
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="flex flex-col items-center gap-2 opacity-40">
-                          <span className="text-5xl">{emoji}</span>
+                {companions.length === 0 ? (
+                  <p className="text-center text-white/40 text-sm py-6">Yükleniyor…</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    {companions.map(c => (
+                      <button
+                        key={c.slug}
+                        className="group relative flex flex-col items-center rounded-3xl overflow-hidden transition-all active:scale-95 duration-200"
+                        style={{
+                          background: "linear-gradient(145deg,#2d1a4a,#1e1035)",
+                          border: `2px solid ${companion === c.slug ? "rgba(139,92,246,0.8)" : "rgba(139,92,246,0.3)"}`,
+                          boxShadow: companion === c.slug ? "0 0 28px rgba(139,92,246,0.35)" : "0 0 16px rgba(139,92,246,0.1)",
+                        }}
+                        onClick={() => selectCompanion(c.slug)}
+                      >
+                        {/* Seçilmiş rozeti */}
+                        {companion === c.slug && (
+                          <div className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-emerald-400 flex items-center justify-center">
+                            <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: "radial-gradient(circle at 50% 60%,rgba(139,92,246,0.18) 0%,transparent 70%)" }} />
+                        <img
+                          src={c.imageUrl}
+                          alt={c.name}
+                          className="w-36 h-36 object-contain drop-shadow-2xl mt-3 group-active:scale-105 transition-transform duration-200"
+                          style={{ filter: "drop-shadow(0 12px 20px rgba(139,92,246,0.25))" }}
+                        />
+                        <div className="w-full px-3 pb-3 pt-1 text-center">
+                          <p className="text-sm font-black text-white">{c.name}</p>
+                          {c.description && (
+                            <p className="text-[10px] text-purple-300/70 font-medium">{c.description}</p>
+                          )}
+                          <div className="mt-1.5 px-3 py-1 rounded-full inline-block text-[10px] font-bold" style={{ background: "rgba(139,92,246,0.3)", color: "#c4b5fd" }}>
+                            {companion === c.slug ? "✓ Seçili" : "Seç"}
+                          </div>
                         </div>
-                      </div>
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)" }}>
-                          <svg className="w-5 h-5 text-white/40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1C8.676 1 6 3.676 6 7v1H4v15h16V8h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v1H8V7c0-2.276 1.724-4 4-4zm0 9a2 2 0 110 4 2 2 0 010-4z"/></svg>
-                        </div>
-                        <p className="text-[10px] font-bold text-white/40">Yakında</p>
-                      </div>
-                      {/* Boş alan için min yükseklik */}
-                      <div className="h-44 w-full" />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Alt not */}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <p className="text-center text-[10px] text-white/30 mt-4">Daha fazla yoldaş yakında geliyor 🐾</p>
               </div>
             </div>
