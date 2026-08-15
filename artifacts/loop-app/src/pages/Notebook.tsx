@@ -12,6 +12,7 @@ import { Link, useLocation } from "wouter";
 import {
   BookOpen, X, ChevronUp, ChevronDown, ArrowRight,
   MoreVertical, Pencil, Heart, Star, Trophy, Flame, Sparkles, Compass,
+  Play, Images, Crown, TrendingUp, User,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -271,6 +272,311 @@ function FeaturedCarousel() {
   );
 }
 
+/* ── Mock: Premium kitaplar ─────────────────────────────────────────── */
+const PREMIUM_BOOKS = [
+  {
+    id: 1, rank: "#01",
+    badge: "PREMIUM YAZAR",
+    title: "Karma",
+    genres: "Dram · Gizem",
+    desc: "İki dünyanın arasında sıkışmış hayatlar… Farklı acılar, farklı seçimler, farklı kaderler.",
+    author: "Nairobi",
+    coverBg: "linear-gradient(160deg,#1c1917 0%,#292524 100%)",
+    thumbBg1: "#1a1a1a", thumbBg2: "#2a2a2a",
+  },
+  {
+    id: 2, rank: "#02",
+    badge: "PREMIUM YAZAR",
+    title: "Labirent",
+    genres: "Gerilim · Polisiye",
+    desc: "Şehrin altındaki gizli ağlarda kovalamaca. Her kapı başka bir sırrı açar.",
+    author: "Marcus",
+    coverBg: "linear-gradient(160deg,#0c0a3e 0%,#1e1b6b 100%)",
+    thumbBg1: "#1a1a2a", thumbBg2: "#2a2a3a",
+  },
+  {
+    id: 3, rank: "#03",
+    badge: "PREMIUM YAZAR",
+    title: "Deniz Kıyısı",
+    genres: "Romantizm · Drama",
+    desc: "Kırık bir aşkın izlerinde yürüyen iki yabancı, aynı sahilde buluşur.",
+    author: "Leyla",
+    coverBg: "linear-gradient(160deg,#0c3040 0%,#0e6b8b 100%)",
+    thumbBg1: "#102030", thumbBg2: "#153040",
+  },
+];
+
+const RECOMMENDED = [
+  { id:1, title:"Sessiz Sayfalar", author:"Maya T.", genre:"Polisiye",   progress:92, coverBg:"linear-gradient(160deg,#1a1a2e,#16213e)" },
+  { id:2, title:"Yıldızların Altında", author:"Ege A.",   genre:"Fantastik", progress:78, coverBg:"linear-gradient(160deg,#2d1b69,#11998e)" },
+  { id:3, title:"Kayıp Şehirler", author:"Derya N.",  genre:"Macera",    progress:64, coverBg:"linear-gradient(160deg,#134e4a,#0d9488)" },
+  { id:4, title:"Sırra Davet",   author:"Deniz K.",  genre:"Gerilim",   progress:51, coverBg:"linear-gradient(160deg,#450a0a,#7f1d1d)" },
+  { id:5, title:"Kırık Zaman",   author:"Elif M.",   genre:"Bilim Kurgu", progress:43, coverBg:"linear-gradient(160deg,#0f172a,#1e3a5f)" },
+];
+
+const TRENDING = [
+  { id:1, rank:1, title:"Bir Adın Bedeli", author:"İrem U.", genre:"Romantizm",    reads:"12.8K", coverBg:"linear-gradient(160deg,#78350f,#d97706)" },
+  { id:2, rank:2, title:"Derin Mesafe",    author:"Uygar Y.", genre:"Genç Yetişkin", reads:"26.4K", coverBg:"linear-gradient(160deg,#1e3a5f,#3b82f6)" },
+  { id:3, rank:3, title:"Gökyüzü Çizgisi", author:"Ece Y.",  genre:"Fantastik",    reads:"9.8K",  coverBg:"linear-gradient(160deg,#14532d,#15803d)" },
+  { id:4, rank:4, title:"Kayıp Harita",    author:"Arda S.", genre:"Macera",       reads:"14.7K", coverBg:"linear-gradient(160deg,#1c1917,#57534e)" },
+  { id:5, rank:5, title:"Sessiz Oda",      author:"Can D.",  genre:"Gerilim",      reads:"10.6K", coverBg:"linear-gradient(160deg,#450a0a,#991b1b)" },
+];
+
+/* ── Premium Yazarlardan Kitaplar ────────────────────────────────────── */
+function PremiumSection() {
+  const [active, setActive] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setActive(Math.round(el.scrollLeft / el.clientWidth));
+  }, []);
+
+  const book = PREMIUM_BOOKS[active];
+
+  return (
+    <div
+      className="mx-4 rounded-3xl overflow-hidden"
+      style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      {/* Üst başlık */}
+      <div className="flex items-start justify-between px-5 pt-5 pb-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{ color: "#fbbf24" }}>
+            Loop Seçkisi · Özel Salon
+          </p>
+          <h2 className="text-[20px] font-black text-white leading-tight">Premium Yazarlardan Kitaplar</h2>
+          <p className="text-[11px] text-white/40 mt-0.5">Sınırlı seçki · sinematik anlatlar</p>
+        </div>
+        <div
+          className="px-3 py-1.5 rounded-full text-[11px] font-black text-white flex-shrink-0 mt-1"
+          style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)", boxShadow: "0 2px 12px #7c3aed55" }}
+        >
+          Pro
+        </div>
+      </div>
+
+      {/* Kaydırılabilir kartlar */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto"
+        style={{ scrollSnapType:"x mandatory", scrollbarWidth:"none", msOverflowStyle:"none" }}
+      >
+        {PREMIUM_BOOKS.map((b, idx) => (
+          <div key={b.id} className="flex-none px-4 pb-2" style={{ width:"100%", scrollSnapAlign:"start" }}>
+            <div
+              className="flex rounded-2xl overflow-hidden"
+              style={{
+                height: 310,
+                border: `1px solid ${idx === active ? "rgba(251,191,36,0.45)" : "rgba(255,255,255,0.07)"}`,
+                transition: "border-color 0.3s",
+              }}
+            >
+              {/* Sol: kapak + sıra rozeti */}
+              <div className="relative flex-none" style={{ width: "38%", background: b.coverBg }}>
+                <div
+                  className="absolute top-3 left-3 text-[11px] font-black text-white px-2 py-1 rounded-lg"
+                  style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                >
+                  {b.rank}
+                </div>
+                {/* Yazar avatarı */}
+                <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center"
+                    style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)" }}
+                  >
+                    <User className="w-3.5 h-3.5 text-white/80" />
+                  </div>
+                  <span className="text-[11px] font-bold text-white/90">{b.author}</span>
+                </div>
+              </div>
+
+              {/* Sağ: bilgi */}
+              <div
+                className="flex-1 flex flex-col min-w-0"
+                style={{ background: "#111", borderLeft: "1px solid rgba(251,191,36,0.3)", padding: "16px 14px" }}
+              >
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 mb-1">{b.badge}</p>
+                <p className="text-[26px] font-black text-white leading-none mb-1">{b.title}</p>
+                <p className="text-[11px] text-white/45 mb-2">{b.genres}</p>
+                <p className="text-[11.5px] text-white/60 leading-relaxed flex-1 line-clamp-3">{b.desc}</p>
+
+                {/* Video önizleme thumbnails */}
+                <div className="flex gap-2 mb-3 mt-2">
+                  <div
+                    className="flex-1 rounded-xl flex items-end p-2"
+                    style={{ height: 64, background: b.thumbBg1, border: "1px solid rgba(255,255,255,0.07)" }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <Play className="w-3 h-3 text-white/60 fill-white/60" />
+                      <span className="text-[9px] text-white/50">Oynuyor</span>
+                    </div>
+                  </div>
+                  <div
+                    className="rounded-xl"
+                    style={{ width: 52, height: 64, background: b.thumbBg2, border: "1px solid rgba(255,255,255,0.07)" }}
+                  />
+                </div>
+
+                {/* Eylem butonları */}
+                <div className="flex gap-2">
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold text-white flex-1 justify-center"
+                    style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
+                  >
+                    Kitaba git <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold text-white/70"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    <Images className="w-3.5 h-3.5" /> Görseller
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Dots */}
+      <div className="flex items-center justify-center gap-2 pb-5">
+        {PREMIUM_BOOKS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => { scrollRef.current?.scrollTo({ left: scrollRef.current.clientWidth * i, behavior: "smooth" }); }}
+            style={{
+              width: i === active ? 28 : 10, height: 10, borderRadius: 99, border: "none", cursor: "pointer",
+              background: i === active ? "#fbbf24" : "rgba(255,255,255,0.2)", transition: "all 0.3s", padding: 0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Okuma Rotan: Sizin İçin Önerdiğimiz ────────────────────────────── */
+function OkumaRotanSection() {
+  return (
+    <div className="mx-4">
+      {/* Başlık */}
+      <div className="flex items-end justify-between mb-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-400 mb-1">Okuma Rotan</p>
+          <h2 className="text-[20px] font-black text-white leading-tight">Sizin İçin Önerdiğimiz</h2>
+        </div>
+        <button className="flex items-center gap-1 text-[13px] font-bold text-white/50 whitespace-nowrap">
+          Tümünü gör <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Yatay kaydırma */}
+      <div
+        className="flex gap-3 overflow-x-auto pb-2"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {RECOMMENDED.map(book => (
+          <div key={book.id} className="flex-none" style={{ width: 120 }}>
+            {/* Kapak */}
+            <div
+              className="relative rounded-2xl overflow-hidden mb-2"
+              style={{ height: 168, background: book.coverBg }}
+            >
+              {/* Tür etiketi */}
+              <div
+                className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold text-white"
+                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+              >
+                {book.genre}
+              </div>
+            </div>
+
+            {/* Başlık + yazar */}
+            <p className="text-[12px] font-bold text-white leading-snug truncate">{book.title}</p>
+            <p className="text-[10px] text-white/45 mb-2 truncate">{book.author}</p>
+
+            {/* İlerleme barı */}
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 rounded-full" style={{ background: "rgba(255,255,255,0.1)" }}>
+                <div
+                  className="h-1 rounded-full"
+                  style={{ width: `${book.progress}%`, background: "linear-gradient(90deg,#7c3aed,#a855f7)" }}
+                />
+              </div>
+              <span className="text-[9px] font-bold text-white/40 flex-shrink-0">{book.progress}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Bu Haftanın Seçkisi: Trend Olanlar ─────────────────────────────── */
+function TrendSection() {
+  return (
+    <div
+      className="mx-4 rounded-3xl overflow-hidden"
+      style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      {/* Başlık */}
+      <div className="flex items-start justify-between px-5 pt-5 pb-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: "#fbbf24" }}>
+            Bu Haftanın Seçkisi
+          </p>
+          <h2 className="text-[20px] font-black text-white">Trend Olanlar</h2>
+        </div>
+        <button
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold text-white/70 whitespace-nowrap mt-1"
+          style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.1)" }}
+        >
+          <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Yükseliş
+        </button>
+      </div>
+
+      {/* Yatay kart listesi */}
+      <div
+        className="flex gap-3 overflow-x-auto px-4 pb-5"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {TRENDING.map(book => (
+          <div key={book.id} className="flex-none" style={{ width: 136 }}>
+            {/* Kapak */}
+            <div
+              className="relative rounded-2xl overflow-hidden mb-2.5"
+              style={{ height: 180, background: book.coverBg }}
+            >
+              {/* Sıra rozeti */}
+              <div
+                className="absolute top-2 left-2 w-7 h-7 rounded-full flex items-center justify-center text-[12px] font-black text-white"
+                style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }}
+              >
+                {book.rank}
+              </div>
+              {/* Tür etiketi */}
+              <div
+                className="absolute bottom-2 left-2 px-2 py-0.5 rounded-md text-[9px] font-bold text-white"
+                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+              >
+                {book.genre}
+              </div>
+            </div>
+
+            <p className="text-[12px] font-black text-white leading-snug mb-0.5 truncate">{book.title}</p>
+            <p className="text-[10px] text-white/40 mb-1 truncate">{book.author}</p>
+            <p className="text-[11px] font-bold" style={{ color: "#fbbf24" }}>{book.reads}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ── Sekme içerikleri ─────────────────────────────────────────────── */
 function KitaplarTab() {
   const [statsOpen, setStatsOpen]   = useState(false);
@@ -364,7 +670,16 @@ function KitaplarTab() {
       {/* ── Loop Seçkisi: Öne Çıkan Hikayeler carousel ─────────────── */}
       <FeaturedCarousel />
 
-      {/* ── Yeni bölüm placeholder ───────────────────────────────── */}
+      {/* ── Premium Yazarlardan Kitaplar ─────────────────────────────── */}
+      <PremiumSection />
+
+      {/* ── Okuma Rotan: Sizin İçin Önerdiğimiz ─────────────────────── */}
+      <OkumaRotanSection />
+
+      {/* ── Bu Haftanın Seçkisi: Trend Olanlar ──────────────────────── */}
+      <TrendSection />
+
+      {/* ── Kitaplarım ───────────────────────────────────────────────── */}
       <div
         className="mx-4 rounded-3xl px-5 py-6"
         style={{ background: "#0f0f0f", border: "1px solid rgba(255,255,255,0.06)" }}
