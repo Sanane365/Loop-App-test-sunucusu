@@ -14,11 +14,13 @@ import dmRouter from "./dm";
 import loopRouter from "./loop";
 import callsRouter from "./calls";
 import gifRouter from "./gif";
-import companionsRouter, { seedBuiltinCompanions } from "./companions";
-import gamesRouter, { ensureGameScoresTable }     from "./games";
+import companionsRouter, { seedBuiltinCompanions, ensureCompanionsPublishedColumn } from "./companions";
+import gamesRouter, { ensureGameScoresTable } from "./games";
 
 // Yerleşik yoldaşları ilk açılışta DB'ye ekle
 seedBuiltinCompanions();
+// published sütununu ekle (migration-less)
+ensureCompanionsPublishedColumn();
 // Oyun skoru tablosunu oluştur
 ensureGameScoresTable();
 

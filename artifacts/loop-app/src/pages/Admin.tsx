@@ -107,7 +107,7 @@ export default function Admin() {
   const [newPassword, setNewPassword] = useState("");
 
   // Yoldaş yönetimi
-  interface CompanionRow { id: number; slug: string; name: string; description: string | null; imageUrl: string; }
+  interface CompanionRow { id: number; slug: string; name: string; description: string | null; imageUrl: string; published: boolean; }
   const [companions, setCompanions] = useState<CompanionRow[]>([]);
   const [compName, setCompName] = useState("");
   const [compDesc, setCompDesc] = useState("");
@@ -143,6 +143,17 @@ export default function Admin() {
     if (!confirm("Bu yoldaşı silmek istediğine emin misin?")) return;
     const r = await fetch(`/api/admin/companions/${id}`, { method: "DELETE" });
     if (r.ok) { toast({ title: "Silindi", duration: 1500 }); fetchCompanions(); }
+  };
+
+  const handleTogglePublish = async (id: number, currentlyPublished: boolean) => {
+    const r = await fetch(`/api/admin/companions/${id}/publish`, { method: "PATCH" });
+    if (r.ok) {
+      toast({ title: currentlyPublished ? "⬇️ Taslağa alındı" : "✅ Yayınlandı", duration: 1800 });
+      fetchCompanions();
+    } else {
+      const e = await r.json().catch(() => ({}));
+      toast({ title: "Hata", description: e.error ?? "Bilinmeyen hata", variant: "destructive" });
+    }
   };
 
   // Kurucu ve Admin Yetkisine Sahip E-postalar Listesi
@@ -682,27 +693,57 @@ export default function Admin() {
                 <p className="text-center text-muted-foreground py-6 text-sm">Henüz yoldaş yok</p>
               )}
               {companions.map(c => (
-                <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card">
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 p-3 rounded-xl border bg-card transition-colors"
+                  style={{ borderColor: c.published ? "hsl(var(--border) / 0.5)" : "rgba(234,179,8,0.35)" }}
+                >
                   <img
                     src={c.imageUrl}
                     alt={c.name}
                     className="w-12 h-12 object-contain rounded-xl bg-muted/30"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold truncate">{c.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold truncate">{c.name}</p>
+                      {/* Yayın durumu rozeti */}
+                      <span
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
+                        style={{
+                          background: c.published ? "rgba(34,197,94,0.15)" : "rgba(234,179,8,0.15)",
+                          color:      c.published ? "#4ade80"              : "#fbbf24",
+                        }}
+                      >
+                        {c.published ? "✓ Yayında" : "⬜ Taslak"}
+                      </span>
+                    </div>
                     <p className="text-[11px] text-muted-foreground truncate">{c.description ?? "—"}</p>
                     <p className="text-[10px] text-muted-foreground/60 font-mono">slug: {c.slug}</p>
                   </div>
-                  {isAdmin && c.slug !== "bear" && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="w-8 h-8 text-muted-foreground hover:text-destructive shrink-0"
-                      onClick={() => handleDeleteCompanion(c.id)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Yayınla / Taslağa al */}
+                    {isAdmin && c.slug !== "bear" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-[11px] px-2.5 font-semibold"
+                        onClick={() => handleTogglePublish(c.id, c.published)}
+                      >
+                        {c.published ? "Taslağa Al" : "Yayınla"}
+                      </Button>
+                    )}
+                    {/* Sil */}
+                    {isAdmin && c.slug !== "bear" && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-8 h-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => handleDeleteCompanion(c.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -2,11 +2,12 @@
  * Companion routes
  *
  * Public:
- *   GET /api/companions          → list all companions
+ *   GET /api/companions          → published list (admin sees all)
  *
  * Admin only:
- *   POST /api/admin/companions   → upload PNG + name/description → create companion
- *   DELETE /api/admin/companions/:id → delete companion (+ file if not built-in)
+ *   POST  /api/admin/companions           → upload PNG + name/description → create (draft)
+ *   PATCH /api/admin/companions/:id/publish → toggle published
+ *   DELETE /api/admin/companions/:id      → delete (non-built-in only)
  */
 
 import { Router } from "express";
@@ -15,6 +16,7 @@ import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
 import { companionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -51,6 +53,27 @@ function requireAdmin(req: any, res: any, next: any) {
   next();
 }
 
+function isAdminUser(req: any): boolean {
+  return !!req.user && (req.user.role === "admin" || req.user.role === "moderator");
+}
+
+/* ── ensure published column exists (migration-less) ────────────────── */
+export async function ensureCompanionsPublishedColumn() {
+  try {
+    await db.execute(sql`
+      ALTER TABLE companions
+      ADD COLUMN IF NOT EXISTS published boolean NOT NULL DEFAULT false
+    `);
+    // bear is always published
+    await db.execute(sql`
+      UPDATE companions SET published = true WHERE slug = 'bear'
+    `);
+    console.log("[companions] published sütunu hazır.");
+  } catch (e) {
+    console.warn("[companions] published sütunu kontrol hatası:", e);
+  }
+}
+
 /* ── seed built-in bear on first run ────────────────────────────────── */
 export async function seedBuiltinCompanions() {
   try {
@@ -65,6 +88,7 @@ export async function seedBuiltinCompanions() {
         name:        "Ayı",
         description: "Sevimli & Sadık",
         imageUrl:    "/companion-bear.png",
+        published:   true,
       });
       console.log("[companions] Ayı yoldaşı otomatik eklendi.");
     }
@@ -74,13 +98,17 @@ export async function seedBuiltinCompanions() {
 }
 
 /* ── GET /api/companions ────────────────────────────────────────────── */
-router.get("/companions", async (_req, res) => {
+// Admin/mod → tüm yoldaşlar (taslaklar dahil)
+// Diğerleri → sadece published:true olanlar
+router.get("/companions", requireAuth, async (req, res) => {
   try {
-    const companions = await db
+    const all = await db
       .select()
       .from(companionsTable)
       .orderBy(companionsTable.createdAt);
-    res.json(companions);
+
+    const result = isAdminUser(req) ? all : all.filter(c => c.published);
+    res.json(result);
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "Sunucu hatası" });
@@ -104,13 +132,11 @@ router.post(
         res.status(400).json({ error: "İsim zorunlu" }); return;
       }
 
-      // generate unique slug from name
       const base = name.trim()
         .toLowerCase()
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "");
       let slug = base || uuidv4().slice(0, 8);
-      // ensure uniqueness
       const existing = await db
         .select()
         .from(companionsTable)
@@ -122,7 +148,13 @@ router.post(
 
       const [companion] = await db
         .insert(companionsTable)
-        .values({ slug, name: name.trim(), description: description?.trim() || null, imageUrl })
+        .values({
+          slug,
+          name:        name.trim(),
+          description: description?.trim() || null,
+          imageUrl,
+          published:   false,   // yeni yoldaşlar taslak olarak eklenir
+        })
         .returning();
 
       res.status(201).json(companion);
@@ -131,6 +163,43 @@ router.post(
       if (req.file) {
         try { fs.unlinkSync(req.file.path); } catch {}
       }
+      res.status(500).json({ error: "Sunucu hatası" });
+    }
+  }
+);
+
+/* ── PATCH /api/admin/companions/:id/publish ────────────────────────── */
+router.patch(
+  "/admin/companions/:id/publish",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const id = parseInt(req.params["id"] as string, 10);
+      if (isNaN(id)) { res.status(400).json({ error: "Geçersiz id" }); return; }
+
+      const [companion] = await db
+        .select()
+        .from(companionsTable)
+        .where(eq(companionsTable.id, id))
+        .limit(1);
+      if (!companion) { res.status(404).json({ error: "Bulunamadı" }); return; }
+
+      // bear daima yayında kalır
+      if (companion.slug === "bear") {
+        res.status(400).json({ error: "Ayı yoldaşı her zaman yayında olmalı" }); return;
+      }
+
+      const newPublished = !companion.published;
+      const [updated] = await db
+        .update(companionsTable)
+        .set({ published: newPublished })
+        .where(eq(companionsTable.id, id))
+        .returning();
+
+      res.json(updated);
+    } catch (e) {
+      console.error(e);
       res.status(500).json({ error: "Sunucu hatası" });
     }
   }
@@ -153,13 +222,11 @@ router.delete(
         .limit(1);
       if (!companion) { res.status(404).json({ error: "Bulunamadı" }); return; }
 
-      // built-in companions cannot be deleted
       if (companion.imageUrl.startsWith("/companion-")) {
         res.status(403).json({ error: "Yerleşik yoldaşlar silinemez" });
         return;
       }
 
-      // only delete file if it's an uploaded one (not built-in)
       if (companion.imageUrl.startsWith("/api/uploads/companions/")) {
         const filename = path.basename(companion.imageUrl);
         const filePath = path.join(uploadDir, filename);
