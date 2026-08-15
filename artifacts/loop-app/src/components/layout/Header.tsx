@@ -1,4 +1,4 @@
-import { Bell, Search, User, LogOut, Home, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun, Menu } from "lucide-react";
+import { Bell, BookOpen, Search, User, LogOut, Home, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun, Menu } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -83,6 +83,14 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
 
         {/* Right icons */}
         <div className="flex items-center gap-4">
+          <Link
+            href="/notebook"
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            data-testid="header-notebook"
+          >
+            <BookOpen className="w-5 h-5" />
+          </Link>
+
           <Link
             href="/notifications"
             className="relative text-muted-foreground hover:text-foreground transition-colors"
