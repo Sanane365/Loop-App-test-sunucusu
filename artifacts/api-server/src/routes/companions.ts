@@ -153,6 +153,12 @@ router.delete(
         .limit(1);
       if (!companion) { res.status(404).json({ error: "Bulunamadı" }); return; }
 
+      // built-in companions cannot be deleted
+      if (companion.imageUrl.startsWith("/companion-")) {
+        res.status(403).json({ error: "Yerleşik yoldaşlar silinemez" });
+        return;
+      }
+
       // only delete file if it's an uploaded one (not built-in)
       if (companion.imageUrl.startsWith("/api/uploads/companions/")) {
         const filename = path.basename(companion.imageUrl);

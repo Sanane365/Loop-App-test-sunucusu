@@ -72,60 +72,86 @@ const QUESTIONS = [
   "En sevdiğin şey nedir?",
 ];
 
-/* ── canvas: flood-fill white background removal ─────────────────────
- *  Starts BFS from all 4 image edges; any near-white pixel that is
- *  reachable from the outside is treated as background and made
- *  transparent.  White pixels *inside* the figure (fur, eyes …) are
- *  never reached and stay intact.
+/* ── canvas: flood-fill background removal ───────────────────────────
+ *  Two modes, auto-detected:
+ *
+ *  A) Image already has an alpha channel (any pixel with alpha < 200):
+ *     BFS only through ALREADY-TRANSPARENT pixels.  White opaque pixels
+ *     (e.g. panda fur, rabbit body) are NEVER touched — they are
+ *     foreground.  This mode correctly handles PNGs downloaded with a
+ *     pre-existing transparent background.
+ *
+ *  B) Fully opaque image (all alpha = 255, e.g. JPG or solid-bg PNG):
+ *     BFS from edges through near-white pixels (r,g,b > 235).
+ *     Works well for non-white subjects on white backgrounds.
  * ────────────────────────────────────────────────────────────────── */
 function stripWhiteBackground(imgSrc: string): Promise<string> {
   return new Promise(resolve => {
     const img = new Image();
+    img.crossOrigin = "anonymous";   // avoids canvas tainting on same-origin proxied imgs
     img.onload = () => {
+      const W = img.naturalWidth;
+      const H = img.naturalHeight;
       const cv  = document.createElement("canvas");
-      cv.width  = img.naturalWidth;
-      cv.height = img.naturalHeight;
+      cv.width  = W;
+      cv.height = H;
       const ctx = cv.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
 
-      const id = ctx.getImageData(0, 0, cv.width, cv.height);
-      const d  = id.data;
-      const W  = cv.width;
-      const H  = cv.height;
+      let id: ImageData;
+      try {
+        id = ctx.getImageData(0, 0, W, H);
+      } catch {
+        // canvas tainted (CORS) — return original unchanged
+        resolve(imgSrc);
+        return;
+      }
+      const d = id.data;
 
-      /* is this pixel part of the background (near-white or transparent)? */
-      const isBg = (idx4: number): boolean => {
-        const a = d[idx4 + 3];
-        if (a < 30) return true; // already transparent
-        const r = d[idx4], g = d[idx4 + 1], b = d[idx4 + 2];
-        return r > 218 && g > 218 && b > 218;
-      };
+      /* ── detect mode ──────────────────────────────────────────────
+       * Scan pixels; if ANY has alpha < 200, the image already has a
+       * meaningful alpha channel → use mode A.
+       * Early-exit after first transparent pixel for speed.
+       */
+      let hasAlpha = false;
+      for (let i = 3; i < d.length; i += 4) {
+        if (d[i] < 200) { hasAlpha = true; break; }
+      }
+
+      /* ── BFS helper ───────────────────────────────────────────── */
+      let isBg: (idx4: number) => boolean;
+
+      if (hasAlpha) {
+        /* Mode A — only propagate through transparent pixels.
+         * Opaque white pixels (white fur, white body) are foreground. */
+        isBg = (idx4: number) => d[idx4 + 3] < 30;
+      } else {
+        /* Mode B — propagate through near-white opaque pixels.
+         * Tight threshold (235) reduces leakage into light-coloured fur. */
+        isBg = (idx4: number) => {
+          if (d[idx4 + 3] < 30) return true;                    // already transparent
+          return d[idx4] > 235 && d[idx4 + 1] > 235 && d[idx4 + 2] > 235;
+        };
+      }
 
       const visited = new Uint8Array(W * H);
       const queue: number[] = [];
 
-      /* seed from every edge pixel */
       const enqueue = (i: number) => {
-        if (!visited[i] && isBg(i * 4)) {
-          visited[i] = 1;
-          queue.push(i);
-        }
+        if (!visited[i] && isBg(i * 4)) { visited[i] = 1; queue.push(i); }
       };
+
+      /* seed from every edge pixel */
       for (let x = 0; x < W; x++) { enqueue(x); enqueue((H - 1) * W + x); }
       for (let y = 1; y < H - 1; y++) { enqueue(y * W); enqueue(y * W + W - 1); }
 
       /* BFS — O(n) with index pointer */
       let head = 0;
       while (head < queue.length) {
-        const i  = queue[head++];
-        const x  = i % W;
-        const y  = (i - x) / W;
-
-        /* soft anti-alias: pixels very close to edge get partial alpha */
-        const pi = i * 4;
-        d[pi + 3] = 0;
-
-        /* 4-connected neighbors */
+        const i = queue[head++];
+        const x = i % W;
+        const y = (i - x) / W;
+        d[i * 4 + 3] = 0;                 // erase pixel
         if (y > 0)     enqueue(i - W);
         if (y < H - 1) enqueue(i + W);
         if (x > 0)     enqueue(i - 1);

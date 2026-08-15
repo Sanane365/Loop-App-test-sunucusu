@@ -693,7 +693,7 @@ export default function Admin() {
                     <p className="text-[11px] text-muted-foreground truncate">{c.description ?? "—"}</p>
                     <p className="text-[10px] text-muted-foreground/60 font-mono">slug: {c.slug}</p>
                   </div>
-                  {c.slug !== "bear" && (
+                  {isAdmin && c.slug !== "bear" && (
                     <Button
                       size="icon"
                       variant="ghost"
