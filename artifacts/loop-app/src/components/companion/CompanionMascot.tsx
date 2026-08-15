@@ -182,7 +182,8 @@ const KF = `
 @keyframes cz-zzz        { 0%{opacity:0;transform:translate(0,0) scale(.5)} 20%{opacity:1} 80%{opacity:.6} 100%{opacity:0;transform:translate(10px,-18px) scale(1.1)} }
 @keyframes cq-pop        { 0%{opacity:0;transform:translateY(6px) scale(.9)} 12%{opacity:1;transform:translateY(0) scale(1)} 85%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-4px) scale(.95)} }
 @keyframes cq-dot        { 0%,80%,100%{transform:translateY(0)}  40%{transform:translateY(-4px)} }
-@keyframes cm-flip-2d    { 0%{transform:scaleX(1)} 50%{transform:scaleX(0)} 100%{transform:scaleX(-1)} }
+@keyframes cm-turn-right { 0%{transform:scaleX(-1) scaleY(1)} 45%{transform:scaleX(0) scaleY(1.1)} 100%{transform:scaleX(1)  scaleY(1)} }
+@keyframes cm-turn-left  { 0%{transform:scaleX(1)  scaleY(1)} 45%{transform:scaleX(0) scaleY(1.1)} 100%{transform:scaleX(-1) scaleY(1)} }
 `;
 
 /* ── animation config ────────────────────────────────────────────────── */
@@ -205,6 +206,7 @@ export default function CompanionMascot({
   const [src,        setSrc]        = useState<string | null>(null);
   const [posX,       setPosX]       = useState(14);
   const [flipped,    setFlipped]    = useState(false);
+  const [turnAnim,   setTurnAnim]   = useState<"cm-turn-left"|"cm-turn-right"|null>(null);
   const [anim,       setAnim]       = useState<AnimState>("idle");
   const [showBubble, setShowBubble] = useState(false);
   const [renaming,   setRenaming]   = useState(false);
@@ -231,6 +233,7 @@ export default function CompanionMascot({
   const peekTimer  = useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const qTimer     = useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const qHideTimer = useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+  const turnTimer  = useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const posXRef    = useRef(14);
   const cwRef      = useRef(320);
   const animRef    = useRef<AnimState>("idle");
@@ -238,6 +241,17 @@ export default function CompanionMascot({
 
   /* keep animRef in sync */
   useEffect(() => { animRef.current = anim; }, [anim]);
+
+  /* ── 2D turn animation on flip change ───────────────────────────── */
+  const prevFlipped = useRef(false);
+  useEffect(() => {
+    if (prevFlipped.current === flipped) return;
+    const goingLeft = flipped;           // true = now facing left
+    prevFlipped.current = flipped;
+    clearTimeout(turnTimer.current);
+    setTurnAnim(goingLeft ? "cm-turn-left" : "cm-turn-right");
+    turnTimer.current = setTimeout(() => setTurnAnim(null), 340);
+  }, [flipped]);
 
   /* measure container */
   useEffect(() => {
@@ -469,33 +483,23 @@ export default function CompanionMascot({
           animation: isWalking ? "cm-shadow 0.5s ease-in-out infinite" : "cm-shadow-idle 3.4s ease-in-out infinite",
         }} />
 
-        {/* ── figure ───────────────────────────────────────────────── */}
-        <div
-          onClick={handleTap}
-          style={{
-            width:     BEAR_W,
-            height:    BEAR_W,
-            cursor:    "pointer",
-            /* 2D flat flip via scaleX — no perspective distortion */
-            transform: flipped ? "scaleX(-1)" : "scaleX(1)",
-            transition:"transform 0.28s ease-in-out",
-            animation: `${cfg.name} ${cfg.dur} ${cfg.easing} ${cfg.iter}`,
-            willChange:"transform",
-            position:  "relative",
-            flexShrink:0,
-          }}
-        >
-          {/* zzz bubbles */}
+        {/* ── figure: flip wrapper (2-D cartoon turn) ──────────────── */}
+        {/*   Outer div  → scaleX flip via turn keyframe              */}
+        {/*   Inner div  → bob/walk/wave animations                   */}
+        {/*   zzz + moon live OUTSIDE the flip so they never mirror   */}
+        <div style={{ position:"relative", width:BEAR_W, height:BEAR_W }}>
+
+          {/* zzz bubbles — always top-right, never flipped */}
           {zzz && [0,1].map(i => (
             <span key={i} style={{
               position:"absolute", top:-4-i*13, right:-4-i*7,
               fontSize:10+i*4, fontWeight:900, color:"#a78bfa",
-              animation:`cz-zzz 2.2s ease-in-out ${i*.9}s infinite`, opacity:0, zIndex:10,
-              ...(flipped ? { transform:"scaleX(-1)" } : {}),
+              animation:`cz-zzz 2.2s ease-in-out ${i*.9}s infinite`,
+              opacity:0, zIndex:10, pointerEvents:"none",
             }}>z</span>
           ))}
 
-          {/* moon badge */}
+          {/* moon badge — always top-left, never flipped */}
           {evening && isSleeping && (
             <div style={{
               position:"absolute", top:-8, left:-8, zIndex:12,
@@ -503,25 +507,48 @@ export default function CompanionMascot({
               width:20, height:20, display:"flex", alignItems:"center", justifyContent:"center",
               border:"1px solid rgba(139,92,246,0.55)",
               boxShadow:"0 0 8px rgba(139,92,246,0.5)",
+              pointerEvents:"none",
             }}>
               <Moon style={{ width:11, height:11, color:"#c4b5fd" }} />
             </div>
           )}
 
-          {src && (
-            <img
-              src={src}
-              alt={name || "Yoldaş"}
+          {/* flip wrapper: only handles scaleX direction via turn keyframe */}
+          <div style={{
+            width:"100%", height:"100%",
+            /* when turning: run keyframe; otherwise hold final scaleX */
+            animation: turnAnim
+              ? `${turnAnim} 0.32s ease-in-out forwards`
+              : undefined,
+            transform: turnAnim ? undefined : `scaleX(${flipped ? -1 : 1})`,
+            transformOrigin: "50% 100%",
+          }}>
+            {/* anim wrapper: walk/idle/wave/peek/happy/sleep */}
+            <div
+              onClick={handleTap}
               style={{
                 width:"100%", height:"100%",
-                objectFit:"contain", display:"block",
-                userSelect:"none", WebkitUserSelect:"none", pointerEvents:"none",
-                filter: nightFilter,
-                transition:"filter 2s ease",
+                cursor:"pointer",
+                animation:`${cfg.name} ${cfg.dur} ${cfg.easing} ${cfg.iter}`,
+                willChange:"transform",
               }}
-              draggable={false}
-            />
-          )}
+            >
+              {src && (
+                <img
+                  src={src}
+                  alt={name || "Yoldaş"}
+                  style={{
+                    width:"100%", height:"100%",
+                    objectFit:"contain", display:"block",
+                    userSelect:"none", WebkitUserSelect:"none", pointerEvents:"none",
+                    filter: nightFilter,
+                    transition:"filter 2s ease",
+                  }}
+                  draggable={false}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── test mode badge ───────────────────────────────────────── */}
