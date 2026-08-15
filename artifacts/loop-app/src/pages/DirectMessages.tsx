@@ -10,6 +10,8 @@ import {
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
   Camera, Users, Phone, Video, Info, Smile, BadgeCheck, Reply,
+  Bookmark, Palette, ChevronRight, Copy, ExternalLink,
+  ImageIcon, ShieldOff, Flag,
 } from "lucide-react";
 import GifPicker from "@/components/shared/GifPicker";
 
@@ -43,6 +45,26 @@ const FAV_EMOJIS: { emoji: string; color: string; glow: string; label: string }[
   { emoji: "🎸", color: "#fde68a", glow: "#fde68a", label: "Gitar" },
 ];
 const DEFAULT_FAV: FavEntry = { color: "#a855f7", glow: "#a855f7" };
+
+// ── DM Tema sistemi ─────────────────────────────────────────────────────────
+interface DmTheme { bubble: string; bgStyle: string }
+const BUBBLE_THEMES = [
+  { id: "violet",  label: "Mor",      light: "#EAE4FF", dark: "rgba(109,40,217,0.28)",  dot: "#a78bfa" },
+  { id: "blue",    label: "Mavi",     light: "#DBEAFE", dark: "rgba(37,99,235,0.28)",   dot: "#60a5fa" },
+  { id: "rose",    label: "Gül",      light: "#FCE7F3", dark: "rgba(190,18,60,0.28)",   dot: "#fb7185" },
+  { id: "green",   label: "Yeşil",    light: "#D1FAE5", dark: "rgba(5,150,105,0.28)",   dot: "#34d399" },
+  { id: "orange",  label: "Turuncu",  light: "#FFEDD5", dark: "rgba(194,65,12,0.28)",   dot: "#fb923c" },
+  { id: "teal",    label: "Turkuaz",  light: "#CCFBF1", dark: "rgba(13,148,136,0.28)",  dot: "#2dd4bf" },
+  { id: "yellow",  label: "Sarı",     light: "#FEF9C3", dark: "rgba(161,98,7,0.28)",    dot: "#facc15" },
+  { id: "zinc",    label: "Gri",      light: "#F4F4F5", dark: "rgba(82,82,91,0.35)",    dot: "#a1a1aa" },
+];
+const DM_BG_STYLES = [
+  { id: "none",         label: "Sade",          css: {} },
+  { id: "violet-glow",  label: "Mor Işık",      css: { background: "radial-gradient(ellipse at 50% 0%, rgba(139,92,246,0.09) 0%, transparent 70%)" } },
+  { id: "ocean",        label: "Okyanus",        css: { background: "linear-gradient(180deg, rgba(14,165,233,0.06) 0%, rgba(20,184,166,0.06) 100%)" } },
+  { id: "sunset",       label: "Gün Batımı",     css: { background: "linear-gradient(160deg, rgba(251,146,60,0.07) 0%, rgba(244,114,182,0.07) 100%)" } },
+  { id: "stars",        label: "Yıldızlar",      css: { backgroundImage: "radial-gradient(circle, rgba(148,163,184,0.25) 1px, transparent 1px)", backgroundSize: "36px 36px" } },
+];
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -301,6 +323,15 @@ export default function DirectMessages() {
 
   // GIF picker state
   const [gifOpen, setGifOpen] = useState(false);
+
+  // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
+  const [showInfoPanel, setShowInfoPanel] = useState(false);
+  const [infoSection, setInfoSection] = useState<"genel"|"tema"|"anlar"|"medya">("genel");
+  const [dmTheme, setDmTheme] = useState<DmTheme>({ bubble: "violet", bgStyle: "none" });
+  const [savedMsgsCache, setSavedMsgsCache] = useState<DmMessage[]>([]);
+  const [savedMsgIds, setSavedMsgIds] = useState<Set<number>>(new Set());
+  const [msgCtxMenu, setMsgCtxMenu] = useState<{ msg: DmMessage; x: number; y: number } | null>(null);
+  const msgLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Group DM state ─────────────────────────────────────────────────────────
   const [groups, setGroups] = useState<DmGroup[]>([]);
@@ -880,6 +911,22 @@ export default function DirectMessages() {
     return undefined;
   }, [userId]);
 
+  // Kullanıcı değişince tema & kayıtlı anları yükle
+  useEffect(() => {
+    if (!userId) return;
+    try {
+      const t = JSON.parse(localStorage.getItem(`dm_theme_${userId}`) || "null");
+      setDmTheme(t ?? { bubble: "violet", bgStyle: "none" });
+    } catch { setDmTheme({ bubble: "violet", bgStyle: "none" }); }
+    try {
+      const saved: DmMessage[] = JSON.parse(localStorage.getItem(`dm_saved_msgs_${userId}`) || "[]");
+      setSavedMsgsCache(saved);
+      setSavedMsgIds(new Set(saved.map(m => m.id)));
+    } catch { setSavedMsgsCache([]); setSavedMsgIds(new Set()); }
+    setShowInfoPanel(false);
+    setMsgCtxMenu(null);
+  }, [userId]);
+
   useEffect(() => {
     if (groupId) {
       const gid = parseInt(groupId);
@@ -915,6 +962,31 @@ export default function DirectMessages() {
       el.scrollTop = el.scrollHeight;
     }
   }, [groupMessages]);
+
+  // ── Tema & Kayıtlı Anlar yardımcıları ──────────────────────────────────
+  const saveDmTheme = (t: DmTheme) => {
+    setDmTheme(t);
+    if (userId) localStorage.setItem(`dm_theme_${userId}`, JSON.stringify(t));
+  };
+  const toggleSaveMsg = (msg: DmMessage) => {
+    setSavedMsgsCache(prev => {
+      const exists = prev.some(m => m.id === msg.id);
+      const next = exists ? prev.filter(m => m.id !== msg.id) : [...prev, msg];
+      if (userId) localStorage.setItem(`dm_saved_msgs_${userId}`, JSON.stringify(next));
+      setSavedMsgIds(new Set(next.map(m => m.id)));
+      return next;
+    });
+    setMsgCtxMenu(null);
+    toast({ title: savedMsgIds.has(msg.id) ? "Anlardan çıkarıldı" : "Ana kayıt edildi ✨", duration: 1500 });
+  };
+  const getBubbleBg = (): string => {
+    const t = BUBBLE_THEMES.find(b => b.id === dmTheme.bubble) ?? BUBBLE_THEMES[0];
+    const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark");
+    return isDark ? t.dark : t.light;
+  };
+  const getBgStyleCss = (): React.CSSProperties => {
+    return DM_BG_STYLES.find(s => s.id === dmTheme.bgStyle)?.css ?? {};
+  };
 
   // ── Arama başlat (header'daki telefon/video butonları) ──────────────────
   const handleStartCall = async (type: "voice" | "video") => {
@@ -1630,7 +1702,10 @@ export default function DirectMessages() {
               >
                 <Video style={{ width: 20, height: 20 }} />
               </button>
-              <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary">
+              <button
+                onClick={() => { setShowInfoPanel(true); setInfoSection("genel"); }}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-primary/10 transition-colors text-primary"
+              >
                 <Info style={{ width: 20, height: 20 }} />
               </button>
             </div>
@@ -1640,6 +1715,7 @@ export default function DirectMessages() {
           <div
             className="flex-1 overflow-y-auto bg-background"
             ref={scrollRef}
+            style={getBgStyleCss()}
             onScroll={() => {
               const el = scrollRef.current;
               if (!el) return;
@@ -1727,7 +1803,23 @@ export default function DirectMessages() {
                           </div>
 
                           {/* Balon + saat-tik altında */}
-                          <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
+                          <div
+                            className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"} relative`}
+                            onContextMenu={(e) => { e.preventDefault(); setMsgCtxMenu({ msg, x: e.clientX, y: e.clientY }); }}
+                            onTouchStart={(e) => {
+                              const sx = e.touches[0].clientX; const sy = e.touches[0].clientY;
+                              if (msgLongPressRef.current) clearTimeout(msgLongPressRef.current);
+                              msgLongPressRef.current = setTimeout(() => { msgLongPressRef.current = null; setMsgCtxMenu({ msg, x: sx, y: sy }); if (navigator.vibrate) navigator.vibrate(20); }, 600);
+                            }}
+                            onTouchEnd={() => { if (msgLongPressRef.current) { clearTimeout(msgLongPressRef.current); msgLongPressRef.current = null; } }}
+                            onTouchMove={() => { if (msgLongPressRef.current) { clearTimeout(msgLongPressRef.current); msgLongPressRef.current = null; } }}
+                          >
+                            {/* Kayıtlı an rozeti */}
+                            {savedMsgIds.has(msg.id) && (
+                              <div className={`absolute -top-1 z-20 ${isMe ? "-left-5" : "-right-5"}`}>
+                                <Bookmark className="w-3.5 h-3.5 text-primary fill-primary drop-shadow-sm" />
+                              </div>
+                            )}
                             {msg.content && (() => {
                               const voiceMatch = msg.content.match(/^__LOOP_CALL_VOICE__(?::(.+))?$/);
                               const videoMatch = msg.content.match(/^__LOOP_CALL_VIDEO__(?::(.+))?$/);
@@ -1742,12 +1834,8 @@ export default function DirectMessages() {
                                 const callLabel = callType === "voice" ? "Sesli Arama" : "Görüntülü Arama";
                                 return (
                                   <div
-                                    className={`flex items-center gap-3 px-4 py-3 min-w-[200px] ${
-                                      isMe
-                                        ? "bg-[#EAE4FF] dark:bg-violet-900/40"
-                                        : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
-                                    }`}
-                                    style={{ borderRadius: "18px" }}
+                                    className={`flex items-center gap-3 px-4 py-3 min-w-[200px] ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`}
+                                    style={{ borderRadius: "18px", ...(isMe ? { background: getBubbleBg() } : {}) }}
                                   >
                                     <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 text-primary">
                                       {callIcon}
@@ -1784,7 +1872,7 @@ export default function DirectMessages() {
                               if (msg.content?.startsWith("__STORY_REACTION__:")) {
                                 const emoji = msg.content.split(":")[2] ?? "❤️";
                                 return (
-                                  <div className={`flex items-center gap-2 px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 200 }}>
+                                  <div className={`flex items-center gap-2 px-3 py-2 rounded-[16px] ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 200, ...(isMe ? { background: getBubbleBg() } : {}) }}>
                                     <span className="text-2xl">{emoji}</span>
                                     <span className="text-xs text-muted-foreground">hikayene tepki verdi</span>
                                   </div>
@@ -1795,7 +1883,7 @@ export default function DirectMessages() {
                               if (msg.content?.startsWith("__STORY_REPLY__:")) {
                                 const text = msg.content.split(":").slice(2).join(":");
                                 return (
-                                  <div className={`px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                  <div className={`px-3 py-2 rounded-[16px] ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220, ...(isMe ? { background: getBubbleBg() } : {}) }}>
                                     <p className="text-[10px] text-muted-foreground font-medium mb-1">📖 Hikaye yanıtı</p>
                                     <p className="text-[14px] text-foreground break-words">{text}</p>
                                   </div>
@@ -1808,7 +1896,7 @@ export default function DirectMessages() {
                                 const postId = parseInt(parts[1]);
                                 const snippet = parts.slice(2).join(":");
                                 return (
-                                  <button onClick={() => setLocation(`/?post=${postId}`)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
+                                  <button onClick={() => setLocation(`/?post=${postId}`)} className={`flex flex-col px-3 py-2.5 rounded-[16px] hover:opacity-90 transition-opacity text-left ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220, ...(isMe ? { background: getBubbleBg() } : {}) }}>
                                     <p className="text-[10px] text-primary font-semibold mb-0.5">📎 Gönderi</p>
                                     <p className="text-[13px] text-foreground line-clamp-3 break-words">{snippet || "Gönderiyi görüntüle"}</p>
                                     <p className="text-[10px] text-muted-foreground mt-1">Görüntülemek için dokun</p>
@@ -1818,12 +1906,8 @@ export default function DirectMessages() {
 
                               return (
                                 <div
-                                  className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${
-                                    isMe
-                                      ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground"
-                                      : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"
-                                  }`}
-                                  style={{ borderRadius: "18px", overflowWrap: "anywhere" }}
+                                  className={`px-4 py-2.5 text-[14px] leading-[1.5] break-words whitespace-pre-wrap ${isMe ? "text-foreground" : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`}
+                                  style={{ borderRadius: "18px", overflowWrap: "anywhere", ...(isMe ? { background: getBubbleBg() } : {}) }}
                                 >
                                   {(() => {
                                     const c = msg.content ?? "";
@@ -1854,12 +1938,10 @@ export default function DirectMessages() {
                             {msg.voiceUrl && (
                               <button
                                 onClick={() => handlePlayDmVoice(msg.id, msg.voiceUrl!)}
-                                className={`flex items-center gap-3 px-4 py-3 rounded-[18px] shadow-sm transition-colors ${
-                                  isMe
-                                    ? "bg-[#EAE4FF] dark:bg-violet-900/40 text-foreground rounded-br-md hover:bg-violet-100 dark:hover:bg-violet-900/60"
-                                    : "bg-white dark:bg-zinc-800/90 text-foreground shadow-[0_1px_4px_rgba(0,0,0,0.08)] rounded-bl-md hover:bg-muted/60"
+                                className={`flex items-center gap-3 px-4 py-3 rounded-[18px] shadow-sm transition-colors text-foreground ${
+                                  isMe ? "rounded-br-md hover:opacity-90" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)] rounded-bl-md hover:bg-muted/60"
                                 }`}
-                                style={{ minWidth: 180 }}
+                                style={{ minWidth: 180, ...(isMe ? { background: getBubbleBg() } : {}) }}
                               >
                                 {playingVoiceId === msg.id ? (
                                   <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
@@ -2053,6 +2135,361 @@ export default function DirectMessages() {
           </div>
 
         </div>
+
+        {/* ── Mesaj Bağlam Menüsü ── */}
+        {msgCtxMenu !== null && (
+          <>
+            <div className="fixed inset-0 z-[70]" onClick={() => setMsgCtxMenu(null)} />
+            <div
+              className="fixed z-[71] bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden min-w-[180px] animate-in fade-in-0 zoom-in-95"
+              style={{
+                left: Math.min(msgCtxMenu.x, window.innerWidth - 196),
+                top: Math.min(msgCtxMenu.y, window.innerHeight - 200),
+              }}
+            >
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors text-left"
+                onClick={() => {
+                  const m = msgCtxMenu.msg;
+                  const dn = m.senderId === me?.id ? (me?.displayName ?? "Sen") : (m.sender?.displayName ?? "Kullanıcı");
+                  const preview = m.content ? m.content.replace(/^__LOOP_REPLY__:[^\n]+\n/, "").slice(0, 100) : m.mediaUrl ? "Medya" : m.voiceUrl ? "Sesli mesaj" : "";
+                  setDmReplyTo({ id: m.id, content: preview, displayName: dn });
+                  setMsgCtxMenu(null);
+                }}
+              >
+                <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Reply className="w-3.5 h-3.5 text-primary" />
+                </div>
+                Yanıtla
+              </button>
+              <div className="h-px bg-border/40 mx-3" />
+              <button
+                className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors text-left"
+                onClick={() => toggleSaveMsg(msgCtxMenu.msg)}
+              >
+                <div className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 ${savedMsgIds.has(msgCtxMenu.msg.id) ? "bg-primary/15" : "bg-muted"}`}>
+                  <Bookmark className={`w-3.5 h-3.5 ${savedMsgIds.has(msgCtxMenu.msg.id) ? "text-primary fill-primary" : "text-muted-foreground"}`} />
+                </div>
+                {savedMsgIds.has(msgCtxMenu.msg.id) ? "Anlardan Çıkar" : "Ana Kaydet ✨"}
+              </button>
+              {msgCtxMenu.msg.content && !msgCtxMenu.msg.content.startsWith("__") && (
+                <>
+                  <div className="h-px bg-border/40 mx-3" />
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors text-left"
+                    onClick={() => {
+                      navigator.clipboard?.writeText(msgCtxMenu.msg.content ?? "").catch(() => {});
+                      setMsgCtxMenu(null);
+                      toast({ title: "Kopyalandı", duration: 1500 });
+                    }}
+                  >
+                    <div className="w-7 h-7 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                      <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
+                    Kopyala
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── Info Paneli ── */}
+        {showInfoPanel && otherUser && (
+          <div className="fixed inset-0 z-[60] flex">
+            <div className="flex-1 bg-black/40 backdrop-blur-[2px]" onClick={() => setShowInfoPanel(false)} />
+            <div className="w-[88vw] max-w-sm h-full bg-card shadow-2xl flex flex-col animate-in slide-in-from-right-4 duration-300 overflow-hidden">
+
+              {/* Panel başlık */}
+              <div className="flex items-center gap-3 px-4 pt-12 pb-4 border-b border-border/40 flex-shrink-0">
+                <button
+                  onClick={() => setShowInfoPanel(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <p className="font-bold text-base">Kişi Detayları</p>
+              </div>
+
+              {/* Kişi kartı */}
+              <div className="flex flex-col items-center px-6 pt-6 pb-4 gap-3 flex-shrink-0">
+                <Avatar className="w-20 h-20 border-4 border-background shadow-md">
+                  <AvatarImage src={otherUser.avatarUrl || ""} />
+                  <AvatarFallback className="text-2xl font-black bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary">
+                    {otherUser.displayName.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="font-black text-xl leading-tight">{otherUser.displayName}</p>
+                    <BadgeCheck className="w-5 h-5 text-primary flex-shrink-0" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-0.5">@{otherUser.username}</p>
+                </div>
+                <button
+                  onClick={() => { setShowInfoPanel(false); setLocation(`/profile/${otherUser.id}`); }}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-border/60 text-sm font-medium hover:bg-muted/40 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Profili Gör
+                </button>
+              </div>
+
+              {/* Sekme navigasyonu */}
+              <div className="flex gap-1 px-4 pb-3 flex-shrink-0 overflow-x-auto">
+                {(["genel", "tema", "anlar", "medya"] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setInfoSection(tab)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all flex-shrink-0 ${
+                      infoSection === tab
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "bg-muted/60 text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {tab === "genel" ? "Genel" : tab === "tema" ? "Tema 🎨" : tab === "anlar" ? `Anlar ${savedMsgsCache.length > 0 ? `(${savedMsgsCache.length})` : ""}` : "Medya"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Sekme içeriği */}
+              <div className="flex-1 overflow-y-auto px-4 pb-8">
+
+                {/* ── Genel ── */}
+                {infoSection === "genel" && (
+                  <div className="flex flex-col gap-2">
+                    <div className="rounded-2xl border border-border/40 overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+                        onClick={() => {
+                          const uid = otherUser.id;
+                          const isFav = favMap.has(uid);
+                          if (isFav) { removeFav(uid); toast({ title: "Favorilerden çıkarıldı", duration: 1500 }); }
+                          else { setShowInfoPanel(false); setFavEmojiDialogId(uid); }
+                        }}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+                          <Heart className={`w-4 h-4 ${favMap.has(otherUser.id) ? "text-rose-500 fill-rose-500" : "text-rose-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{favMap.has(otherUser.id) ? "Favorilerden Çıkar" : "Favorilere Ekle"}</p>
+                          <p className="text-xs text-muted-foreground">Özel neon çerçeve ve emoji</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
+                      <div className="h-px bg-border/30 mx-4" />
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+                        onClick={() => { setShowInfoPanel(false); setInfoSection("tema"); setTimeout(() => setShowInfoPanel(true), 0); setInfoSection("tema"); }}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center flex-shrink-0">
+                          <Palette className="w-4 h-4 text-violet-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">Sohbet Temasını Düzenle</p>
+                          <p className="text-xs text-muted-foreground">Balon rengi ve arka plan</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
+                      <div className="h-px bg-border/30 mx-4" />
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+                        onClick={() => setInfoSection("anlar")}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                          <Bookmark className="w-4 h-4 text-amber-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">Kayıtlı Anlar</p>
+                          <p className="text-xs text-muted-foreground">{savedMsgsCache.length > 0 ? `${savedMsgsCache.length} an kayıtlı` : "Henüz kaydedilen an yok"}</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    </div>
+
+                    {/* Bildirim / Sessize Al */}
+                    <div className="rounded-2xl border border-border/40 overflow-hidden">
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+                        onClick={() => { setShowInfoPanel(false); setMuteDialogId(otherUser.id); }}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+                          <BellOff className="w-4 h-4 text-muted-foreground" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">
+                            {mutedMap.has(otherUser.id) && mutedMap.get(otherUser.id)! > Date.now() ? "Sessize Alındı" : "Sessize Al"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Bildirim ayarları</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    </div>
+
+                    {/* Tehlikeli Bölge */}
+                    <div className="rounded-2xl border border-destructive/20 overflow-hidden mt-2">
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-destructive/5 transition-colors text-left"
+                        onClick={() => toast({ title: "Engelleme yakında geliyor 🔒", duration: 2000 })}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                          <ShieldOff className="w-4 h-4 text-destructive" />
+                        </div>
+                        <p className="text-sm font-semibold text-destructive">Engelle</p>
+                      </button>
+                      <div className="h-px bg-destructive/10 mx-4" />
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-destructive/5 transition-colors text-left"
+                        onClick={() => toast({ title: "Şikayet gönderildi", duration: 2000 })}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                          <Flag className="w-4 h-4 text-destructive" />
+                        </div>
+                        <p className="text-sm font-semibold text-destructive">Şikayet Et</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Tema ── */}
+                {infoSection === "tema" && (
+                  <div className="flex flex-col gap-5">
+                    {/* Balon rengi */}
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Mesaj Balonu Rengi</p>
+                      <div className="grid grid-cols-4 gap-2.5">
+                        {BUBBLE_THEMES.map(t => (
+                          <button
+                            key={t.id}
+                            onClick={() => saveDmTheme({ ...dmTheme, bubble: t.id })}
+                            className="flex flex-col items-center gap-1.5 group"
+                          >
+                            <div
+                              className="w-12 h-12 rounded-2xl border-2 transition-all flex items-center justify-center shadow-sm"
+                              style={{
+                                background: t.light,
+                                borderColor: dmTheme.bubble === t.id ? t.dot : "transparent",
+                                boxShadow: dmTheme.bubble === t.id ? `0 0 0 3px ${t.dot}44` : undefined,
+                              }}
+                            >
+                              {dmTheme.bubble === t.id && (
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ background: t.dot }} />
+                              )}
+                            </div>
+                            <span className="text-[10px] text-muted-foreground font-medium">{t.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Arka plan */}
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Sohbet Arka Planı</p>
+                      <div className="flex flex-col gap-2">
+                        {DM_BG_STYLES.map(s => (
+                          <button
+                            key={s.id}
+                            onClick={() => saveDmTheme({ ...dmTheme, bgStyle: s.id })}
+                            className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all hover:bg-muted/30 text-left"
+                            style={{ borderColor: dmTheme.bgStyle === s.id ? "hsl(var(--primary))" : "hsl(var(--border) / 0.4)" }}
+                          >
+                            <div
+                              className="w-10 h-10 rounded-xl border border-border/30 flex-shrink-0"
+                              style={s.css as React.CSSProperties}
+                            />
+                            <span className="text-sm font-medium">{s.label}</span>
+                            {dmTheme.bgStyle === s.id && (
+                              <div className="ml-auto w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-primary-foreground" />
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Kayıtlı Anlar ── */}
+                {infoSection === "anlar" && (
+                  <div>
+                    {savedMsgsCache.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                        <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center">
+                          <Bookmark className="w-7 h-7 text-amber-500/60" />
+                        </div>
+                        <p className="font-semibold text-sm">Henüz kayıtlı an yok</p>
+                        <p className="text-xs text-muted-foreground/70 max-w-[200px]">
+                          Bir mesaja uzun bas → <strong>Ana Kaydet</strong> ile özel anları buraya ekle
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        <p className="text-xs text-muted-foreground font-medium mb-1">{savedMsgsCache.length} an kayıtlı</p>
+                        {savedMsgsCache.map(m => {
+                          const isMe = m.senderId === me?.id;
+                          const preview = m.content
+                            ? m.content.replace(/^__LOOP_REPLY__:[^\n]+\n/, "").replace(/^__[A-Z_]+__(:.*)?/, "📎 Medya içeriği").slice(0, 120)
+                            : m.mediaUrl ? "📷 Görsel" : m.voiceUrl ? "🎤 Sesli mesaj" : "";
+                          const timeStr = format(new Date(m.createdAt), "d MMM, HH:mm", { locale: tr });
+                          return (
+                            <div
+                              key={m.id}
+                              className="relative flex flex-col gap-1.5 px-4 py-3.5 rounded-2xl border border-border/40 bg-muted/20 hover:bg-muted/30 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-[11px] font-semibold text-primary">{isMe ? "Sen" : otherUser.displayName}</span>
+                                <span className="text-[10px] text-muted-foreground">{timeStr}</span>
+                              </div>
+                              <p className="text-[13px] text-foreground/90 leading-relaxed line-clamp-3">{preview}</p>
+                              <button
+                                className="absolute top-2.5 right-2.5 w-7 h-7 flex items-center justify-center rounded-full hover:bg-destructive/10 transition-colors"
+                                onClick={() => toggleSaveMsg(m)}
+                              >
+                                <X className="w-3.5 h-3.5 text-muted-foreground hover:text-destructive" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Ortak Medya ── */}
+                {infoSection === "medya" && (
+                  <div>
+                    {messages.filter(m => m.mediaUrl).length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                          <ImageIcon className="w-7 h-7 text-muted-foreground/40" />
+                        </div>
+                        <p className="font-semibold text-sm">Paylaşılan medya yok</p>
+                        <p className="text-xs text-muted-foreground/70">Bu sohbette henüz görsel paylaşılmadı</p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium mb-3">{messages.filter(m => m.mediaUrl).length} görsel</p>
+                        <div className="grid grid-cols-3 gap-1 rounded-2xl overflow-hidden">
+                          {messages.filter(m => m.mediaUrl).map(m => (
+                            <div key={m.id} className="aspect-square overflow-hidden bg-muted">
+                              {m.mediaType === "video"
+                                ? <video src={m.mediaUrl!} className="w-full h-full object-cover" />
+                                : <img src={m.mediaUrl!} alt="Medya" className="w-full h-full object-cover" loading="lazy" />
+                              }
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          </div>
+        )}
+
       </AppLayout>
     );
   }
