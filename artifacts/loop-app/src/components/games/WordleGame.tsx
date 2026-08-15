@@ -1,11 +1,14 @@
 /**
  * WordleGame — 5 harfli Türkçe Wordle
  *
- * Layout stratejisi:
- *   - Kapsayıcı h-full flex-col
- *   - Üst kısım (açıklama + toast + tahta): flex:1, overflow-y:auto
- *   - Alt kısım (klavye): flex-none, her zaman görünür
- *   - Karo boyutu dinamik: kapsayıcı yüksekliği ölçülür, en fazla 50px
+ * Layout:
+ *   • Dış kapsayıcı: flex-col, h-full
+ *   • Tahta bölgesi: flex-1 min-h-0 overflow-y-auto (küçük ekranlarda kaydırılır)
+ *   • Klavye: flex-none — ASLA kesilmez
+ *
+ * Klavye tasarımı:
+ *   • Sabit karo boyutu 44 px — JS ölçüm yok, layout atlaması yok
+ *   • Tuş genişliği: w-full / sütun sayısı — satır hiçbir zaman taşmaz
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -13,6 +16,8 @@ import { getDailyWord, WORDLE_WORDS } from "./words";
 
 const ROWS = 6;
 const COLS = 5;
+const T    = 44;   // karo boyutu (px)
+const GAP  = 5;
 
 type LetterStatus = "correct" | "present" | "absent" | "empty" | "filled";
 interface Cell { letter: string; status: LetterStatus }
@@ -23,20 +28,26 @@ interface Props {
   onGameEnd:      (won: boolean, attempts: number) => void;
 }
 
-/* ── Türkçe Q klavye ────────────────────────────────────────────────── */
+/* ── Türkçe Q klavye satırları ──────────────────────────────────────── */
 const KB_ROWS = [
   ["E","R","T","Y","U","İ","O","P","Ğ","Ü"],
   ["A","S","D","F","G","H","J","K","L","Ş","I"],
   ["GİR","Z","C","V","B","N","M","Ö","Ç","SİL"],
-];
+] as const;
 
-const BG: Record<LetterStatus, string> = {
-  correct: "#22c55e", present: "#d97706", absent: "#374151",
-  empty: "transparent", filled: "transparent",
+const STATUS_BG: Record<LetterStatus, string> = {
+  correct:  "#22c55e",
+  present:  "#d97706",
+  absent:   "#374151",
+  empty:    "transparent",
+  filled:   "transparent",
 };
-const BD: Record<LetterStatus, string> = {
-  correct: "#22c55e", present: "#d97706", absent: "#374151",
-  empty: "rgba(255,255,255,0.15)", filled: "rgba(255,255,255,0.65)",
+const STATUS_BD: Record<LetterStatus, string> = {
+  correct:  "#22c55e",
+  present:  "#d97706",
+  absent:   "#374151",
+  empty:    "rgba(255,255,255,0.15)",
+  filled:   "rgba(255,255,255,0.65)",
 };
 
 function emptyBoard(): Cell[][] {
@@ -48,40 +59,36 @@ function emptyBoard(): Cell[][] {
 export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Props) {
   const target = (targetWord ?? getDailyWord()).toUpperCase();
 
-  const [board,       setBoard]       = useState<Cell[][]>(emptyBoard);
-  const [currentRow,  setCurrentRow]  = useState(0);
-  const [currentCol,  setCurrentCol]  = useState(0);
-  const [gameState,   setGameState]   = useState<"playing"|"won"|"lost">(
+  const [board,       setBoard]      = useState<Cell[][]>(emptyBoard);
+  const [currentRow,  setCurrentRow] = useState(0);
+  const [currentCol,  setCurrentCol] = useState(0);
+  const [gameState,   setGameState]  = useState<"playing"|"won"|"lost">(
     alreadyPlayed ? (alreadyPlayed.result === "won" ? "won" : "lost") : "playing"
   );
   const [usedLetters, setUsedLetters] = useState<Map<string, LetterStatus>>(new Map());
-  const [shakeRow,    setShakeRow]    = useState<number | null>(null);
-  const [message,     setMessage]     = useState<string | null>(null);
-  const [flipRow,     setFlipRow]     = useState<number | null>(null);
-  const [tileSize,    setTileSize]    = useState(46);
+  const [shakeRow,    setShakeRow]   = useState<number | null>(null);
+  const [message,     setMessage]    = useState<string | null>(null);
+  const [flipRow,     setFlipRow]    = useState<number | null>(null);
 
-  /* ── Dinamik karo boyutu ─────────────────────────────────────────── */
-  const containerRef = useRef<HTMLDivElement>(null);
+  /* klavye satırı genişliği — kap ölçülür, tuş genişliği hesaplanır */
+  const kbRef   = useRef<HTMLDivElement>(null);
+  const [keyW,  setKeyW]  = useState(28);
+  const [actnW, setActnW] = useState(42);
+
   useEffect(() => {
-    const measure = () => {
-      if (!containerRef.current) return;
-      const h = containerRef.current.clientHeight;
-      // Tahta: 6T + 5*GAP(6) = 6T + 30
-      // Klavye: ~128px (3 satır × 40px + 8px boşluk)
-      // Açıklama + toast: ~80px
-      // Toplam: 6T + 30 + 128 + 80 = 6T + 238 ≤ h
-      const T = Math.min(50, Math.max(36, Math.floor((h - 250) / 6)));
-      setTileSize(T);
+    const calc = () => {
+      if (!kbRef.current) return;
+      const W = kbRef.current.clientWidth - 4; // 2px padding her yanda
+      // Satır 2 en uzun: 11 tuş + 10 boşluk (gap-0.5 = 2px)
+      const w = Math.floor((W - 11 * 2) / 11);
+      setKeyW(Math.max(22, Math.min(32, w)));
+      setActnW(Math.max(34, Math.min(48, Math.floor(w * 1.5))));
     };
-    measure();
-    const obs = new ResizeObserver(measure);
-    if (containerRef.current) obs.observe(containerRef.current);
+    calc();
+    const obs = new ResizeObserver(calc);
+    if (kbRef.current) obs.observe(kbRef.current);
     return () => obs.disconnect();
   }, []);
-
-  const GAP      = 5;
-  const boardW   = COLS * tileSize + (COLS - 1) * GAP;
-  const keyH     = Math.max(34, Math.round(tileSize * 0.78));
 
   const showMsg = (msg: string) => {
     setMessage(msg);
@@ -93,7 +100,9 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
       letter: guess[i], status: "absent" as LetterStatus,
     }));
     const tArr = target.split(""); const gArr = guess.split("");
-    gArr.forEach((l, i) => { if (l === tArr[i]) { result[i].status = "correct"; tArr[i] = "#"; } });
+    gArr.forEach((l, i) => {
+      if (l === tArr[i]) { result[i].status = "correct"; tArr[i] = "#"; }
+    });
     gArr.forEach((l, i) => {
       if (result[i].status !== "correct") {
         const ti = tArr.indexOf(l);
@@ -139,21 +148,29 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
 
   const addLetter = useCallback((letter: string) => {
     if (gameState !== "playing" || currentCol >= COLS) return;
-    setBoard(prev => { const n = prev.map(r => [...r]); n[currentRow][currentCol] = { letter, status: "filled" }; return n; });
+    setBoard(prev => {
+      const n = prev.map(r => [...r]);
+      n[currentRow][currentCol] = { letter, status: "filled" };
+      return n;
+    });
     setCurrentCol(c => c + 1);
   }, [gameState, currentRow, currentCol]);
 
   const deleteLetter = useCallback(() => {
     if (currentCol === 0) return;
-    setBoard(prev => { const n = prev.map(r => [...r]); n[currentRow][currentCol - 1] = { letter: "", status: "empty" }; return n; });
+    setBoard(prev => {
+      const n = prev.map(r => [...r]);
+      n[currentRow][currentCol - 1] = { letter: "", status: "empty" };
+      return n;
+    });
     setCurrentCol(c => c - 1);
   }, [currentRow, currentCol]);
 
   const handleKey = useCallback((key: string) => {
     if (gameState !== "playing") return;
-    if (key === "GİR" || key === "ENTER")    { submitGuess(); return; }
+    if (key === "GİR" || key === "ENTER")     { submitGuess(); return; }
     if (key === "SİL" || key === "BACKSPACE") { deleteLetter(); return; }
-    if (/^[A-ZÇŞĞÜÖİI]$/.test(key)) addLetter(key);
+    if (/^[A-ZÇŞĞÜÖİI]$/.test(key))          addLetter(key);
   }, [gameState, submitGuess, deleteLetter, addLetter]);
 
   useEffect(() => {
@@ -162,33 +179,31 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
     return () => window.removeEventListener("keydown", h);
   }, [handleKey]);
 
+  const boardW = COLS * T + (COLS - 1) * GAP;
+
   return (
-    <div ref={containerRef} className="flex flex-col h-full w-full select-none">
+    <div className="flex flex-col h-full w-full select-none">
 
-      {/* ── Üst alan: açıklama + toast + tahta (kaydırılabilir) ────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-2 py-2">
+      {/* ── Üst alan: açıklama + toast + tahta (kaydırılabilir) ─────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col items-center gap-2 py-2 px-1">
 
-        {/* Nasıl oynanır */}
-        <div className="flex items-center gap-2 flex-wrap justify-center px-2">
-          <span className="flex items-center gap-1 text-[10px] text-white/50">
-            <span className="inline-block w-4 h-4 rounded text-[8px] leading-4 text-center font-black"
-              style={{ background: "#22c55e" }}>A</span>
-            Doğru yerde
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-white/50">
-            <span className="inline-block w-4 h-4 rounded text-[8px] leading-4 text-center font-black"
-              style={{ background: "#d97706" }}>B</span>
-            Var, yanlış yer
-          </span>
-          <span className="flex items-center gap-1 text-[10px] text-white/50">
-            <span className="inline-block w-4 h-4 rounded text-[8px] leading-4 text-center font-black"
-              style={{ background: "#374151" }}>C</span>
-            Kelimede yok
-          </span>
+        {/* Nasıl oynanır — tek satır */}
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          {[
+            { color: "#22c55e", label: "Doğru yerde" },
+            { color: "#d97706", label: "Var, yanlış" },
+            { color: "#374151", label: "Yok" },
+          ].map(({ color, label }) => (
+            <span key={label} className="flex items-center gap-1 text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+              <span className="inline-flex w-4 h-4 rounded items-center justify-center text-[8px] font-black text-white"
+                style={{ background: color }}>A</span>
+              {label}
+            </span>
+          ))}
         </div>
 
-        {/* Toast / sonuç bandı */}
-        <div className="min-h-[30px] flex items-center justify-center w-full px-4">
+        {/* Toast / sonuç */}
+        <div className="min-h-[28px] flex items-center justify-center w-full">
           {message && (
             <div className="px-4 py-1 rounded-xl text-[12px] font-bold text-white"
               style={{ background: "rgba(30,15,60,0.97)", border: "1px solid rgba(139,92,246,0.55)" }}>
@@ -198,7 +213,7 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
           {!message && gameState === "won" && (
             <div className="px-4 py-1 rounded-xl text-[12px] font-bold"
               style={{ background: "rgba(34,197,94,0.15)", border: "1px solid rgba(34,197,94,0.35)", color: "#86efac" }}>
-              🎉 Kazandın! {alreadyPlayed?.attempts ?? currentRow} denemede buldun.
+              🎉 Kazandın! {alreadyPlayed?.attempts ?? currentRow} denemede.
             </div>
           )}
           {!message && gameState === "lost" && (
@@ -210,23 +225,28 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
         </div>
 
         {/* ── Tahmin tahtası ─────────────────────────────────────────── */}
-        <div style={{ width: boardW, flexShrink: 0 }}>
+        <div style={{ width: boardW }}>
           {board.map((row, ri) => (
             <div key={ri} className="flex" style={{
-              gap: GAP, marginBottom: ri < ROWS - 1 ? GAP : 0,
+              gap: GAP,
+              marginBottom: ri < ROWS - 1 ? GAP : 0,
               animation: shakeRow === ri ? "wshake 0.42s ease" : undefined,
             }}>
               {row.map((cell, ci) => (
                 <div key={ci} style={{
-                  width: tileSize, height: tileSize, flexShrink: 0,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: Math.round(tileSize * 0.44), fontWeight: 900,
-                  color:       cell.status === "empty" ? "rgba(255,255,255,0.18)" : "#fff",
-                  background:  BG[cell.status],
-                  border:      `2px solid ${BD[cell.status]}`,
-                  borderRadius: 7,
-                  transition:  "background 0.28s, border-color 0.28s",
-                  animation:   flipRow === ri ? `wflip 0.55s ease ${ci * 0.08}s` : undefined,
+                  width:          T,
+                  height:         T,
+                  display:        "flex",
+                  alignItems:     "center",
+                  justifyContent: "center",
+                  fontSize:       20,
+                  fontWeight:     900,
+                  color:          cell.status === "empty" ? "rgba(255,255,255,0.18)" : "#fff",
+                  background:     STATUS_BG[cell.status],
+                  border:         `2px solid ${STATUS_BD[cell.status]}`,
+                  borderRadius:   7,
+                  transition:     "background 0.28s, border-color 0.28s",
+                  animation:      flipRow === ri ? `wflip 0.55s ease ${ci * 0.08}s` : undefined,
                 }}>
                   {cell.letter}
                 </div>
@@ -236,11 +256,11 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
         </div>
       </div>
 
-      {/* ── Klavye — her zaman altta ─────────────────────────────────── */}
-      <div className="flex-none pb-2 pt-1 flex flex-col gap-1.5 w-full">
+      {/* ── Klavye — her zaman görünür (flex-none) ───────────────────── */}
+      <div ref={kbRef} className="flex-none w-full pb-3 pt-1">
         {KB_ROWS.map((row, ri) => (
-          <div key={ri} className="flex justify-center gap-1">
-            {row.map(key => {
+          <div key={ri} className="flex justify-center" style={{ gap: 2, marginBottom: ri < KB_ROWS.length - 1 ? 4 : 0 }}>
+            {(row as readonly string[]).map(key => {
               const status   = usedLetters.get(key);
               const isAction = key === "GİR" || key === "SİL";
               return (
@@ -248,19 +268,20 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
                   key={key}
                   onPointerDown={e => { e.preventDefault(); handleKey(key); }}
                   style={{
-                    minWidth:    isAction ? 44 : 28,
-                    height:      keyH,
-                    padding:     "0 3px",
-                    fontSize:    isAction ? 10 : 13,
-                    fontWeight:  isAction ? 800 : 700,
-                    borderRadius: 6,
-                    border:      "none",
-                    cursor:      "pointer",
-                    color:       status ? "#fff" : "rgba(255,255,255,0.88)",
-                    background:  status ? BG[status] : "rgba(255,255,255,0.11)",
-                    transition:  "background 0.22s",
-                    flexShrink:  0,
-                    letterSpacing: isAction ? "-0.04em" : 0,
+                    width:        isAction ? actnW : keyW,
+                    height:       38,
+                    padding:      0,
+                    fontSize:     isAction ? 9 : 13,
+                    fontWeight:   isAction ? 800 : 700,
+                    borderRadius: 5,
+                    border:       "none",
+                    cursor:       "pointer",
+                    flexShrink:   0,
+                    color:        status ? "#fff" : "rgba(255,255,255,0.88)",
+                    background:   status ? STATUS_BG[status] : "rgba(255,255,255,0.11)",
+                    transition:   "background 0.22s",
+                    letterSpacing: isAction ? "-0.03em" : 0,
+                    lineHeight:   1,
                   }}
                 >
                   {key}

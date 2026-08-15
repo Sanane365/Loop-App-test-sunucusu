@@ -232,7 +232,7 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
       </div>
 
       {/* ── İÇERİK (kalan alan, sabit) ────────────────────────────────── */}
-      <div className="relative flex-1 overflow-hidden">
+      <div className="relative flex-1 min-h-0 overflow-hidden">
 
         {/* OYUN SEÇİCİ */}
         {view === "select" && (

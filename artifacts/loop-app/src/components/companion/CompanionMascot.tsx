@@ -155,14 +155,28 @@ function stripWhiteBackground(imgSrc: string): Promise<string> {
           resolve(cv.toDataURL("image/png")); return;
         }
 
-        /* Mode B — match corner colour within ±12 per channel.
-         * Tight enough to preserve off-white (≥243) animal fur. */
-        const TOL = 12;
+        /* Mode B — iki katmanlı tolerans:
+         *  · TIGHT (≤15): kesinlikle arkaplan → sil
+         *  · OUTER (≤38): gri/nötr anti-aliased kenar → sil (satürasyon düşük)
+         *  · OUTER + renkli piksel (satürasyon ≥ 0.18): figürün parçası → koru
+         *
+         * Bu yöntem kenar anti-aliasing'ini yakalayıp renkli figür piksellerini korur.
+         */
+        const TIGHT = 15;
+        const OUTER = 38;
         isBg = (idx4: number) => {
           if (d[idx4 + 3] < 30) return true;
-          return Math.abs(d[idx4]     - bgR) <= TOL
-              && Math.abs(d[idx4 + 1] - bgG) <= TOL
-              && Math.abs(d[idx4 + 2] - bgB) <= TOL;
+          const r = d[idx4], g = d[idx4 + 1], b = d[idx4 + 2];
+          const dr = Math.abs(r - bgR);
+          const dg = Math.abs(g - bgG);
+          const db = Math.abs(b - bgB);
+          if (dr > OUTER || dg > OUTER || db > OUTER) return false;  // kesinlikle figür
+          if (dr <= TIGHT && dg <= TIGHT && db <= TIGHT) return true; // kesinlikle arka plan
+          // Gri bölge: satürasyon kontrolü
+          const max = Math.max(r, g, b);
+          const min = Math.min(r, g, b);
+          const sat = max === 0 ? 0 : (max - min) / max;
+          return sat < 0.18;  // düşük satürasyon = nötr kenar → arka plan
         };
       }
 
