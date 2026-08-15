@@ -324,6 +324,10 @@ export default function DirectMessages() {
   // GIF picker state
   const [gifOpen, setGifOpen] = useState(false);
 
+  // Friendship series state — { msgId: "accepted" | "rejected" | "pending" }
+  const [friendshipStatus, setFriendshipStatus] = useState<Record<number, "accepted" | "rejected" | "pending">>({});
+  const friendshipKey = userId ? `dm_friendship_${userId}` : null;
+
   // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [infoSection, setInfoSection] = useState<"genel"|"tema"|"anlar"|"medya">("genel");
@@ -962,6 +966,45 @@ export default function DirectMessages() {
       el.scrollTop = el.scrollHeight;
     }
   }, [groupMessages]);
+
+  // Friendship status localStorage sync
+  useEffect(() => {
+    if (!friendshipKey) return;
+    try {
+      const saved = JSON.parse(localStorage.getItem(friendshipKey) ?? "{}");
+      setFriendshipStatus(saved);
+    } catch { setFriendshipStatus({}); }
+  }, [friendshipKey]);
+
+  const respondFriendship = (msgId: number, response: "accepted" | "rejected") => {
+    setFriendshipStatus(prev => {
+      const next = { ...prev, [msgId]: response };
+      if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const handleSendFriendshipRequest = async () => {
+    setShowPlusMenu(false);
+    if (!userId || !me) return;
+    const newMsgId = Date.now(); // temporary optimistic id
+    try {
+      const res = await fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: "__LOOP_FRIENDSHIP__" }),
+        credentials: "include",
+      });
+      if (res.ok) {
+        const sent = await res.json();
+        setFriendshipStatus(prev => {
+          const next = { ...prev, [sent.id]: "pending" as const };
+          if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(next));
+          return next;
+        });
+      }
+    } catch { /* silent */ void newMsgId; }
+  };
 
   // ── Tema & Kayıtlı Anlar yardımcıları ──────────────────────────────────
   const saveDmTheme = (t: DmTheme) => {
@@ -1858,6 +1901,91 @@ export default function DirectMessages() {
                                 );
                               }
 
+                              // Arkadaşlık Serisi teklifi
+                              if (msg.content === "__LOOP_FRIENDSHIP__") {
+                                const status = friendshipStatus[msg.id];
+                                const canRespond = !isMe && !status;
+                                return (
+                                  <div className="flex flex-col items-center select-none" style={{ maxWidth: 220 }}>
+                                    {/* Köpek görseli */}
+                                    <div className="relative">
+                                      <img
+                                        src="/friendship-pup.png"
+                                        alt="Arkadaşlık köpeği"
+                                        className="w-44 h-44 object-contain drop-shadow-xl"
+                                        style={{ filter: "drop-shadow(0 8px 24px rgba(251,191,36,0.35))" }}
+                                      />
+                                      {/* Parlayan halka efekti */}
+                                      <div className="absolute inset-0 rounded-full pointer-events-none animate-ping opacity-10"
+                                        style={{ background: "radial-gradient(circle, #fbbf24 0%, transparent 70%)", animationDuration: "2.5s" }} />
+                                    </div>
+
+                                    {/* Animasyonlu levha */}
+                                    <div
+                                      className="relative -mt-3 w-[210px] rounded-2xl border-2 border-amber-400/60 shadow-lg overflow-hidden animate-in fade-in-0 slide-in-from-top-2"
+                                      style={{
+                                        background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 50%, #fde68a 100%)",
+                                        boxShadow: "0 4px 20px rgba(251,191,36,0.3), inset 0 1px 0 rgba(255,255,255,0.8)",
+                                      }}
+                                    >
+                                      {/* Üst dekorasyon şeridi */}
+                                      <div className="h-1.5 w-full" style={{ background: "repeating-linear-gradient(90deg, #f59e0b 0px, #f59e0b 8px, #fbbf24 8px, #fbbf24 16px)" }} />
+
+                                      <div className="px-4 py-3 text-center">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-amber-600/70 mb-0.5">🐾 Teklif</p>
+                                        <p className="text-sm font-black text-amber-900 leading-snug">
+                                          {isMe ? "Arkadaşlık Serisi" : `${otherUser?.displayName ?? "Biri"} Arkadaşlık`}
+                                        </p>
+                                        <p className="text-[11px] text-amber-700/80 font-medium mt-0.5">
+                                          {isMe ? "Teklifin gönderildi 🐕" : "Seriye davet ediyor!"}
+                                        </p>
+
+                                        {/* Durum / Butonlar */}
+                                        {status === "accepted" && (
+                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300">
+                                            <span className="text-sm">🎉</span>
+                                            <span className="text-xs font-bold text-emerald-700">Kabul Edildi!</span>
+                                          </div>
+                                        )}
+                                        {status === "rejected" && (
+                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200">
+                                            <span className="text-sm">😔</span>
+                                            <span className="text-xs font-bold text-rose-500">Reddedildi</span>
+                                          </div>
+                                        )}
+                                        {(status === "pending" || (isMe && !status)) && (
+                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 border border-amber-300">
+                                            <span className="text-xs">⏳</span>
+                                            <span className="text-xs font-bold text-amber-700">Yanıt bekleniyor…</span>
+                                          </div>
+                                        )}
+                                        {canRespond && (
+                                          <div className="mt-3 flex gap-2">
+                                            <button
+                                              className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 shadow-sm"
+                                              style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff", boxShadow: "0 2px 8px rgba(16,185,129,0.4)" }}
+                                              onClick={() => respondFriendship(msg.id, "accepted")}
+                                            >
+                                              <span>✅</span> Kabul Et
+                                            </button>
+                                            <button
+                                              className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 shadow-sm"
+                                              style={{ background: "linear-gradient(135deg,#f87171,#ef4444)", color: "#fff", boxShadow: "0 2px 8px rgba(239,68,68,0.4)" }}
+                                              onClick={() => respondFriendship(msg.id, "rejected")}
+                                            >
+                                              <span>❌</span> Reddet
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Alt dekorasyon şeridi */}
+                                      <div className="h-1.5 w-full" style={{ background: "repeating-linear-gradient(90deg, #fbbf24 0px, #fbbf24 8px, #f59e0b 8px, #f59e0b 16px)" }} />
+                                    </div>
+                                  </div>
+                                );
+                              }
+
                               // GIF mesajı
                               if (msg.content?.startsWith("__LOOP_GIF__:")) {
                                 const gifUrl = msg.content.slice("__LOOP_GIF__:".length);
@@ -2041,6 +2169,16 @@ export default function DirectMessages() {
                       <span className="text-lg">😊</span>
                     </div>
                     Sticker
+                  </button>
+                  <div className="h-px bg-border/40 mx-3" />
+                  <button
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
+                    onClick={handleSendFriendshipRequest}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-amber-400/15 flex items-center justify-center overflow-hidden">
+                      <img src="/friendship-pup.png" alt="pup" className="w-full h-full object-cover scale-110" />
+                    </div>
+                    <span className="leading-tight">Arkadaşlık<br /><span className="text-[11px] text-muted-foreground font-normal">Serisi Teklifi</span></span>
                   </button>
                 </div>
               </>
