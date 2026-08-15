@@ -15,9 +15,12 @@ import loopRouter from "./loop";
 import callsRouter from "./calls";
 import gifRouter from "./gif";
 import companionsRouter, { seedBuiltinCompanions } from "./companions";
+import gamesRouter, { ensureGameScoresTable }     from "./games";
 
 // Yerleşik yoldaşları ilk açılışta DB'ye ekle
 seedBuiltinCompanions();
+// Oyun skoru tablosunu oluştur
+ensureGameScoresTable();
 
 const router: IRouter = Router();
 
@@ -36,6 +39,7 @@ router.use(loopRouter);
 router.use(callsRouter);
 router.use(gifRouter);
 router.use(companionsRouter);
+router.use(gamesRouter);
 
 // ÖNEMLİ: React kodlarını (createRoot, App, vs.) BURADAN SİLMELİSİN!
 // Bu dosya sadece API'yi yönetmeli.

@@ -9,12 +9,13 @@ import {
   Search, SlidersHorizontal, Mic, StopCircle, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
-  Camera, Users, Phone, Video, Info, Smile, BadgeCheck, Reply,
+  Camera, Users, Phone, Video, Info, Gamepad2, BadgeCheck, Reply,
   Bookmark, Palette, ChevronRight, Copy, ExternalLink,
   ImageIcon, ShieldOff, Flag,
 } from "lucide-react";
 import GifPicker from "@/components/shared/GifPicker";
 import CompanionMascot from "@/components/companion/CompanionMascot";
+import GamePanel from "@/components/games/GamePanel";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _mapGiphyResults = (data: any[]) =>
@@ -331,6 +332,7 @@ export default function DirectMessages() {
 
   // Companion (Yoldaş) state
   const [showCompanionPicker, setShowCompanionPicker] = useState(false);
+  const [showGamePanel,       setShowGamePanel]       = useState(false);
   const [companion, setCompanion] = useState<string | null>(null); // slug e.g. "bear"
   const companionKey = userId ? `dm_companion_${userId}` : null;
   const [companionName, setCompanionName] = useState("Yoldaşım");
@@ -2317,8 +2319,12 @@ export default function DirectMessages() {
                     </button>
                   ) : (
                     <div className="flex items-center gap-0.5 flex-shrink-0">
-                      <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground">
-                        <Smile className="w-5 h-5" />
+                      <button
+                        onClick={() => setShowGamePanel(true)}
+                        className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted transition-colors text-muted-foreground"
+                        title="Oyun Alanı"
+                      >
+                        <Gamepad2 className="w-5 h-5" />
                       </button>
                       <button
                         onClick={startRecording}
@@ -2334,6 +2340,16 @@ export default function DirectMessages() {
           </div>
 
         </div>
+
+        {/* ── Oyun Paneli ─────────────────────────────────────────────── */}
+        {me && (
+          <GamePanel
+            isOpen={showGamePanel}
+            onClose={() => setShowGamePanel(false)}
+            me={{ id: me.id, displayName: me.displayName, avatarUrl: me.avatarUrl ?? null }}
+            other={otherUser ? { id: otherUser.id, displayName: otherUser.displayName, avatarUrl: otherUser.avatarUrl ?? null } : null}
+          />
+        )}
 
         {/* ── Yoldaş Seçici Overlay ── */}
         {showCompanionPicker && (

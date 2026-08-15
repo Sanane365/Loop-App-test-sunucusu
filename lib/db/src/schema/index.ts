@@ -6,3 +6,4 @@ export * from "./notifications";
 export * from "./dm";
 export * from "./loop";
 export * from "./companions";
+export * from "./games";;
