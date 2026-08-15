@@ -178,17 +178,31 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
   const [draft,     setDraft]     = useState(name);
   const [zzz,       setZzz]       = useState(false);
 
-  const walkTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const sleepTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const animTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const peekTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const vwRef      = useRef(window.innerWidth);
-  const posXRef    = useRef(14); // mirror of posX for use inside closures
+  const walkTimer   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const sleepTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const animTimer   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const peekTimer   = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const vwRef       = useRef(320); // actual parent container width, updated via ResizeObserver
+  const posXRef     = useRef(14);  // mirror of posX for use inside closures
+  const wrapperRef  = useRef<HTMLDivElement>(null); // root div of this component
 
+  /* ── measure actual parent container width (not window) ── */
   useEffect(() => {
-    const upd = () => { vwRef.current = window.innerWidth; };
-    window.addEventListener("resize", upd);
-    return () => window.removeEventListener("resize", upd);
+    const el = wrapperRef.current?.parentElement;
+    if (!el) { vwRef.current = window.innerWidth; return; }
+    vwRef.current = el.clientWidth;
+    const ro = new ResizeObserver(entries => {
+      vwRef.current = entries[0]?.contentRect.width ?? el.clientWidth;
+      // re-clamp posX if needed after resize
+      setPosX(prev => {
+        const max = Math.max(0, vwRef.current - 100);
+        const next = Math.min(prev, max);
+        posXRef.current = next;
+        return next;
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   /* ── sleep timer ── */
@@ -206,9 +220,10 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
       const vw      = vwRef.current;
       const cur     = posXRef.current;
       const goRight = cur < vw / 2;
-      const target  = goRight ? vw - 112 : 14;
+      // clamp target so bear never exits the container (90px bear + 8px margin)
+      const target  = goRight ? Math.max(0, vw - 98) : 8;
       const dist    = Math.abs(target - cur);
-      const walkMs  = Math.max(2800, dist * 5.5);
+      const walkMs  = Math.max(2400, dist * 6);
 
       posXRef.current = target;
       setPosX(target);
@@ -284,11 +299,10 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
 
   /* ── walk transition ── */
   const isWalking = anim === "walk-right" || anim === "walk-left";
-  const dist = Math.abs(posX - (flipped ? 14 : vwRef.current - 112));
-  const walkMs = Math.max(2800, dist * 5.5);
+  const walkMs = 3500; // fixed generous duration; actual dist varies but this always covers it
 
   /* ── limb style helper ── */
-  const limbStyle = (key: LimbKey, extra?: CSSProperties): CSSProperties => {
+  const limbStyle = (key: LimbKey): CSSProperties => {
     const def = LIMBS[key];
     const a   = ANIM_MAP[anim][key];
     return {
@@ -301,7 +315,6 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
       transformOrigin: `${def.ox} ${def.oy}`,
       animation:       a ? `${a.name} ${a.dur} ease-in-out ${a.iter}` : "none",
       willChange:      "transform",
-      ...extra,
     };
   };
 
@@ -309,7 +322,7 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
     width:         "100%",
     height:        "100%",
     objectFit:     "contain",
-    mixBlendMode:  "multiply",
+    /* NO mix-blend-mode here — applied to the outer figure wrapper instead */
     display:       "block",
     userSelect:    "none",
     WebkitUserSelect: "none",
@@ -322,10 +335,13 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
       <style>{KF}</style>
 
       <div
+        ref={wrapperRef}
         className="absolute z-20 pointer-events-auto select-none"
         style={{
           bottom: 0,
           left: posX,
+          /* hard-clamp so it never visually exits container */
+          maxWidth: 90,
           transition: isWalking
             ? `left ${walkMs}ms linear`
             : "left 0.5s cubic-bezier(.4,0,.2,1)",
@@ -385,16 +401,20 @@ export default function CompanionMascot({ companionId, name, isTyping, onMessage
           animation: "ls-shadow 3.4s ease-in-out infinite",
         }} />
 
-        {/* ── figure wrapper: flip for walk-left ── */}
+        {/* ── figure wrapper: flip for walk-left, multiply removes white bg ── */}
         <div
           onClick={handleTap}
           style={{
-            position:  "relative",
-            width:     90,
-            height:    90,
-            cursor:    "pointer",
-            transform: flipped ? "scaleX(-1)" : "scaleX(1)",
-            transition:"transform .28s ease",
+            position:    "relative",
+            width:       90,
+            height:      90,
+            cursor:      "pointer",
+            transform:   flipped ? "scaleX(-1)" : "scaleX(1)",
+            transition:  "transform .28s ease",
+            /* All layers composite to white in non-bear areas, then the whole
+               thing is multiplied against the page background → white becomes
+               transparent without each layer bleeding into its siblings.      */
+            mixBlendMode: "multiply",
           }}
         >
           {/* zzz bubbles */}
