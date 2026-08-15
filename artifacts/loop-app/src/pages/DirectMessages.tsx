@@ -21,6 +21,28 @@ const _mapGiphyResults = (data: any[]) =>
     preview: g.images?.fixed_height_still?.url ?? g.images?.downsized_still?.url ?? g.images?.fixed_height?.url ?? "",
   })).filter((g: any) => g.url);
 import { useAuth } from "@/lib/auth";
+
+// ── Favori sistemi ──────────────────────────────────────────────────────────
+interface FavEntry { emoji?: string; color: string; glow: string }
+const FAV_EMOJIS: { emoji: string; color: string; glow: string; label: string }[] = [
+  { emoji: "🔥", color: "#ff4500", glow: "#ff4500", label: "Ateş" },
+  { emoji: "⚡", color: "#facc15", glow: "#facc15", label: "Şimşek" },
+  { emoji: "💜", color: "#a855f7", glow: "#a855f7", label: "Mor kalp" },
+  { emoji: "💙", color: "#3b82f6", glow: "#3b82f6", label: "Mavi kalp" },
+  { emoji: "💚", color: "#22c55e", glow: "#22c55e", label: "Yeşil kalp" },
+  { emoji: "❤️", color: "#ef4444", glow: "#ef4444", label: "Kırmızı kalp" },
+  { emoji: "🌙", color: "#818cf8", glow: "#818cf8", label: "Ay" },
+  { emoji: "⭐", color: "#fbbf24", glow: "#fbbf24", label: "Yıldız" },
+  { emoji: "🌊", color: "#06b6d4", glow: "#06b6d4", label: "Dalga" },
+  { emoji: "🌸", color: "#f472b6", glow: "#f472b6", label: "Çiçek" },
+  { emoji: "💎", color: "#67e8f9", glow: "#67e8f9", label: "Elmas" },
+  { emoji: "🎯", color: "#fb923c", glow: "#fb923c", label: "Hedef" },
+  { emoji: "🦋", color: "#c084fc", glow: "#c084fc", label: "Kelebek" },
+  { emoji: "🌈", color: "#f9a8d4", glow: "#f9a8d4", label: "Gökkuşağı" },
+  { emoji: "🍀", color: "#4ade80", glow: "#4ade80", label: "Yonca" },
+  { emoji: "🎸", color: "#fde68a", glow: "#fde68a", label: "Gitar" },
+];
+const DEFAULT_FAV: FavEntry = { color: "#a855f7", glow: "#a855f7" };
 import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -373,9 +395,10 @@ export default function DirectMessages() {
   const [pinnedIds, setPinnedIds] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("dm_pinned") || "[]")); } catch { return new Set(); }
   });
-  const [favIds, setFavIds] = useState<Set<number>>(() => {
-    try { return new Set(JSON.parse(localStorage.getItem("dm_favs") || "[]")); } catch { return new Set(); }
+  const [favMap, setFavMap] = useState<Map<number, FavEntry>>(() => {
+    try { return new Map(JSON.parse(localStorage.getItem("dm_favs2") || "[]")); } catch { return new Map(); }
   });
+  const [favEmojiDialogId, setFavEmojiDialogId] = useState<number | null>(null);
   const [mutedMap, setMutedMap] = useState<Map<number, number>>(() => {
     try { return new Map(JSON.parse(localStorage.getItem("dm_muted") || "[]")); } catch { return new Map(); }
   });
@@ -595,13 +618,23 @@ export default function DirectMessages() {
     });
     setMenuId(null);
   };
-  const toggleFav = (id: number) => {
-    setFavIds(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem("dm_favs", JSON.stringify([...next]));
+  const removeFav = (id: number) => {
+    setFavMap(prev => {
+      const next = new Map(prev);
+      next.delete(id);
+      localStorage.setItem("dm_favs2", JSON.stringify([...next]));
       return next;
     });
+    setMenuId(null);
+  };
+  const addFav = (id: number, entry: FavEntry) => {
+    setFavMap(prev => {
+      const next = new Map(prev);
+      next.set(id, entry);
+      localStorage.setItem("dm_favs2", JSON.stringify([...next]));
+      return next;
+    });
+    setFavEmojiDialogId(null);
     setMenuId(null);
   };
   const muteFor = (id: number, hours: number) => {
@@ -2047,7 +2080,7 @@ export default function DirectMessages() {
     })
     .sort((a, b) => {
       if (activeTab !== "tumu") {
-        const rank = (id: number) => pinnedIds.has(id) ? 0 : favIds.has(id) ? 1 : 2;
+        const rank = (id: number) => pinnedIds.has(id) ? 0 : favMap.has(id) ? 1 : 2;
         return rank(a.user?.id ?? -1) - rank(b.user?.id ?? -1);
       }
       // Tümü: zaman sırasına göre
@@ -2417,7 +2450,10 @@ export default function DirectMessages() {
                 const time = formatMsgTime(c.lastMessage.createdAt);
                 const isOnline = idx < 3;
                 const isPinned = pinnedIds.has(uid);
-                const isFav = favIds.has(uid);
+                const favEntry = favMap.get(uid);
+                const isFav = !!favEntry;
+                const favColor = favEntry?.color ?? DEFAULT_FAV.color;
+                const favGlow  = favEntry?.glow  ?? DEFAULT_FAV.glow;
                 const mutedUntil = mutedMap.get(uid);
                 const isMuted = !!mutedUntil && mutedUntil > Date.now();
                 const isSelected = selectedIds.has(uid);
@@ -2425,34 +2461,52 @@ export default function DirectMessages() {
                 return (
                   <div
                     key={uid}
-                    className={`relative transition-all duration-200
-                      ${isFav
-                        ? "mx-3 my-1.5 rounded-2xl overflow-hidden shadow-md shadow-violet-500/10"
-                        : "border-b border-border/30 last:border-0"
-                      }
-                    `}
+                    className={`relative transition-all duration-300 ${isFav ? "mx-3 my-1.5 rounded-2xl overflow-hidden" : "border-b border-border/30 last:border-0"}`}
+                    style={isFav ? {
+                      boxShadow: `0 0 0 1.5px ${favColor}55, 0 0 18px ${favGlow}28, 0 4px 16px ${favGlow}14`,
+                    } : undefined}
                   >
-                    {/* Favori arka plan gradyanı */}
+                    {/* Favori neon arka plan */}
                     {isFav && (
-                      <div className="absolute inset-0 bg-gradient-to-r from-violet-500/[0.08] via-purple-500/[0.06] to-fuchsia-500/[0.08] rounded-2xl pointer-events-none" />
-                    )}
-                    {isFav && (
-                      <div className="absolute inset-0 rounded-2xl ring-1 ring-violet-400/30 pointer-events-none" />
+                      <div
+                        className="absolute inset-0 rounded-2xl pointer-events-none"
+                        style={{ background: `linear-gradient(135deg, ${favColor}0d 0%, transparent 60%, ${favColor}08 100%)` }}
+                      />
                     )}
 
-                    {/* Sağ üst köşe — favori kalp rozeti */}
-                    {isFav && (
-                      <div className="absolute top-2 right-10 z-10 w-5 h-5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center shadow-sm shadow-violet-500/40">
+                    {/* Favori emoji rozeti */}
+                    {isFav && favEntry?.emoji && (
+                      <div
+                        className="absolute top-1.5 right-10 z-10 flex items-center justify-center"
+                        style={{ width: 28, height: 28 }}
+                      >
+                        {/* Dış parlama halkası */}
+                        <div
+                          className="absolute inset-0 rounded-full animate-pulse"
+                          style={{ boxShadow: `0 0 10px ${favGlow}cc, 0 0 20px ${favGlow}55`, background: `${favColor}22` }}
+                        />
+                        {/* İç zemin */}
+                        <div
+                          className="absolute inset-[3px] rounded-full"
+                          style={{ background: `radial-gradient(circle at 40% 35%, ${favColor}88, ${favColor}33)`, backdropFilter: "blur(4px)" }}
+                        />
+                        {/* Emoji */}
+                        <span className="relative z-10 text-[13px] leading-none select-none drop-shadow-sm">{favEntry.emoji}</span>
+                      </div>
+                    )}
+                    {/* Emoji olmayan favori: neon kalp rozeti */}
+                    {isFav && !favEntry?.emoji && (
+                      <div
+                        className="absolute top-1.5 right-10 z-10 w-[22px] h-[22px] rounded-full flex items-center justify-center"
+                        style={{ background: `radial-gradient(circle at 40% 35%, ${favColor}cc, ${favColor}66)`, boxShadow: `0 0 8px ${favGlow}cc` }}
+                      >
                         <Heart className="w-2.5 h-2.5 text-white fill-white" />
                       </div>
                     )}
 
                     {/* Kart içeriği */}
                     <div
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left select-none
-                        ${isSelected ? "bg-primary/8" : isFav ? "hover:bg-violet-500/[0.06] active:bg-violet-500/10" : "hover:bg-muted/40 active:bg-muted/60"}
-                        ${isSelecting ? "cursor-pointer" : ""}
-                      `}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 transition-colors text-left select-none ${isSelected ? "bg-primary/8" : "hover:bg-white/[0.03] active:bg-white/[0.06]"} ${isSelecting ? "cursor-pointer" : ""}`}
                       onClick={() => {
                         if (menuId !== null) { setMenuId(null); return; }
                         if (isSelecting) { toggleSelect(uid); return; }
@@ -2477,11 +2531,11 @@ export default function DirectMessages() {
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <Avatar
-                          className={`shadow-sm ${isFav ? "border-2 border-violet-400/50" : "border-2 border-background"}`}
-                          style={{ width: 52, height: 52 }}
+                          className="shadow-sm border-2"
+                          style={{ width: 52, height: 52, borderColor: isFav ? `${favColor}88` : "hsl(var(--background))" }}
                         >
                           <AvatarImage src={c.user?.avatarUrl || ""} />
-                          <AvatarFallback className={`font-bold text-base ${isFav ? "bg-gradient-to-br from-violet-400/30 to-fuchsia-400/20 text-violet-600" : "bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary"}`}>
+                          <AvatarFallback className="font-bold text-base bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary">
                             {c.user?.displayName?.charAt(0) ?? "?"}
                           </AvatarFallback>
                         </Avatar>
@@ -2494,25 +2548,33 @@ export default function DirectMessages() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-1.5 min-w-0">
-                            <span className={`font-bold text-[15px] truncate ${isFav ? "text-violet-700 dark:text-violet-300" : c.unreadCount > 0 ? "text-foreground" : "text-foreground/90"}`}>
+                            <span
+                              className="font-bold text-[15px] truncate"
+                              style={isFav ? { color: favColor } : undefined}
+                            >
                               {c.user?.displayName ?? "Bilinmiyor"}
                             </span>
                             {isPinned && <Pin className="w-3 h-3 text-primary/60 flex-shrink-0" />}
                             {isMuted && <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
                           </div>
-                          <span className={`text-[11px] flex-shrink-0 ${isFav ? "text-violet-400" : "text-muted-foreground"}`}>{time}</span>
+                          <span
+                            className="text-[11px] flex-shrink-0"
+                            style={isFav ? { color: `${favColor}bb` } : { color: "hsl(var(--muted-foreground))" }}
+                          >{time}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <p className={`text-sm truncate ${
-                            c.unreadCount > 0
-                              ? isFav ? "text-violet-600 dark:text-violet-300 font-medium" : "text-foreground font-medium"
-                              : isSpecial ? "text-muted-foreground italic" : isFav ? "text-violet-500/80 dark:text-violet-400/80" : "text-muted-foreground"
-                          }`}>
+                          <p className={`text-sm truncate ${c.unreadCount > 0 ? "font-medium text-foreground" : isSpecial ? "text-muted-foreground italic" : "text-muted-foreground"}`}>
                             {preview}
                           </p>
                           <div className="flex-shrink-0 flex items-center gap-1.5">
                             {c.unreadCount > 0 && !isMuted && (
-                              <span className={`min-w-[20px] h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center ${isFav ? "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white" : "bg-primary text-primary-foreground"}`}>
+                              <span
+                                className="min-w-[20px] h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center text-white"
+                                style={isFav
+                                  ? { background: `linear-gradient(135deg, ${favColor}, ${favColor}bb)`, boxShadow: `0 0 8px ${favGlow}88` }
+                                  : { background: "hsl(var(--primary))", color: "hsl(var(--primary-foreground))" }
+                                }
+                              >
                                 {c.unreadCount > 9 ? "9+" : c.unreadCount}
                               </span>
                             )}
@@ -2524,7 +2586,7 @@ export default function DirectMessages() {
                       {/* Üç nokta butonu */}
                       {!isSelecting && (
                         <button
-                          className={`flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors -mr-1 ${isFav ? "hover:bg-violet-500/10" : "hover:bg-muted"}`}
+                          className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors -mr-1 hover:bg-muted/60"
                           onClick={e => {
                             e.stopPropagation();
                             if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
@@ -2533,7 +2595,7 @@ export default function DirectMessages() {
                             setMenuId(uid);
                           }}
                         >
-                          <MoreVertical className={`w-4 h-4 ${isFav ? "text-violet-400" : "text-muted-foreground"}`} />
+                          <MoreVertical className="w-4 h-4 text-muted-foreground" />
                         </button>
                       )}
                     </div>
@@ -2547,7 +2609,7 @@ export default function DirectMessages() {
           {menuId !== null && menuPos !== null && (() => {
             const uid = menuId;
             const isPinned = pinnedIds.has(uid);
-            const isFav    = favIds.has(uid);
+            const isFav    = favMap.has(uid);
             const mutedUntil = mutedMap.get(uid);
             const isMuted  = !!mutedUntil && mutedUntil > Date.now();
             return (
@@ -2564,7 +2626,10 @@ export default function DirectMessages() {
                 </button>
                 <button
                   className="w-full flex items-center gap-2.5 px-4 py-3.5 text-sm hover:bg-muted/60 transition-colors text-left border-t border-border/40"
-                  onClick={() => toggleFav(uid)}
+                  onClick={() => {
+                    if (isFav) { removeFav(uid); }
+                    else { setMenuId(null); setMenuPos(null); setFavEmojiDialogId(uid); }
+                  }}
                 >
                   <Heart className={`w-4 h-4 ${isFav ? "text-rose-400 fill-rose-400" : "text-rose-400"}`} />
                   {isFav ? "Favoriden çıkar" : "Favori ekle"}
@@ -2586,6 +2651,86 @@ export default function DirectMessages() {
               </div>
             );
           })()}
+
+          {/* ── Favori Emoji Seçici Dialog ── */}
+          {favEmojiDialogId !== null && (
+            <div className="fixed inset-0 z-[60] flex flex-col justify-end">
+              <div
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                onClick={() => setFavEmojiDialogId(null)}
+              />
+              <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
+                {/* Tutamaç */}
+                <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
+
+                {/* Başlık */}
+                <div className="flex items-center gap-3 mb-1">
+                  <div className="w-10 h-10 rounded-2xl bg-rose-500/10 flex items-center justify-center flex-shrink-0">
+                    <Heart className="w-5 h-5 text-rose-500 fill-rose-500" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-base leading-tight">Favori Ekle</p>
+                    <p className="text-xs text-muted-foreground">Bir emoji seç (isteğe bağlı)</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground/70 mb-5 ml-[52px]">
+                  Seçtiğin emoji bu kişiyi yansıtır ve kart çerçevesi o emojinin rengine göre parlar.
+                </p>
+
+                {/* Emoji grid */}
+                <div className="grid grid-cols-4 gap-3 mb-5">
+                  {FAV_EMOJIS.map(({ emoji, color, glow, label }) => (
+                    <button
+                      key={emoji}
+                      aria-label={label}
+                      className="relative flex flex-col items-center gap-1.5 py-3 rounded-2xl transition-all active:scale-95 group"
+                      style={{ background: `${color}14` }}
+                      onClick={() => addFav(favEmojiDialogId, { emoji, color, glow })}
+                    >
+                      {/* Dış parlama halkası */}
+                      <div
+                        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity"
+                        style={{ boxShadow: `0 0 0 1.5px ${color}88, 0 0 14px ${glow}44` }}
+                      />
+                      {/* Emoji kabı */}
+                      <div
+                        className="relative w-12 h-12 rounded-xl flex items-center justify-center"
+                        style={{
+                          background: `radial-gradient(circle at 38% 32%, ${color}55, ${color}22)`,
+                          boxShadow: `0 0 12px ${glow}55, inset 0 1px 0 ${color}44`,
+                        }}
+                      >
+                        {/* İnce iç halka */}
+                        <div
+                          className="absolute inset-0 rounded-xl"
+                          style={{ boxShadow: `inset 0 0 0 1px ${color}44` }}
+                        />
+                        <span className="text-2xl leading-none select-none drop-shadow">{emoji}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-medium truncate w-full text-center px-1">{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Emojisiz favori / vazgeç */}
+                <div className="flex gap-2">
+                  <button
+                    className="flex-1 py-3 rounded-2xl text-sm font-semibold border border-border/60 text-muted-foreground hover:bg-muted/40 transition-colors"
+                    onClick={() => setFavEmojiDialogId(null)}
+                  >
+                    Vazgeç
+                  </button>
+                  <button
+                    className="flex-1 py-3 rounded-2xl text-sm font-semibold bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 transition-colors"
+                    onClick={() => addFav(favEmojiDialogId, DEFAULT_FAV)}
+                  >
+                    Emojisiz Ekle
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Çoklu seçim alt çubuğu — nav barının üstünde (bottom-16 = 64px) */}
           {isSelecting && (
