@@ -11,7 +11,7 @@ import { useState, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   BookOpen, X, ChevronUp, ChevronDown, ArrowRight,
-  MoreVertical, Pencil, Heart, Star,
+  MoreVertical, Pencil, Heart, Star, Trophy, Flame, Sparkles, Compass,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -19,59 +19,59 @@ import { BottomNav } from "@/components/layout/BottomNav";
 /* ── Mock veri — gerçek API bağlandığında değişecek ─────────────────── */
 const FEATURED = [
   {
-    id:     1,
-    title:  "BİR ADININ BEDELİ",
-    author: "Eylül Çetiner",
-    desc:   "Eylül Çetiner kanser olduğunu öğrendiği gün ilk aşkı ile karşılaşır. Çağan Demirsoy kim...",
-    genre:  "#25 içinde Romantizm",
-    coverBg: "linear-gradient(160deg,#92400e,#f59e0b)",
-    badge:  "#f59e0b",
-    badgeIcon: "👑",
-    reads:  "12.8K",
-    likes:  161,
-    rating: 5.0,
+    id:      1,
+    title:   "BİR ADININ BEDELİ",
+    author:  "Eylül Çetiner",
+    desc:    "Eylül Çetiner kanser olduğunu öğrendiği gün ilk aşkı ile karşılaşır. Çağan Demirsoy kim...",
+    genre:   "#25 içinde Romantizm",
+    coverBg: "linear-gradient(160deg,#78350f,#d97706)",
+    badgeBg: "#b45309",
+    BadgeIcon: Trophy,
+    reads:   "12.8K",
+    likes:   161,
+    rating:  5.0,
     coverImg: null as string | null,
   },
   {
-    id:     2,
-    title:  "GECE YARISI TRENI",
-    author: "Deniz Karaköse",
-    desc:   "İstanbul'un karanlık sokaklarında kaybolan bir dedektif ve gizemli bir sır çözmeye çalışır...",
-    genre:  "#8 içinde Gerilim",
-    coverBg: "linear-gradient(160deg,#1e1b4b,#6366f1)",
-    badge:  "#6366f1",
-    badgeIcon: "🔥",
-    reads:  "8.3K",
-    likes:  94,
-    rating: 4.8,
+    id:      2,
+    title:   "GECE YARISI TRENI",
+    author:  "Deniz Karaköse",
+    desc:    "İstanbul'un karanlık sokaklarında kaybolan bir dedektif ve gizemli bir sır çözmeye çalışır...",
+    genre:   "#8 içinde Gerilim",
+    coverBg: "linear-gradient(160deg,#1e1b4b,#4f46e5)",
+    badgeBg: "#4338ca",
+    BadgeIcon: Flame,
+    reads:   "8.3K",
+    likes:   94,
+    rating:  4.8,
     coverImg: null as string | null,
   },
   {
-    id:     3,
-    title:  "YAĞMUR VE SESSIZLIK",
-    author: "Selin Arslan",
-    desc:   "Dağ evinde mahsur kalan iki yabancı, fırtınanın ardından birbirlerini keşfeder...",
-    genre:  "#41 içinde Romantizm",
-    coverBg: "linear-gradient(160deg,#0c4a6e,#38bdf8)",
-    badge:  "#38bdf8",
-    badgeIcon: "⭐",
-    reads:  "5.1K",
-    likes:  73,
-    rating: 4.6,
+    id:      3,
+    title:   "YAĞMUR VE SESSİZLİK",
+    author:  "Selin Arslan",
+    desc:    "Dağ evinde mahsur kalan iki yabancı, fırtınanın ardından birbirlerini keşfeder...",
+    genre:   "#41 içinde Romantizm",
+    coverBg: "linear-gradient(160deg,#0c4a6e,#0284c7)",
+    badgeBg: "#0369a1",
+    BadgeIcon: Sparkles,
+    reads:   "5.1K",
+    likes:   73,
+    rating:  4.6,
     coverImg: null as string | null,
   },
   {
-    id:     4,
-    title:  "KARANLIK LABIRENT",
-    author: "Baran Yıldız",
-    desc:   "Tarihi bir labirentin derinliklerinde gizlenmiş sır, yüzyıllardır kimse tarafından çözülemedi...",
-    genre:  "#12 içinde Macera",
-    coverBg: "linear-gradient(160deg,#1c1917,#57534e)",
-    badge:  "#a8a29e",
-    badgeIcon: "🗝️",
-    reads:  "3.7K",
-    likes:  48,
-    rating: 4.5,
+    id:      4,
+    title:   "KARANLIK LABİRENT",
+    author:  "Baran Yıldız",
+    desc:    "Tarihi bir labirentin derinliklerinde gizlenmiş sır, yüzyıllardır kimse tarafından çözülemedi...",
+    genre:   "#12 içinde Macera",
+    coverBg: "linear-gradient(160deg,#1c1917,#44403c)",
+    badgeBg: "#57534e",
+    BadgeIcon: Compass,
+    reads:   "3.7K",
+    likes:   48,
+    rating:  4.5,
     coverImg: null as string | null,
   },
 ];
@@ -131,51 +131,53 @@ function FeaturedCarousel() {
           msOverflowStyle:      "none",
         }}
       >
-        {FEATURED.map((book, idx) => (
+        {FEATURED.map((book, idx) => {
+          const { BadgeIcon } = book;
+          return (
           <div
             key={book.id}
             className="flex-none mr-3 last:mr-0"
             style={{
-              width:          "calc(100% - 28px)", /* sonraki kart hafif gözükür */
+              width:           "calc(100% - 24px)",
               scrollSnapAlign: "start",
-              height:          260,
+              height:          310,
             }}
           >
             {/* Kart: sol = kapak, sağ = bilgi */}
             <div className="flex h-full rounded-2xl overflow-hidden" style={{
-              border: `1.5px solid ${idx === activeIdx ? "rgba(212,163,42,0.55)" : "rgba(255,255,255,0.08)"}`,
+              border:     `1.5px solid ${idx === activeIdx ? "rgba(251,191,36,0.6)" : "rgba(255,255,255,0.08)"}`,
               transition: "border-color 0.3s",
             }}>
 
-              {/* Kapak resmi */}
-              <div className="relative flex-none" style={{ width: "42%", background: book.coverBg }}>
+              {/* Kapak */}
+              <div className="relative flex-none" style={{ width: "40%", background: book.coverBg }}>
                 {book.coverImg
                   ? <img src={book.coverImg} alt={book.title} className="w-full h-full object-cover" />
                   : null}
-                {/* Rozet */}
+                {/* Rozet — lucide ikon */}
                 <div
-                  className="absolute top-3 left-3 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg"
-                  style={{ background: book.badge }}
+                  className="absolute top-3 left-3 w-11 h-11 rounded-full flex items-center justify-center shadow-xl"
+                  style={{ background: book.badgeBg, boxShadow: `0 4px 16px ${book.badgeBg}88` }}
                 >
-                  {book.badgeIcon}
+                  <BadgeIcon className="w-5 h-5 text-white" strokeWidth={2.2} />
                 </div>
               </div>
 
               {/* Sağ bilgi paneli */}
               <div
-                className="flex-1 flex flex-col px-4 pt-4 pb-3 min-w-0"
-                style={{ background: "#0f0f0f", borderLeft: "1.5px solid rgba(212,163,42,0.35)" }}
+                className="flex-1 flex flex-col px-4 pt-4 pb-4 min-w-0"
+                style={{ background: "#0f0f0f", borderLeft: "1.5px solid rgba(251,191,36,0.45)" }}
               >
                 {/* Başlık + menü */}
                 <div className="flex items-start justify-between gap-1 mb-2">
                   <p className="text-[15px] font-black text-white leading-snug flex-1">{book.title}</p>
-                  <button className="text-white/40 hover:text-white/70 flex-shrink-0 mt-0.5">
+                  <button className="text-white/35 hover:text-white/70 flex-shrink-0 mt-0.5">
                     <MoreVertical className="w-4 h-4" />
                   </button>
                 </div>
 
                 {/* Açıklama */}
-                <p className="text-[12px] text-white/60 leading-relaxed line-clamp-3 mb-3 flex-1">
+                <p className="text-[12px] text-white/55 leading-relaxed line-clamp-3 mb-3 flex-1">
                   {book.desc}
                 </p>
 
@@ -184,9 +186,9 @@ function FeaturedCarousel() {
                   <span
                     className="text-[11px] font-bold px-3 py-1.5 rounded-full"
                     style={{
-                      border:  "1.5px solid #d4a320",
-                      color:   "#d4a320",
-                      background: "rgba(212,163,32,0.08)",
+                      border:     "1.5px solid #fbbf24",
+                      color:      "#fbbf24",
+                      background: "rgba(251,191,36,0.1)",
                     }}
                   >
                     {book.genre}
@@ -195,35 +197,36 @@ function FeaturedCarousel() {
 
                 {/* Okuma sayısı */}
                 <div
-                  className="flex items-center px-3 py-1.5 rounded-full mb-2"
-                  style={{ background: "rgba(255,255,255,0.06)" }}
+                  className="flex items-center px-3 py-2 rounded-full mb-2.5"
+                  style={{ background: "rgba(255,255,255,0.07)" }}
                 >
                   <span className="text-sm font-black text-white mr-1.5">{book.reads}</span>
-                  <span className="text-sm text-white/40 font-medium">okuma</span>
+                  <span className="text-[13px] text-white/40 font-medium">okuma</span>
                 </div>
 
                 {/* Beğeni + Puan */}
                 <div className="flex items-center gap-2">
                   <div
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-1 justify-center"
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-1 justify-center"
                     style={{ background: "rgba(255,255,255,0.07)" }}
                   >
                     <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400" />
-                    <span className="text-sm font-bold text-white">{book.likes}</span>
+                    <span className="text-[13px] font-bold text-white">{book.likes}</span>
                   </div>
                   <div
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-1 justify-center"
-                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(212,163,32,0.3)" }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-1 justify-center"
+                    style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.4)" }}
                   >
                     <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-sm font-bold text-white">{book.rating.toFixed(1)}</span>
+                    <span className="text-[13px] font-bold text-white">{book.rating.toFixed(1)}</span>
                     <span className="text-[11px] text-white/40">/ 5</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Sayfa noktaları */}
