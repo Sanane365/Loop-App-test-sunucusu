@@ -91,8 +91,7 @@ function FeaturedCarousel() {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const cardW = el.scrollWidth / FEATURED.length;
-    setActiveIdx(Math.round(el.scrollLeft / cardW));
+    setActiveIdx(Math.round(el.scrollLeft / el.clientWidth));
   }, []);
 
   return (
@@ -118,113 +117,128 @@ function FeaturedCarousel() {
         </button>
       </div>
 
-      {/* Kaydırılabilir kart alanı */}
+      {/* Kaydırılabilir kart alanı — tam genişlik, peek yok */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto gap-0 px-4 pb-4"
+        className="flex overflow-x-auto pb-4"
         style={{
-          scrollSnapType:       "x mandatory",
-          scrollBehavior:       "smooth",
+          scrollSnapType:          "x mandatory",
+          scrollBehavior:          "smooth",
           WebkitOverflowScrolling: "touch",
-          scrollbarWidth:       "none",
-          msOverflowStyle:      "none",
+          scrollbarWidth:          "none",
+          msOverflowStyle:         "none",
+          gap:                     0,
         }}
       >
         {FEATURED.map((book, idx) => {
           const { BadgeIcon } = book;
           return (
-          <div
-            key={book.id}
-            className="flex-none mr-3 last:mr-0"
-            style={{
-              width:           "calc(100% - 24px)",
-              scrollSnapAlign: "start",
-              height:          310,
-            }}
-          >
-            {/* Kart: sol = kapak, sağ = bilgi */}
-            <div className="flex h-full rounded-2xl overflow-hidden" style={{
-              border:     `1.5px solid ${idx === activeIdx ? "rgba(251,191,36,0.6)" : "rgba(255,255,255,0.08)"}`,
-              transition: "border-color 0.3s",
-            }}>
-
-              {/* Kapak */}
-              <div className="relative flex-none" style={{ width: "40%", background: book.coverBg }}>
-                {book.coverImg
-                  ? <img src={book.coverImg} alt={book.title} className="w-full h-full object-cover" />
-                  : null}
-                {/* Rozet — lucide ikon */}
-                <div
-                  className="absolute top-3 left-3 w-11 h-11 rounded-full flex items-center justify-center shadow-xl"
-                  style={{ background: book.badgeBg, boxShadow: `0 4px 16px ${book.badgeBg}88` }}
-                >
-                  <BadgeIcon className="w-5 h-5 text-white" strokeWidth={2.2} />
-                </div>
-              </div>
-
-              {/* Sağ bilgi paneli */}
+            <div
+              key={book.id}
+              className="flex-none px-4"
+              style={{ width: "100%", scrollSnapAlign: "start" }}
+            >
+              {/* Kart: sol = kapak, sağ = bilgi */}
               <div
-                className="flex-1 flex flex-col px-4 pt-4 pb-4 min-w-0"
-                style={{ background: "#0f0f0f", borderLeft: "1.5px solid rgba(251,191,36,0.45)" }}
+                className="flex rounded-2xl overflow-hidden"
+                style={{
+                  height:     330,
+                  border:     `1.5px solid ${idx === activeIdx ? "rgba(251,191,36,0.65)" : "rgba(255,255,255,0.09)"}`,
+                  transition: "border-color 0.3s",
+                }}
               >
-                {/* Başlık + menü */}
-                <div className="flex items-start justify-between gap-1 mb-2">
-                  <p className="text-[15px] font-black text-white leading-snug flex-1">{book.title}</p>
-                  <button className="text-white/35 hover:text-white/70 flex-shrink-0 mt-0.5">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {/* Açıklama */}
-                <p className="text-[12px] text-white/55 leading-relaxed line-clamp-3 mb-3 flex-1">
-                  {book.desc}
-                </p>
-
-                {/* Tür etiketi */}
-                <div className="mb-3">
-                  <span
-                    className="text-[11px] font-bold px-3 py-1.5 rounded-full"
+                {/* Kapak */}
+                <div
+                  className="relative flex-none"
+                  style={{ width: "42%", background: book.coverBg }}
+                >
+                  {book.coverImg && (
+                    <img src={book.coverImg} alt={book.title} className="w-full h-full object-cover" />
+                  )}
+                  {/* Rozet */}
+                  <div
+                    className="absolute top-3 left-3 w-11 h-11 rounded-full flex items-center justify-center"
                     style={{
-                      border:     "1.5px solid #fbbf24",
-                      color:      "#fbbf24",
-                      background: "rgba(251,191,36,0.1)",
+                      background:  book.badgeBg,
+                      boxShadow:   `0 4px 18px ${book.badgeBg}99`,
                     }}
                   >
-                    {book.genre}
-                  </span>
+                    <BadgeIcon className="w-5 h-5 text-white" strokeWidth={2.2} />
+                  </div>
                 </div>
 
-                {/* Okuma sayısı */}
+                {/* Sağ bilgi paneli */}
                 <div
-                  className="flex items-center px-3 py-2 rounded-full mb-2.5"
-                  style={{ background: "rgba(255,255,255,0.07)" }}
+                  className="flex-1 flex flex-col min-w-0"
+                  style={{
+                    background:  "#0f0f0f",
+                    borderLeft:  "1.5px solid rgba(251,191,36,0.4)",
+                    padding:     "18px 16px 16px",
+                  }}
                 >
-                  <span className="text-sm font-black text-white mr-1.5">{book.reads}</span>
-                  <span className="text-[13px] text-white/40 font-medium">okuma</span>
-                </div>
+                  {/* Başlık + menü */}
+                  <div className="flex items-start justify-between gap-1 mb-3">
+                    <p className="text-[15px] font-black text-white leading-snug flex-1">
+                      {book.title}
+                    </p>
+                    <button className="text-white/35 flex-shrink-0 mt-0.5">
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                {/* Beğeni + Puan */}
-                <div className="flex items-center gap-2">
+                  {/* Açıklama */}
+                  <p className="text-[12.5px] text-white/55 leading-[1.55] line-clamp-3 mb-4 flex-1">
+                    {book.desc}
+                  </p>
+
+                  {/* Tür etiketi */}
+                  <div className="mb-3">
+                    <span
+                      className="inline-block text-[11px] font-bold px-3 py-1.5 rounded-full"
+                      style={{
+                        border:     "1.5px solid #fbbf24",
+                        color:      "#fbbf24",
+                        background: "rgba(251,191,36,0.1)",
+                      }}
+                    >
+                      {book.genre}
+                    </span>
+                  </div>
+
+                  {/* Okuma sayısı */}
                   <div
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-1 justify-center"
+                    className="flex items-center px-3 py-2 rounded-full mb-2.5"
                     style={{ background: "rgba(255,255,255,0.07)" }}
                   >
-                    <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400" />
-                    <span className="text-[13px] font-bold text-white">{book.likes}</span>
+                    <span className="text-sm font-black text-white mr-1.5">{book.reads}</span>
+                    <span className="text-[13px] text-white/40">okuma</span>
                   </div>
-                  <div
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-full flex-1 justify-center"
-                    style={{ background: "rgba(251,191,36,0.1)", border: "1px solid rgba(251,191,36,0.4)" }}
-                  >
-                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                    <span className="text-[13px] font-bold text-white">{book.rating.toFixed(1)}</span>
-                    <span className="text-[11px] text-white/40">/ 5</span>
+
+                  {/* Beğeni + Puan */}
+                  <div className="flex gap-2">
+                    <div
+                      className="flex items-center justify-center gap-1.5 py-2 rounded-full flex-1"
+                      style={{ background: "rgba(255,255,255,0.07)" }}
+                    >
+                      <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400" />
+                      <span className="text-[13px] font-bold text-white">{book.likes}</span>
+                    </div>
+                    <div
+                      className="flex items-center justify-center gap-1.5 py-2 rounded-full flex-1"
+                      style={{
+                        background: "rgba(251,191,36,0.1)",
+                        border:     "1px solid rgba(251,191,36,0.45)",
+                      }}
+                    >
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span className="text-[13px] font-bold text-white">{book.rating.toFixed(1)}</span>
+                      <span className="text-[11px] text-white/40">/ 5</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
           );
         })}
       </div>
@@ -237,14 +251,13 @@ function FeaturedCarousel() {
             onClick={() => {
               const el = scrollRef.current;
               if (!el) return;
-              const cardW = el.scrollWidth / FEATURED.length;
-              el.scrollTo({ left: cardW * i, behavior: "smooth" });
+              el.scrollTo({ left: el.clientWidth * i, behavior: "smooth" });
             }}
             style={{
               width:        i === activeIdx ? 28 : 10,
               height:       10,
               borderRadius: 99,
-              background:   i === activeIdx ? "#d4a320" : "rgba(255,255,255,0.2)",
+              background:   i === activeIdx ? "#fbbf24" : "rgba(255,255,255,0.2)",
               border:       "none",
               cursor:       "pointer",
               transition:   "all 0.3s ease",
