@@ -19,6 +19,7 @@ import Admin from "@/pages/Admin";
 import DirectMessages from "@/pages/DirectMessages";
 import Bookmarks from "@/pages/Bookmarks";
 import PostDetail from "@/pages/PostDetail";
+import Notebook from "@/pages/Notebook";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,8 @@ function Router() {
       <Route path="/dm/:userId" component={DirectMessages} />
       <Route path="/bookmarks" component={Bookmarks} />
       <Route path="/post/:postId" component={PostDetail} />
+      <Route path="/notebook" component={Notebook} />
+      <Route path="/notebook/:tab" component={Notebook} />
       <Route component={NotFound} />
     </Switch>
   );
