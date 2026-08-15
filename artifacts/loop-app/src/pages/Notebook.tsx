@@ -7,11 +7,11 @@
  *   • Özel bottom nav (BottomNav otomatik değişir)
  */
 
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   BookOpen, X, ChevronUp, ChevronDown, ArrowRight,
-  Tag, Activity, BookMarked, CalendarDays, MoreVertical, Pencil,
+  MoreVertical, Pencil, Heart, Star,
 } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { BottomNav } from "@/components/layout/BottomNav";
@@ -24,19 +24,55 @@ const FEATURED = [
     author: "Eylül Çetiner",
     desc:   "Eylül Çetiner kanser olduğunu öğrendiği gün ilk aşkı ile karşılaşır. Çağan Demirsoy kim...",
     genre:  "#25 içinde Romantizm",
-    color:  "#f59e0b",
-    rank:   "👑",
-    reads:  "12",
+    coverBg: "linear-gradient(160deg,#92400e,#f59e0b)",
+    badge:  "#f59e0b",
+    badgeIcon: "👑",
+    reads:  "12.8K",
+    likes:  161,
+    rating: 5.0,
+    coverImg: null as string | null,
   },
   {
     id:     2,
     title:  "GECE YARISI TRENI",
     author: "Deniz Karaköse",
-    desc:   "İstanbul'un karanlık sokaklarında kaybolan bir dedektif ve gizemli bir sır...",
+    desc:   "İstanbul'un karanlık sokaklarında kaybolan bir dedektif ve gizemli bir sır çözmeye çalışır...",
     genre:  "#8 içinde Gerilim",
-    color:  "#6366f1",
-    rank:   "🔥",
-    reads:  "8",
+    coverBg: "linear-gradient(160deg,#1e1b4b,#6366f1)",
+    badge:  "#6366f1",
+    badgeIcon: "🔥",
+    reads:  "8.3K",
+    likes:  94,
+    rating: 4.8,
+    coverImg: null as string | null,
+  },
+  {
+    id:     3,
+    title:  "YAĞMUR VE SESSIZLIK",
+    author: "Selin Arslan",
+    desc:   "Dağ evinde mahsur kalan iki yabancı, fırtınanın ardından birbirlerini keşfeder...",
+    genre:  "#41 içinde Romantizm",
+    coverBg: "linear-gradient(160deg,#0c4a6e,#38bdf8)",
+    badge:  "#38bdf8",
+    badgeIcon: "⭐",
+    reads:  "5.1K",
+    likes:  73,
+    rating: 4.6,
+    coverImg: null as string | null,
+  },
+  {
+    id:     4,
+    title:  "KARANLIK LABIRENT",
+    author: "Baran Yıldız",
+    desc:   "Tarihi bir labirentin derinliklerinde gizlenmiş sır, yüzyıllardır kimse tarafından çözülemedi...",
+    genre:  "#12 içinde Macera",
+    coverBg: "linear-gradient(160deg,#1c1917,#57534e)",
+    badge:  "#a8a29e",
+    badgeIcon: "🗝️",
+    reads:  "3.7K",
+    likes:  48,
+    rating: 4.5,
+    coverImg: null as string | null,
   },
 ];
 
@@ -46,6 +82,178 @@ const STATS = [
   { label: "Okuyucu",     value: "0" },
   { label: "Toplam Görüntülenme", value: "0" },
 ];
+
+/* ── Loop Seçkisi Carousel ───────────────────────────────────────────── */
+function FeaturedCarousel() {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const cardW = el.scrollWidth / FEATURED.length;
+    setActiveIdx(Math.round(el.scrollLeft / cardW));
+  }, []);
+
+  return (
+    <div
+      className="mx-4 rounded-3xl overflow-hidden"
+      style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)" }}
+    >
+      {/* Başlık */}
+      <div className="flex items-start justify-between px-5 pt-5 pb-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-1">
+            Loop Seçkisi
+          </p>
+          <h2 className="text-[22px] font-black text-white leading-tight">
+            Öne Çıkan Hikayeler
+          </h2>
+        </div>
+        <button
+          className="flex items-center gap-2 rounded-full font-bold text-sm text-white px-4 py-2 mt-1 whitespace-nowrap flex-shrink-0"
+          style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.12)" }}
+        >
+          Tümünü Gör <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Kaydırılabilir kart alanı */}
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex overflow-x-auto gap-0 px-4 pb-4"
+        style={{
+          scrollSnapType:       "x mandatory",
+          scrollBehavior:       "smooth",
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth:       "none",
+          msOverflowStyle:      "none",
+        }}
+      >
+        {FEATURED.map((book, idx) => (
+          <div
+            key={book.id}
+            className="flex-none mr-3 last:mr-0"
+            style={{
+              width:          "calc(100% - 28px)", /* sonraki kart hafif gözükür */
+              scrollSnapAlign: "start",
+              height:          260,
+            }}
+          >
+            {/* Kart: sol = kapak, sağ = bilgi */}
+            <div className="flex h-full rounded-2xl overflow-hidden" style={{
+              border: `1.5px solid ${idx === activeIdx ? "rgba(212,163,42,0.55)" : "rgba(255,255,255,0.08)"}`,
+              transition: "border-color 0.3s",
+            }}>
+
+              {/* Kapak resmi */}
+              <div className="relative flex-none" style={{ width: "42%", background: book.coverBg }}>
+                {book.coverImg
+                  ? <img src={book.coverImg} alt={book.title} className="w-full h-full object-cover" />
+                  : null}
+                {/* Rozet */}
+                <div
+                  className="absolute top-3 left-3 w-10 h-10 rounded-full flex items-center justify-center text-xl shadow-lg"
+                  style={{ background: book.badge }}
+                >
+                  {book.badgeIcon}
+                </div>
+              </div>
+
+              {/* Sağ bilgi paneli */}
+              <div
+                className="flex-1 flex flex-col px-4 pt-4 pb-3 min-w-0"
+                style={{ background: "#0f0f0f", borderLeft: "1.5px solid rgba(212,163,42,0.35)" }}
+              >
+                {/* Başlık + menü */}
+                <div className="flex items-start justify-between gap-1 mb-2">
+                  <p className="text-[15px] font-black text-white leading-snug flex-1">{book.title}</p>
+                  <button className="text-white/40 hover:text-white/70 flex-shrink-0 mt-0.5">
+                    <MoreVertical className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Açıklama */}
+                <p className="text-[12px] text-white/60 leading-relaxed line-clamp-3 mb-3 flex-1">
+                  {book.desc}
+                </p>
+
+                {/* Tür etiketi */}
+                <div className="mb-3">
+                  <span
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-full"
+                    style={{
+                      border:  "1.5px solid #d4a320",
+                      color:   "#d4a320",
+                      background: "rgba(212,163,32,0.08)",
+                    }}
+                  >
+                    {book.genre}
+                  </span>
+                </div>
+
+                {/* Okuma sayısı */}
+                <div
+                  className="flex items-center px-3 py-1.5 rounded-full mb-2"
+                  style={{ background: "rgba(255,255,255,0.06)" }}
+                >
+                  <span className="text-sm font-black text-white mr-1.5">{book.reads}</span>
+                  <span className="text-sm text-white/40 font-medium">okuma</span>
+                </div>
+
+                {/* Beğeni + Puan */}
+                <div className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-1 justify-center"
+                    style={{ background: "rgba(255,255,255,0.07)" }}
+                  >
+                    <Heart className="w-3.5 h-3.5 text-pink-400 fill-pink-400" />
+                    <span className="text-sm font-bold text-white">{book.likes}</span>
+                  </div>
+                  <div
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full flex-1 justify-center"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(212,163,32,0.3)" }}
+                  >
+                    <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                    <span className="text-sm font-bold text-white">{book.rating.toFixed(1)}</span>
+                    <span className="text-[11px] text-white/40">/ 5</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Sayfa noktaları */}
+      <div className="flex items-center justify-center gap-2 pb-5">
+        {FEATURED.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              const el = scrollRef.current;
+              if (!el) return;
+              const cardW = el.scrollWidth / FEATURED.length;
+              el.scrollTo({ left: cardW * i, behavior: "smooth" });
+            }}
+            style={{
+              width:        i === activeIdx ? 28 : 10,
+              height:       10,
+              borderRadius: 99,
+              background:   i === activeIdx ? "#d4a320" : "rgba(255,255,255,0.2)",
+              border:       "none",
+              cursor:       "pointer",
+              transition:   "all 0.3s ease",
+              padding:      0,
+              flexShrink:   0,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /* ── Sekme içerikleri ─────────────────────────────────────────────── */
 function KitaplarTab() {
@@ -137,67 +345,8 @@ function KitaplarTab() {
         </div>
       )}
 
-      {/* ── Loop Seçkisi: Öne Çıkan Hikayeler ────────────────────── */}
-      <div
-        className="mx-4 rounded-3xl overflow-hidden"
-        style={{
-          background: "#0f0f0f",
-          border:     "1px solid rgba(255,255,255,0.06)",
-        }}
-      >
-        {/* Başlık satırı */}
-        <div className="flex items-start justify-between px-5 pt-5 pb-3">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400 mb-1">
-              Loop Seçkisi
-            </p>
-            <h2 className="text-xl font-black text-white leading-tight">
-              Öne Çıkan Hikayeler
-            </h2>
-          </div>
-          <button className="flex items-center gap-1 text-sm font-bold text-white/60 hover:text-white transition-colors mt-1">
-            Tümünü Gör <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        {/* Kitap kartları */}
-        <div className="px-4 pb-5 flex flex-col gap-3">
-          {FEATURED.map(book => (
-            <div
-              key={book.id}
-              className="flex gap-3 rounded-2xl overflow-hidden"
-              style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
-            >
-              {/* Kapak */}
-              <div
-                className="w-20 h-24 flex-shrink-0 flex items-center justify-center text-2xl rounded-l-2xl"
-                style={{ background: book.color }}
-              >
-                {book.rank}
-              </div>
-
-              {/* Bilgi */}
-              <div className="flex-1 py-3 pr-2 min-w-0">
-                <div className="flex items-start justify-between">
-                  <p className="text-sm font-black text-white leading-tight pr-2">{book.title}</p>
-                  <button className="text-white/40 hover:text-white/70 transition-colors flex-shrink-0">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
-                </div>
-                <p className="text-[11px] text-white/50 mt-1 leading-relaxed line-clamp-2">{book.desc}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className="text-[10px] font-bold px-2.5 py-1 rounded-full"
-                    style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24", border: "1px solid rgba(245,158,11,0.3)" }}
-                  >
-                    {book.genre}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* ── Loop Seçkisi: Öne Çıkan Hikayeler carousel ─────────────── */}
+      <FeaturedCarousel />
 
       {/* ── Yeni bölüm placeholder ───────────────────────────────── */}
       <div
