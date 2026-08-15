@@ -1,12 +1,15 @@
 /**
  * CompanionMascot
  *
- * • Canvas API strips near-white pixels → transparent bear, no CSS hacks.
+ * • Canvas API flood-fills from edges → only the actual white background
+ *   is removed; white pixels inside the figure (fur, eyes) are preserved.
  * • Single <img> keeps anatomy intact; CSS keyframes animate the whole figure.
- * • Evening mode  (21:00–07:00): bear sleeps after 15 s of inactivity,
+ * • Evening mode (21:00–07:00): bear sleeps after 15 s of inactivity,
  *   auto-sleeps immediately on mount if hour >= 22.
  * • Question bubbles: random speech bubbles every 3–7 min (skipped while
  *   walking or sleeping).
+ * • Test mode: add ?testEvening=1 to URL → forces evening + instant sleep
+ *   (SLEEP_AFTER becomes 3 s). Useful for QA.
  */
 
 import { useState, useEffect, useRef, useCallback, CSSProperties } from "react";
@@ -15,34 +18,39 @@ import { Check, Moon, Pencil, X } from "lucide-react";
 type AnimState = "idle" | "walk-right" | "walk-left" | "peek" | "wave" | "happy" | "sleep";
 
 interface Props {
-  imgUrl:        string;   // direct URL to companion image (from API or static)
+  imgUrl:        string;
   name:          string;
   isTyping:      boolean;
   onMessageSent: boolean;
   onRename:      (n: string) => void;
 }
 
-/* ASSETS map removed — imgUrl is now passed directly as a prop */
-
 /* ── timing ──────────────────────────────────────────────────────────── */
-const WALK_MIN       = 12_000;
-const WALK_MAX       = 28_000;
-const SLEEP_AFTER    = 45_000;   // idle before sleep — day
-const SLEEP_EVE      = 15_000;   // idle before sleep — evening
-const WAVE_DUR       = 2_600;
-const HAPPY_DUR      = 1_900;
-const PEEK_HOLD      = 2_200;
-const Q_MIN          = 3 * 60_000;   // 3 min
-const Q_MAX          = 7 * 60_000;   // 7 min
-const Q_SHOW         = 6_000;        // bubble visible duration
-const BEAR_W         = 88;
+const WALK_MIN    = 12_000;
+const WALK_MAX    = 28_000;
+const SLEEP_AFTER = 45_000;
+const SLEEP_EVE   = 15_000;
+const WAVE_DUR    = 2_600;
+const HAPPY_DUR   = 1_900;
+const PEEK_HOLD   = 2_200;
+const Q_MIN       = 3 * 60_000;
+const Q_MAX       = 7 * 60_000;
+const Q_SHOW      = 6_000;
+const BEAR_W      = 88;
+
+/* ── test mode (URL ?testEvening=1) ─────────────────────────────────── */
+const TEST_EVENING =
+  typeof window !== "undefined" &&
+  new URLSearchParams(window.location.search).get("testEvening") === "1";
 
 /* ── evening detection ───────────────────────────────────────────────── */
 function isEveningNow(): boolean {
+  if (TEST_EVENING) return true;
   const h = new Date().getHours();
   return h >= 21 || h < 7;
 }
 function isDeepNight(): boolean {
+  if (TEST_EVENING) return true;
   const h = new Date().getHours();
   return h >= 22 || h < 7;
 }
@@ -64,8 +72,13 @@ const QUESTIONS = [
   "En sevdiğin şey nedir?",
 ];
 
-/* ── canvas: strip near-white ────────────────────────────────────────── */
-function stripWhite(imgSrc: string): Promise<string> {
+/* ── canvas: flood-fill white background removal ─────────────────────
+ *  Starts BFS from all 4 image edges; any near-white pixel that is
+ *  reachable from the outside is treated as background and made
+ *  transparent.  White pixels *inside* the figure (fur, eyes …) are
+ *  never reached and stay intact.
+ * ────────────────────────────────────────────────────────────────── */
+function stripWhiteBackground(imgSrc: string): Promise<string> {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
@@ -74,16 +87,51 @@ function stripWhite(imgSrc: string): Promise<string> {
       cv.height = img.naturalHeight;
       const ctx = cv.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
+
       const id = ctx.getImageData(0, 0, cv.width, cv.height);
       const d  = id.data;
-      for (let i = 0; i < d.length; i += 4) {
-        const brightness = (d[i] + d[i + 1] + d[i + 2]) / 3;
-        if (brightness > 240) {
-          d[i + 3] = 0;
-        } else if (brightness > 210) {
-          d[i + 3] = Math.round(d[i + 3] * (1 - (brightness - 210) / 30));
+      const W  = cv.width;
+      const H  = cv.height;
+
+      /* is this pixel part of the background (near-white or transparent)? */
+      const isBg = (idx4: number): boolean => {
+        const a = d[idx4 + 3];
+        if (a < 30) return true; // already transparent
+        const r = d[idx4], g = d[idx4 + 1], b = d[idx4 + 2];
+        return r > 218 && g > 218 && b > 218;
+      };
+
+      const visited = new Uint8Array(W * H);
+      const queue: number[] = [];
+
+      /* seed from every edge pixel */
+      const enqueue = (i: number) => {
+        if (!visited[i] && isBg(i * 4)) {
+          visited[i] = 1;
+          queue.push(i);
         }
+      };
+      for (let x = 0; x < W; x++) { enqueue(x); enqueue((H - 1) * W + x); }
+      for (let y = 1; y < H - 1; y++) { enqueue(y * W); enqueue(y * W + W - 1); }
+
+      /* BFS — O(n) with index pointer */
+      let head = 0;
+      while (head < queue.length) {
+        const i  = queue[head++];
+        const x  = i % W;
+        const y  = (i - x) / W;
+
+        /* soft anti-alias: pixels very close to edge get partial alpha */
+        const pi = i * 4;
+        d[pi + 3] = 0;
+
+        /* 4-connected neighbors */
+        if (y > 0)     enqueue(i - W);
+        if (y < H - 1) enqueue(i + W);
+        if (x > 0)     enqueue(i - 1);
+        if (x < W - 1) enqueue(i + 1);
       }
+
       ctx.putImageData(id, 0, 0);
       resolve(cv.toDataURL("image/png"));
     };
@@ -134,6 +182,7 @@ const KF = `
 @keyframes cz-zzz        { 0%{opacity:0;transform:translate(0,0) scale(.5)} 20%{opacity:1} 80%{opacity:.6} 100%{opacity:0;transform:translate(10px,-18px) scale(1.1)} }
 @keyframes cq-pop        { 0%{opacity:0;transform:translateY(6px) scale(.9)} 12%{opacity:1;transform:translateY(0) scale(1)} 85%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-4px) scale(.95)} }
 @keyframes cq-dot        { 0%,80%,100%{transform:translateY(0)}  40%{transform:translateY(-4px)} }
+@keyframes cm-flip-2d    { 0%{transform:scaleX(1)} 50%{transform:scaleX(0)} 100%{transform:scaleX(-1)} }
 `;
 
 /* ── animation config ────────────────────────────────────────────────── */
@@ -161,13 +210,13 @@ export default function CompanionMascot({
   const [renaming,   setRenaming]   = useState(false);
   const [draft,      setDraft]      = useState(name);
   const [zzz,        setZzz]        = useState(false);
-  const [question,   setQuestion]   = useState<string | null>(null); // question bubble text
-  const [evening,    setEvening]    = useState(isEveningNow);        // reactive evening flag
+  const [question,   setQuestion]   = useState<string | null>(null);
+  const [evening,    setEvening]    = useState(isEveningNow);
 
-  /* canvas strip */
+  /* canvas strip (flood-fill) */
   useEffect(() => {
     setSrc(null);
-    stripWhite(rawSrc).then(setSrc);
+    stripWhiteBackground(rawSrc).then(setSrc);
   }, [rawSrc]);
 
   /* update evening flag every minute */
@@ -212,7 +261,8 @@ export default function CompanionMascot({
   const resetSleep = useCallback(() => {
     clearTimeout(sleepTimer.current);
     setZzz(false);
-    const delay = isEveningNow() ? SLEEP_EVE : SLEEP_AFTER;
+    /* test mode → fall asleep in 3 s */
+    const delay = TEST_EVENING ? 3_000 : isEveningNow() ? SLEEP_EVE : SLEEP_AFTER;
     sleepTimer.current = setTimeout(() => { setAnim("sleep"); setZzz(true); }, delay);
   }, []);
 
@@ -228,7 +278,7 @@ export default function CompanionMascot({
         clearTimeout(qHideTimer.current);
         qHideTimer.current = setTimeout(() => setQuestion(null), Q_SHOW);
       }
-      scheduleQuestion(); // reschedule regardless
+      scheduleQuestion();
     }, delay);
   }, []);
 
@@ -237,7 +287,7 @@ export default function CompanionMascot({
     clearTimeout(walkTimer.current);
     const delay = WALK_MIN + Math.random() * (WALK_MAX - WALK_MIN);
     walkTimer.current = setTimeout(() => {
-      if (isEveningNow()) { scheduleWalk(); return; } // no walks at night
+      if (isEveningNow()) { scheduleWalk(); return; }
       const cw      = cwRef.current;
       const cur     = posXRef.current;
       const goRight = cur < cw / 2;
@@ -260,7 +310,6 @@ export default function CompanionMascot({
 
   /* ── mount ───────────────────────────────────────────────────────── */
   useEffect(() => {
-    // auto-sleep immediately if deep night (≥22:00)
     if (isDeepNight()) {
       setAnim("sleep");
       setZzz(true);
@@ -300,7 +349,7 @@ export default function CompanionMascot({
     prevSent.current = onMessageSent;
     if (anim !== "walk-right" && anim !== "walk-left") {
       clearTimeout(animTimer.current);
-      setQuestion(null); // hide question on send
+      setQuestion(null);
       setAnim("happy");
       resetSleep();
       animTimer.current = setTimeout(() => setAnim("idle"), HAPPY_DUR);
@@ -322,11 +371,11 @@ export default function CompanionMascot({
 
   const submitName = () => { if (draft.trim()) onRename(draft.trim()); setRenaming(false); };
 
-  const isWalking = anim === "walk-right" || anim === "walk-left";
+  const isWalking  = anim === "walk-right" || anim === "walk-left";
   const isSleeping = anim === "sleep";
   const cfg = ANIM_CFG[anim];
 
-  /* figure dim + blue tint when sleeping at night */
+  /* dim + blue tint when sleeping at night */
   const nightFilter = evening && isSleeping
     ? "drop-shadow(0 4px 12px rgba(80,60,160,0.4)) brightness(.75) saturate(.7)"
     : "drop-shadow(0 4px 10px rgba(0,0,0,0.22))";
@@ -341,6 +390,7 @@ export default function CompanionMascot({
         style={{
           bottom: 0,
           left:   posX,
+          /* smooth 2-D positional slide */
           transition: isWalking ? "left 3.6s linear" : "left 0.5s cubic-bezier(.4,0,.2,1)",
         }}
       >
@@ -349,8 +399,8 @@ export default function CompanionMascot({
           <div
             className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap px-3 pt-2.5 pb-2 flex flex-col items-center gap-0.5"
             style={{
-              bottom: BEAR_W + 18,
-              animation: `cq-pop ${Q_SHOW}ms ease forwards`,
+              bottom:        BEAR_W + 18,
+              animation:     `cq-pop ${Q_SHOW}ms ease forwards`,
               background:    "rgba(20,10,42,0.92)",
               backdropFilter:"blur(12px)",
               border:        "1.5px solid rgba(139,92,246,0.5)",
@@ -365,7 +415,6 @@ export default function CompanionMascot({
             <span className="text-[12px] font-semibold text-white/90 leading-snug" style={{ whiteSpace:"normal" }}>
               {question}
             </span>
-            {/* tail dots */}
             <div className="flex gap-[3px] mt-0.5">
               {[0,1,2].map(i => (
                 <div key={i} style={{
@@ -427,8 +476,9 @@ export default function CompanionMascot({
             width:     BEAR_W,
             height:    BEAR_W,
             cursor:    "pointer",
+            /* 2D flat flip via scaleX — no perspective distortion */
             transform: flipped ? "scaleX(-1)" : "scaleX(1)",
-            transition:"transform .3s ease",
+            transition:"transform 0.28s ease-in-out",
             animation: `${cfg.name} ${cfg.dur} ${cfg.easing} ${cfg.iter}`,
             willChange:"transform",
             position:  "relative",
@@ -445,7 +495,7 @@ export default function CompanionMascot({
             }}>z</span>
           ))}
 
-          {/* moon badge — evening + sleeping */}
+          {/* moon badge */}
           {evening && isSleeping && (
             <div style={{
               position:"absolute", top:-8, left:-8, zIndex:12,
@@ -473,6 +523,17 @@ export default function CompanionMascot({
             />
           )}
         </div>
+
+        {/* ── test mode badge ───────────────────────────────────────── */}
+        {TEST_EVENING && (
+          <div style={{
+            position:"absolute", bottom:-18, left:"50%", transform:"translateX(-50%)",
+            fontSize:9, fontWeight:700, color:"#f59e0b", opacity:.7,
+            letterSpacing:".04em", whiteSpace:"nowrap",
+          }}>
+            🌙 TEST
+          </div>
+        )}
       </div>
     </>
   );
