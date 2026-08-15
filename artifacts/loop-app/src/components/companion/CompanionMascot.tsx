@@ -85,73 +85,101 @@ const QUESTIONS = [
  *     BFS from edges through near-white pixels (r,g,b > 235).
  *     Works well for non-white subjects on white backgrounds.
  * ────────────────────────────────────────────────────────────────── */
+/* ── canvas: background removal ─────────────────────────────────────
+ *  Three modes (auto-detected):
+ *
+ *  A) Image has alpha channel (≥0.5% transparent pixels):
+ *     BFS only through already-transparent pixels — never touches opaque
+ *     white fur/body. Best for cartoon PNGs with pre-made transparency.
+ *
+ *  B) Fully opaque image, corners are near-white (solid white BG):
+ *     BFS from edges; a pixel is "background" iff it matches the corner
+ *     colour within ±TOL on every channel (default TOL=12).
+ *     Very tight → preserves off-white fur (≥243 but not pure white).
+ *
+ *  C) Fully opaque, corners are not white (no detectable white BG):
+ *     Return image unchanged.
+ *
+ *  NOTE: No crossOrigin attribute — this is a same-origin request through
+ *  the Vite proxy and adding crossOrigin="anonymous" can taint the canvas
+ *  if the API server doesn't send explicit CORS headers.
+ * ──────────────────────────────────────────────────────────────────── */
 function stripWhiteBackground(imgSrc: string): Promise<string> {
   return new Promise(resolve => {
     const img = new Image();
-    img.crossOrigin = "anonymous";   // avoids canvas tainting on same-origin proxied imgs
+    // No crossOrigin — same-origin proxy, CORS taint not needed
     img.onload = () => {
       const W = img.naturalWidth;
       const H = img.naturalHeight;
+      if (!W || !H) { resolve(imgSrc); return; }
+
       const cv  = document.createElement("canvas");
-      cv.width  = W;
-      cv.height = H;
+      cv.width  = W; cv.height = H;
       const ctx = cv.getContext("2d")!;
       ctx.drawImage(img, 0, 0);
 
       let id: ImageData;
-      try {
-        id = ctx.getImageData(0, 0, W, H);
-      } catch {
-        // canvas tainted (CORS) — return original unchanged
-        resolve(imgSrc);
-        return;
-      }
+      try { id = ctx.getImageData(0, 0, W, H); }
+      catch { resolve(imgSrc); return; }   // fallback if canvas still tainted
       const d = id.data;
 
-      /* ── detect mode ──────────────────────────────────────────────
-       * Scan pixels; if ANY has alpha < 200, the image already has a
-       * meaningful alpha channel → use mode A.
-       * Early-exit after first transparent pixel for speed.
-       */
-      let hasAlpha = false;
+      /* ── Mode A: check for existing transparency ────────────────── */
+      let transparentCount = 0;
       for (let i = 3; i < d.length; i += 4) {
-        if (d[i] < 200) { hasAlpha = true; break; }
+        if (d[i] < 200) { transparentCount++; if (transparentCount > W * H * 0.005) break; }
       }
+      const hasAlpha = transparentCount > W * H * 0.005;
 
-      /* ── BFS helper ───────────────────────────────────────────── */
       let isBg: (idx4: number) => boolean;
 
       if (hasAlpha) {
-        /* Mode A — only propagate through transparent pixels.
-         * Opaque white pixels (white fur, white body) are foreground. */
+        /* Mode A — propagate ONLY through transparent pixels.
+         * Opaque white pixels (fur, eyes, body) are always foreground. */
         isBg = (idx4: number) => d[idx4 + 3] < 30;
+
       } else {
-        /* Mode B — propagate through near-white opaque pixels.
-         * Tight threshold (235) reduces leakage into light-coloured fur. */
+        /* Sample 4 corners to get background colour */
+        const cx = [0, W - 1, 0, W - 1];
+        const cy = [0, 0, H - 1, H - 1];
+        let bgR = 0, bgG = 0, bgB = 0;
+        for (let k = 0; k < 4; k++) {
+          const p = (cy[k] * W + cx[k]) * 4;
+          bgR += d[p]; bgG += d[p + 1]; bgB += d[p + 2];
+        }
+        bgR = Math.round(bgR / 4);
+        bgG = Math.round(bgG / 4);
+        bgB = Math.round(bgB / 4);
+
+        /* Mode C: corners are not near-white → no white background to remove */
+        if (bgR < 220 || bgG < 220 || bgB < 220) {
+          resolve(cv.toDataURL("image/png")); return;
+        }
+
+        /* Mode B — match corner colour within ±12 per channel.
+         * Tight enough to preserve off-white (≥243) animal fur. */
+        const TOL = 12;
         isBg = (idx4: number) => {
-          if (d[idx4 + 3] < 30) return true;                    // already transparent
-          return d[idx4] > 235 && d[idx4 + 1] > 235 && d[idx4 + 2] > 235;
+          if (d[idx4 + 3] < 30) return true;
+          return Math.abs(d[idx4]     - bgR) <= TOL
+              && Math.abs(d[idx4 + 1] - bgG) <= TOL
+              && Math.abs(d[idx4 + 2] - bgB) <= TOL;
         };
       }
 
+      /* ── BFS from every edge pixel ───────────────────────────────── */
       const visited = new Uint8Array(W * H);
       const queue: number[] = [];
-
       const enqueue = (i: number) => {
         if (!visited[i] && isBg(i * 4)) { visited[i] = 1; queue.push(i); }
       };
-
-      /* seed from every edge pixel */
       for (let x = 0; x < W; x++) { enqueue(x); enqueue((H - 1) * W + x); }
       for (let y = 1; y < H - 1; y++) { enqueue(y * W); enqueue(y * W + W - 1); }
 
-      /* BFS — O(n) with index pointer */
       let head = 0;
       while (head < queue.length) {
         const i = queue[head++];
-        const x = i % W;
-        const y = (i - x) / W;
-        d[i * 4 + 3] = 0;                 // erase pixel
+        const x = i % W; const y = (i - x) / W;
+        d[i * 4 + 3] = 0;
         if (y > 0)     enqueue(i - W);
         if (y < H - 1) enqueue(i + W);
         if (x > 0)     enqueue(i - 1);

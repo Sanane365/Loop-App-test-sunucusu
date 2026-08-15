@@ -987,9 +987,9 @@ export default function DirectMessages() {
   // Fetch companions list from API
   useEffect(() => {
     fetch("/api/companions")
-      .then(r => r.json())
-      .then(setCompanions)
-      .catch(() => {});
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setCompanions(Array.isArray(data) ? data : []))
+      .catch(() => setCompanions([]));
   }, []);
 
   // Friendship + companion localStorage sync
