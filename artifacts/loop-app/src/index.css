@@ -106,3 +106,8 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@keyframes companion-bob {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50%       { transform: translateY(-6px) rotate(1deg); }
+}

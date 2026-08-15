@@ -328,6 +328,11 @@ export default function DirectMessages() {
   const [friendshipStatus, setFriendshipStatus] = useState<Record<number, "accepted" | "rejected" | "pending">>({});
   const friendshipKey = userId ? `dm_friendship_${userId}` : null;
 
+  // Companion (Yoldaş) state
+  const [showCompanionPicker, setShowCompanionPicker] = useState(false);
+  const [companion, setCompanion] = useState<string | null>(null); // "bear" | null
+  const companionKey = userId ? `dm_companion_${userId}` : null;
+
   // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [infoSection, setInfoSection] = useState<"genel"|"tema"|"anlar"|"medya">("genel");
@@ -967,14 +972,18 @@ export default function DirectMessages() {
     }
   }, [groupMessages]);
 
-  // Friendship status localStorage sync
+  // Friendship + companion localStorage sync
   useEffect(() => {
     if (!friendshipKey) return;
     try {
       const saved = JSON.parse(localStorage.getItem(friendshipKey) ?? "{}");
       setFriendshipStatus(saved);
     } catch { setFriendshipStatus({}); }
-  }, [friendshipKey]);
+    if (companionKey) {
+      const c = localStorage.getItem(companionKey);
+      setCompanion(c ?? null);
+    }
+  }, [friendshipKey, companionKey]);
 
   const respondFriendship = (msgId: number, response: "accepted" | "rejected") => {
     setFriendshipStatus(prev => {
@@ -982,6 +991,16 @@ export default function DirectMessages() {
       if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(next));
       return next;
     });
+    if (response === "accepted") {
+      setTimeout(() => setShowCompanionPicker(true), 400);
+    }
+  };
+
+  const selectCompanion = (id: string) => {
+    setCompanion(id);
+    if (companionKey) localStorage.setItem(companionKey, id);
+    setShowCompanionPicker(false);
+    toast({ title: "🐾 Yoldaşın seçildi!", description: "Sohbet alanında seninle birlikte!", duration: 2500 });
   };
 
   const handleSendFriendshipRequest = async () => {
@@ -1754,9 +1773,28 @@ export default function DirectMessages() {
             </div>
           </div>
 
-          {/* ── Mesajlar ── */}
+          {/* ── Mesajlar + Floating Companion ── */}
+          <div className="relative flex-1 min-h-0">
+          {/* Floating yoldaş maskotu */}
+          {companion && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none select-none animate-in fade-in-0 duration-700">
+              <div className="relative">
+                {/* Gölge / parlama */}
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-12 h-3 rounded-full blur-sm opacity-30" style={{ background: "#fbbf24" }} />
+                <img
+                  src={companion === "bear" ? "/companion-bear.png" : "/friendship-pup.png"}
+                  alt="Yoldaş"
+                  className="w-16 h-16 object-contain drop-shadow-xl"
+                  style={{
+                    filter: "drop-shadow(0 4px 12px rgba(139,92,246,0.35))",
+                    animation: "companion-bob 3s ease-in-out infinite",
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <div
-            className="flex-1 overflow-y-auto bg-background"
+            className="h-full overflow-y-auto bg-background"
             ref={scrollRef}
             style={getBgStyleCss()}
             onScroll={() => {
@@ -1940,27 +1978,28 @@ export default function DirectMessages() {
                                           {isMe ? "Teklifin gönderildi 🐕" : "Seriye davet ediyor!"}
                                         </p>
 
-                                        {/* Durum / Butonlar */}
+                                        {/* Durum / Butonlar — fixed min-height prevents layout jump */}
+                                        <div className="mt-2.5" style={{ minHeight: 52 }}>
                                         {status === "accepted" && (
-                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300">
+                                          <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-100 border border-emerald-300">
                                             <span className="text-sm">🎉</span>
                                             <span className="text-xs font-bold text-emerald-700">Kabul Edildi!</span>
                                           </div>
                                         )}
                                         {status === "rejected" && (
-                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200">
+                                          <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-50 border border-rose-200">
                                             <span className="text-sm">😔</span>
                                             <span className="text-xs font-bold text-rose-500">Reddedildi</span>
                                           </div>
                                         )}
                                         {(status === "pending" || (isMe && !status)) && (
-                                          <div className="mt-2.5 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 border border-amber-300">
+                                          <div className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 border border-amber-300">
                                             <span className="text-xs">⏳</span>
                                             <span className="text-xs font-bold text-amber-700">Yanıt bekleniyor…</span>
                                           </div>
                                         )}
                                         {canRespond && (
-                                          <div className="mt-3 flex gap-2">
+                                          <div className="flex gap-2">
                                             <button
                                               className="flex-1 flex items-center justify-center gap-1 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 shadow-sm"
                                               style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff", boxShadow: "0 2px 8px rgba(16,185,129,0.4)" }}
@@ -1977,6 +2016,7 @@ export default function DirectMessages() {
                                             </button>
                                           </div>
                                         )}
+                                        </div>
                                       </div>
 
                                       {/* Alt dekorasyon şeridi */}
@@ -2112,6 +2152,7 @@ export default function DirectMessages() {
 
             </div>
           </div>
+          </div>{/* end relative flex-1 min-h-0 */}
 
           {/* ── Input Bar ── */}
           <div className="relative">
@@ -2273,6 +2314,88 @@ export default function DirectMessages() {
           </div>
 
         </div>
+
+        {/* ── Yoldaş Seçici Overlay ── */}
+        {showCompanionPicker && (
+          <div className="fixed inset-0 z-[80] flex items-end justify-center">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCompanionPicker(false)} />
+            <div
+              className="relative w-full max-w-md rounded-t-3xl overflow-hidden animate-in slide-in-from-bottom-4 duration-500"
+              style={{ background: "linear-gradient(160deg,#1a0e2e 0%,#0f172a 60%,#0c1a2e 100%)" }}
+            >
+              {/* Parlayan arka plan efekti */}
+              <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 50% -10%,rgba(139,92,246,0.25) 0%,transparent 65%)" }} />
+
+              {/* Başlık */}
+              <div className="relative pt-5 pb-2 px-6 text-center">
+                <div className="w-10 h-1 rounded-full bg-white/20 mx-auto mb-5" />
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-purple-300/80 mb-1">🌟 Arkadaşlık Serisi</p>
+                <h2 className="text-2xl font-black text-white leading-tight">Yoldaşını Seç</h2>
+                <p className="text-sm text-white/50 mt-1">Sohbette seninle birlikte olacak</p>
+              </div>
+
+              {/* Hayvan kartları */}
+              <div className="relative px-5 pb-6 pt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Ayı — mevcut */}
+                  <button
+                    className="group relative flex flex-col items-center rounded-3xl overflow-hidden transition-all active:scale-95 duration-200"
+                    style={{ background: "linear-gradient(145deg,#2d1a4a,#1e1035)", border: "2px solid rgba(139,92,246,0.4)", boxShadow: "0 0 24px rgba(139,92,246,0.2)" }}
+                    onClick={() => selectCompanion("bear")}
+                  >
+                    {/* Seçilmiş rozeti */}
+                    {companion === "bear" && (
+                      <div className="absolute top-2.5 right-2.5 z-10 w-6 h-6 rounded-full bg-emerald-400 flex items-center justify-center">
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                    )}
+                    {/* Parlayan arka plan */}
+                    <div className="absolute inset-0 opacity-0 group-active:opacity-100 transition-opacity" style={{ background: "radial-gradient(circle at 50% 60%,rgba(251,191,36,0.15) 0%,transparent 70%)" }} />
+                    <img
+                      src="/companion-bear.png"
+                      alt="Ayı Yoldaş"
+                      className="w-36 h-36 object-contain drop-shadow-2xl mt-3 group-active:scale-105 transition-transform duration-200"
+                      style={{ filter: "drop-shadow(0 12px 20px rgba(251,191,36,0.3))" }}
+                    />
+                    <div className="w-full px-3 pb-3 pt-1 text-center">
+                      <p className="text-sm font-black text-white">Ayı</p>
+                      <p className="text-[10px] text-purple-300/70 font-medium">Sevimli & Sadık</p>
+                      <div className="mt-1.5 px-3 py-1 rounded-full inline-block text-[10px] font-bold" style={{ background: "rgba(139,92,246,0.3)", color: "#c4b5fd" }}>
+                        {companion === "bear" ? "✓ Seçili" : "Seç"}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Yakında — kilitli slot */}
+                  {(["🦊","🐧","🐱","🐰"] as const).slice(0, 1).map(emoji => (
+                    <div
+                      key={emoji}
+                      className="relative flex flex-col items-center rounded-3xl overflow-hidden"
+                      style={{ background: "linear-gradient(145deg,#1a1a2e,#12121e)", border: "2px solid rgba(255,255,255,0.06)" }}
+                    >
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 opacity-40">
+                          <span className="text-5xl">{emoji}</span>
+                        </div>
+                      </div>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: "rgba(255,255,255,0.08)" }}>
+                          <svg className="w-5 h-5 text-white/40" fill="currentColor" viewBox="0 0 24 24"><path d="M12 1C8.676 1 6 3.676 6 7v1H4v15h16V8h-2V7c0-3.324-2.676-6-6-6zm0 2c2.276 0 4 1.724 4 4v1H8V7c0-2.276 1.724-4 4-4zm0 9a2 2 0 110 4 2 2 0 010-4z"/></svg>
+                        </div>
+                        <p className="text-[10px] font-bold text-white/40">Yakında</p>
+                      </div>
+                      {/* Boş alan için min yükseklik */}
+                      <div className="h-44 w-full" />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Alt not */}
+                <p className="text-center text-[10px] text-white/30 mt-4">Daha fazla yoldaş yakında geliyor 🐾</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Mesaj Bağlam Menüsü ── */}
         {msgCtxMenu !== null && (
