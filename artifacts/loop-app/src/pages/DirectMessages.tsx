@@ -14,6 +14,7 @@ import {
   ImageIcon, ShieldOff, Flag,
 } from "lucide-react";
 import GifPicker from "@/components/shared/GifPicker";
+import CompanionMascot from "@/components/companion/CompanionMascot";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _mapGiphyResults = (data: any[]) =>
@@ -332,6 +333,10 @@ export default function DirectMessages() {
   const [showCompanionPicker, setShowCompanionPicker] = useState(false);
   const [companion, setCompanion] = useState<string | null>(null); // "bear" | null
   const companionKey = userId ? `dm_companion_${userId}` : null;
+  const [companionName, setCompanionName] = useState("Yoldaşım");
+  const companionNameKey = userId ? `dm_companion_name_${userId}` : null;
+  // toggled each time user sends a message → CompanionMascot triggers happy anim
+  const [msgSentToggle, setMsgSentToggle] = useState(false);
 
   // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
   const [showInfoPanel, setShowInfoPanel] = useState(false);
@@ -983,7 +988,11 @@ export default function DirectMessages() {
       const c = localStorage.getItem(companionKey);
       setCompanion(c ?? null);
     }
-  }, [friendshipKey, companionKey]);
+    if (companionNameKey) {
+      const n = localStorage.getItem(companionNameKey);
+      if (n) setCompanionName(n);
+    }
+  }, [friendshipKey, companionKey, companionNameKey]);
 
   const respondFriendship = (msgId: number, response: "accepted" | "rejected") => {
     setFriendshipStatus(prev => {
@@ -1001,6 +1010,11 @@ export default function DirectMessages() {
     if (companionKey) localStorage.setItem(companionKey, id);
     setShowCompanionPicker(false);
     toast({ title: "🐾 Yoldaşın seçildi!", description: "Sohbet alanında seninle birlikte!", duration: 2500 });
+  };
+
+  const saveCompanionName = (n: string) => {
+    setCompanionName(n);
+    if (companionNameKey) localStorage.setItem(companionNameKey, n);
   };
 
   const handleSendFriendshipRequest = async () => {
@@ -1222,6 +1236,7 @@ export default function DirectMessages() {
       });
       if (res.ok) {
         setContent("");
+        setMsgSentToggle(v => !v);
         fetchMessages(parseInt(userId));
         fetchConversations();
       }
@@ -1777,21 +1792,13 @@ export default function DirectMessages() {
           <div className="relative flex-1 min-h-0">
           {/* Floating yoldaş maskotu */}
           {companion && (
-            <div className="absolute bottom-3 right-3 z-10 pointer-events-none select-none animate-in fade-in-0 duration-700">
-              <div className="relative">
-                {/* Gölge / parlama */}
-                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-12 h-3 rounded-full blur-sm opacity-30" style={{ background: "#fbbf24" }} />
-                <img
-                  src={companion === "bear" ? "/companion-bear.png" : "/friendship-pup.png"}
-                  alt="Yoldaş"
-                  className="w-16 h-16 object-contain drop-shadow-xl"
-                  style={{
-                    filter: "drop-shadow(0 4px 12px rgba(139,92,246,0.35))",
-                    animation: "companion-bob 3s ease-in-out infinite",
-                  }}
-                />
-              </div>
-            </div>
+            <CompanionMascot
+              companionId={companion}
+              name={companionName}
+              isTyping={content.length > 0}
+              onMessageSent={msgSentToggle}
+              onRename={saveCompanionName}
+            />
           )}
           <div
             className="h-full overflow-y-auto bg-background"
