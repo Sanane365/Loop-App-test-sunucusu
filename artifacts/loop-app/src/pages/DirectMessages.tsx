@@ -2098,18 +2098,61 @@ export default function DirectMessages() {
             {/* ── Polaroid Kamera — filtre butonunun sağına taşındı ── */}
             <button
               onClick={openLoopViewer}
-              className="relative w-10 h-10 flex items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground hover:text-foreground flex-shrink-0 transition-colors"
+              className="relative flex-shrink-0 focus:outline-none"
+              style={{ width: 40, height: 40, overflow: "visible" }}
             >
-              {/* Kamera gövdesi */}
-              <div className="relative w-6 h-5 rounded-t-lg overflow-hidden bg-zinc-700 flex items-center justify-center">
-                <div className="w-3 h-3 rounded-full bg-zinc-900 border border-zinc-500 flex items-center justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
-                </div>
-                <div className="absolute top-0.5 right-1 w-1 h-0.5 bg-amber-300/80 rounded-full" />
+              {/* Polaroid fotoğraflar — butonun üstünden dışarıya çıkıyor */}
+              <div
+                className="absolute left-0 w-10"
+                style={{
+                  bottom: "100%",
+                  height: unviewedPhotos.length > 0 ? 44 : 0,
+                  transition: "height 0.3s",
+                  overflow: "visible",
+                }}
+              >
+                {unviewedPhotos.slice(0, 3).map((photo, i) => {
+                  const rotations = [-14, 8, -5];
+                  const translateY = [0, -6, -12];
+                  const gradients = ["from-violet-400 to-purple-500", "from-pink-400 to-rose-500", "from-sky-400 to-blue-500"];
+                  return (
+                    <div
+                      key={photo.id}
+                      className="absolute bottom-0 left-0 right-0"
+                      style={{
+                        transform: `rotate(${rotations[i % 3]}deg) translateY(${translateY[i % 3]}px)`,
+                        zIndex: 3 - i,
+                      }}
+                    >
+                      <div className="bg-white shadow-lg rounded-[3px] p-0.5 pb-2.5 w-10">
+                        {photo.mediaUrl ? (
+                          <img src={`/api${photo.mediaUrl}`} alt="" className="w-9 h-9 object-cover rounded-[2px]" />
+                        ) : (
+                          <div className={`w-9 h-9 bg-gradient-to-br ${gradients[i % 3]} rounded-[2px] flex items-center justify-center`}>
+                            <span className="text-white font-bold text-xs drop-shadow">{photo.sender?.displayName?.charAt(0) ?? "?"}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
+
+              {/* Kamera gövdesi */}
+              <div className="absolute bottom-0 left-0 w-10 overflow-hidden rounded-t-xl" style={{ height: 28 }}>
+                <div className="absolute inset-0 bg-zinc-800 rounded-t-xl" />
+                <div className="absolute top-0 left-1.5 right-1.5 h-1.5 bg-zinc-700 rounded-t-sm" />
+                <div className="absolute inset-0 flex items-center justify-center mt-2">
+                  <div className="w-4 h-4 rounded-full bg-zinc-900 border-[1.5px] border-zinc-500 flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-700 border border-zinc-500/60" />
+                  </div>
+                </div>
+                <div className="absolute top-2 right-1.5 w-1.5 h-1 bg-amber-300/80 rounded-full" />
+              </div>
+
               {/* Okunmamış rozet */}
               {unviewedPhotos.length > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[16px] h-4 bg-primary rounded-full text-[9px] font-bold text-primary-foreground flex items-center justify-center px-0.5 shadow-sm z-10">
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full text-[8px] font-bold text-primary-foreground flex items-center justify-center shadow-sm z-20">
                   {unviewedPhotos.length}
                 </span>
               )}
@@ -2324,7 +2367,10 @@ export default function DirectMessages() {
                     <div
                       key={uid}
                       className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
-                      onClick={() => setLocation(`/dm/${c.user?.id}`)}
+                      onClick={() => {
+                        if (menuId !== null) { setMenuId(null); return; }
+                        setLocation(`/dm/${c.user?.id}`);
+                      }}
                     >
                       <Avatar className="border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
                         <AvatarImage src={c.user?.avatarUrl || ""} />
@@ -2346,6 +2392,19 @@ export default function DirectMessages() {
                           )}
                         </div>
                       </div>
+                      {/* Üç nokta menü */}
+                      <button
+                        className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors -mr-1"
+                        onClick={e => {
+                          e.stopPropagation();
+                          if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
+                          const rect = (e.currentTarget as HTMLButtonElement).getBoundingClientRect();
+                          setMenuPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+                          setMenuId(uid);
+                        }}
+                      >
+                        <MoreVertical className="w-4 h-4 text-muted-foreground" />
+                      </button>
                     </div>
                   );
                 })
