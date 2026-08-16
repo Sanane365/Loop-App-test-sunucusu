@@ -817,13 +817,23 @@ export default function WriteBook() {
 
           {/* ── Öne Çıkan Hikayeler ── */}
           <section className="relative overflow-hidden rounded-[2rem] shadow-[0_32px_100px_rgba(0,0,0,0.35)]">
-            {/* Blurred backdrop from active story */}
-            <div className="absolute inset-0 -z-0">
-              <img
-                src={featuredStories[selectedStoryIndex].cover}
-                alt=""
-                className="h-full w-full object-cover scale-110 blur-2xl opacity-30 transition-all duration-700"
-              />
+            {/* Blurred backdrop — all images pre-rendered; only opacity changes, no src swap */}
+            <div className="absolute inset-0 -z-0 overflow-hidden">
+              {featuredStories.map((story, index) => (
+                <img
+                  key={index}
+                  src={story.cover}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover blur-2xl"
+                  style={{
+                    transform: "scale(1.2)",
+                    opacity: selectedStoryIndex === index ? 0.3 : 0,
+                    transition: "opacity 0.5s ease",
+                    willChange: "opacity",
+                  }}
+                />
+              ))}
               <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d12]/80 via-[#0d0d12]/70 to-[#0d0d12]/95" />
             </div>
 

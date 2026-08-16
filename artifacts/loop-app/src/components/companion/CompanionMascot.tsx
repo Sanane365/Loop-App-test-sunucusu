@@ -599,6 +599,7 @@ export default function CompanionMascot({
                 cursor:"pointer",
                 animation:`${cfg.name} ${cfg.dur} ${cfg.easing} ${cfg.iter}`,
                 willChange:"transform",
+                transformOrigin:"50% 100%",
               }}
             >
               {src && (
