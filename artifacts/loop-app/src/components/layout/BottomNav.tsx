@@ -16,7 +16,7 @@ const NOTEBOOK_TABS = [
 /* ── Kalem fan-menü seçenekleri ──────────────────────────────────────── */
 const PEN_ACTIONS = [
   { label: "Taslak",       Icon: FileText,        href: "/notebook/yeni?type=draft",  color: "#a78bfa" },
-  { label: "Yaz",          Icon: Feather,          href: "/notebook/yeni?type=write",  color: "#f59e0b" },
+  { label: "Yaz",          Icon: Feather,          href: "/icerik-olustur",            color: "#f59e0b" },
   { label: "Akış Ekle",    Icon: Rss,              href: "/notebook/yeni?type=feed",   color: "#34d399" },
   { label: "Çalışmalarım", Icon: BriefcaseBusiness, href: "/notebook/calismalari",     color: "#f472b6" },
 ];

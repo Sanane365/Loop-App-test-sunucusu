@@ -21,6 +21,7 @@ import Bookmarks from "@/pages/Bookmarks";
 import PostDetail from "@/pages/PostDetail";
 import Notebook from "@/pages/Notebook";
 import Loops from "@/pages/Loops";
+import IcerikOlustur from "@/pages/IcerikOlustur";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/post/:postId" component={PostDetail} />
       <Route path="/notebook" component={Notebook} />
       <Route path="/loops" component={Loops} />
+      <Route path="/icerik-olustur" component={IcerikOlustur} />
       <Route component={NotFound} />
     </Switch>
   );
