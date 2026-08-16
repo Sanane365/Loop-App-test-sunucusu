@@ -276,33 +276,42 @@ function FeaturedCarousel() {
 const PREMIUM_BOOKS = [
   {
     id: 1, rank: "#01",
-    badge: "PREMIUM YAZAR",
     title: "Karma",
     genres: "Dram · Gizem",
     desc: "İki dünyanın arasında sıkışmış hayatlar… Farklı acılar, farklı seçimler, farklı kaderler.",
     author: "Nairobi",
-    coverBg: "linear-gradient(160deg,#1c1917 0%,#292524 100%)",
-    thumbBg1: "#1a1a1a", thumbBg2: "#2a2a2a",
+    coverBg: "linear-gradient(175deg,#0f0f0f 0%,#1c1917 50%,#0a0a0a 100%)",
+    videos: [
+      { bg: "linear-gradient(160deg,#1a1a1a,#0d0d0d)" },
+      { bg: "linear-gradient(160deg,#1e1a10,#12100a)" },
+      { bg: "linear-gradient(160deg,#141414,#0a0a0a)" },
+    ],
   },
   {
     id: 2, rank: "#02",
-    badge: "PREMIUM YAZAR",
     title: "Labirent",
     genres: "Gerilim · Polisiye",
     desc: "Şehrin altındaki gizli ağlarda kovalamaca. Her kapı başka bir sırrı açar.",
     author: "Marcus",
-    coverBg: "linear-gradient(160deg,#0c0a3e 0%,#1e1b6b 100%)",
-    thumbBg1: "#1a1a2a", thumbBg2: "#2a2a3a",
+    coverBg: "linear-gradient(175deg,#0a0a1e 0%,#0c0a3e 50%,#070718 100%)",
+    videos: [
+      { bg: "linear-gradient(160deg,#0d0d1e,#090912)" },
+      { bg: "linear-gradient(160deg,#0f0f20,#07070f)" },
+      { bg: "linear-gradient(160deg,#0a0a18,#060610)" },
+    ],
   },
   {
     id: 3, rank: "#03",
-    badge: "PREMIUM YAZAR",
     title: "Deniz Kıyısı",
     genres: "Romantizm · Drama",
     desc: "Kırık bir aşkın izlerinde yürüyen iki yabancı, aynı sahilde buluşur.",
     author: "Leyla",
-    coverBg: "linear-gradient(160deg,#0c3040 0%,#0e6b8b 100%)",
-    thumbBg1: "#102030", thumbBg2: "#153040",
+    coverBg: "linear-gradient(175deg,#060e14 0%,#0c2030 50%,#040c14 100%)",
+    videos: [
+      { bg: "linear-gradient(160deg,#0d1e28,#070f14)" },
+      { bg: "linear-gradient(160deg,#0f2030,#07101a)" },
+      { bg: "linear-gradient(160deg,#0a1820,#050d14)" },
+    ],
   },
 ];
 
@@ -322,116 +331,242 @@ const TRENDING = [
   { id:5, rank:5, title:"Sessiz Oda",      author:"Can D.",  genre:"Gerilim",      reads:"10.6K", coverBg:"linear-gradient(160deg,#450a0a,#991b1b)" },
 ];
 
+/* ── Video Thumbnail — animasyonlu büyük/küçük ───────────────────────── */
+const GOLD = "#ffd700";
+const GOLD_GLOW = "0 0 0 1.5px #ffd700, 0 0 16px #ffd70088, 0 0 32px #ffd70033";
+
+function VideoThumb({
+  bg, active, onClick, large,
+  showLabel, videoIdx, totalVideos,
+}: {
+  bg: string; active: boolean; onClick: () => void; large: boolean;
+  showLabel: boolean; videoIdx: number; totalVideos: number;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className="relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer"
+      style={{
+        background:     bg,
+        boxShadow:      active ? GOLD_GLOW : "none",
+        border:         active ? `1.5px solid ${GOLD}` : "1px solid rgba(255,255,255,0.08)",
+        transition:     "all 0.4s cubic-bezier(0.34,1.56,0.64,1)",
+        width:          large ? "65%" : "32%",
+        aspectRatio:    "16/10",
+        flexShrink:     0,
+      }}
+    >
+      {/* Grain overlay */}
+      <div className="absolute inset-0 opacity-20"
+        style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E\")" }} />
+
+      {/* Aktif: Oynuyor label + dots */}
+      {showLabel && (
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-between px-2.5 py-2"
+          style={{ background: "linear-gradient(0deg,rgba(0,0,0,0.85),transparent)" }}
+        >
+          <div className="flex items-center gap-1.5">
+            <Play className="w-2.5 h-2.5 fill-white text-white" />
+            <span className="text-[10px] font-bold text-white/90">Oynuyor</span>
+          </div>
+          {/* Mini dots */}
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalVideos }).map((_, di) => (
+              <div
+                key={di}
+                style={{
+                  width:        di === videoIdx ? 14 : 6,
+                  height:       6,
+                  borderRadius: 99,
+                  background:   di === videoIdx ? GOLD : "rgba(255,255,255,0.3)",
+                  transition:   "all 0.3s",
+                  boxShadow:    di === videoIdx ? `0 0 6px ${GOLD}` : "none",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pasif: play ikonu overlay */}
+      {!active && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-7 h-7 rounded-full flex items-center justify-center"
+            style={{ background: "rgba(0,0,0,0.55)", border: "1px solid rgba(255,255,255,0.2)" }}
+          >
+            <Play className="w-3 h-3 fill-white/70 text-white/70" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Premium Yazarlardan Kitaplar ────────────────────────────────────── */
 function PremiumSection() {
-  const [active, setActive] = useState(0);
+  const [bookIdx,  setBookIdx]  = useState(0);
+  const [videoIdx, setVideoIdx] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setActive(Math.round(el.scrollLeft / el.clientWidth));
+    const idx = Math.round(el.scrollLeft / el.clientWidth);
+    setBookIdx(idx);
+    setVideoIdx(0); // her kitap değişince video sıfırlanır
   }, []);
-
-  const book = PREMIUM_BOOKS[active];
 
   return (
     <div
       className="mx-4 rounded-3xl overflow-hidden"
-      style={{ background: "#0a0a0a", border: "1px solid rgba(255,255,255,0.07)" }}
+      style={{ background: "#080808", border: "1px solid rgba(255,255,255,0.08)" }}
     >
       {/* Üst başlık */}
       <div className="flex items-start justify-between px-5 pt-5 pb-3">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-1" style={{ color: "#fbbf24" }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.22em] mb-1.5" style={{ color: GOLD, letterSpacing: "0.22em" }}>
             Loop Seçkisi · Özel Salon
           </p>
-          <h2 className="text-[20px] font-black text-white leading-tight">Premium Yazarlardan Kitaplar</h2>
-          <p className="text-[11px] text-white/40 mt-0.5">Sınırlı seçki · sinematik anlatlar</p>
+          <h2 className="text-[22px] font-black text-white leading-tight">Premium Yazarlardan Kitaplar</h2>
+          <p className="text-[11px] text-white/35 mt-0.5">Sınırlı seçki · sinematik anlatlar</p>
         </div>
+        {/* Pro rozeti — çember */}
         <div
-          className="px-3 py-1.5 rounded-full text-[11px] font-black text-white flex-shrink-0 mt-1"
-          style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)", boxShadow: "0 2px 12px #7c3aed55" }}
+          className="w-10 h-10 rounded-full flex items-center justify-center text-[12px] font-black text-white flex-shrink-0 mt-1"
+          style={{ background: "#111", border: "1.5px solid rgba(255,255,255,0.25)" }}
         >
           Pro
         </div>
       </div>
 
-      {/* Kaydırılabilir kartlar */}
+      {/* Kaydırılabilir kitap kartları */}
       <div
         ref={scrollRef}
         onScroll={handleScroll}
         className="flex overflow-x-auto"
-        style={{ scrollSnapType:"x mandatory", scrollbarWidth:"none", msOverflowStyle:"none" }}
+        style={{ scrollSnapType: "x mandatory", scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {PREMIUM_BOOKS.map((b, idx) => (
-          <div key={b.id} className="flex-none px-4 pb-2" style={{ width:"100%", scrollSnapAlign:"start" }}>
+        {PREMIUM_BOOKS.map((b, bIdx) => (
+          <div key={b.id} className="flex-none px-4 pb-3" style={{ width: "100%", scrollSnapAlign: "start" }}>
             <div
               className="flex rounded-2xl overflow-hidden"
               style={{
-                height: 310,
-                border: `1px solid ${idx === active ? "rgba(251,191,36,0.45)" : "rgba(255,255,255,0.07)"}`,
-                transition: "border-color 0.3s",
+                minHeight:  460,
+                border:     `1px solid ${bIdx === bookIdx ? "rgba(255,215,0,0.2)" : "rgba(255,255,255,0.06)"}`,
+                transition: "border-color 0.4s",
               }}
             >
-              {/* Sol: kapak + sıra rozeti */}
+              {/* ── Sol: kapak ──────────────────────────────────────── */}
               <div className="relative flex-none" style={{ width: "38%", background: b.coverBg }}>
+                {/* Işık efekti */}
+                <div className="absolute inset-0"
+                  style={{ background: "radial-gradient(ellipse at 60% 30%, rgba(255,215,0,0.04) 0%, transparent 70%)" }} />
+
+                {/* Sıra rozeti */}
                 <div
-                  className="absolute top-3 left-3 text-[11px] font-black text-white px-2 py-1 rounded-lg"
-                  style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+                  className="absolute top-3 left-3 text-[11px] font-black text-white/80 px-2.5 py-1 rounded-lg"
+                  style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.1)" }}
                 >
                   {b.rank}
                 </div>
+
                 {/* Yazar avatarı */}
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+                <div className="absolute bottom-4 left-3 flex items-center gap-2">
                   <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center"
-                    style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)" }}
+                    className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0"
+                    style={{ background: "rgba(255,255,255,0.12)", border: "1.5px solid rgba(255,255,255,0.25)" }}
                   >
-                    <User className="w-3.5 h-3.5 text-white/80" />
+                    <User className="w-4 h-4 text-white/70" />
                   </div>
-                  <span className="text-[11px] font-bold text-white/90">{b.author}</span>
+                  <span className="text-[11px] font-bold text-white/80">{b.author}</span>
                 </div>
               </div>
 
-              {/* Sağ: bilgi */}
+              {/* ── Sağ: bilgi + video ──────────────────────────────── */}
               <div
                 className="flex-1 flex flex-col min-w-0"
-                style={{ background: "#111", borderLeft: "1px solid rgba(251,191,36,0.3)", padding: "16px 14px" }}
+                style={{
+                  background:  "#0d0d0d",
+                  borderLeft:  `1px solid rgba(255,215,0,0.15)`,
+                  padding:     "18px 14px 16px",
+                }}
               >
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-400 mb-1">{b.badge}</p>
-                <p className="text-[26px] font-black text-white leading-none mb-1">{b.title}</p>
-                <p className="text-[11px] text-white/45 mb-2">{b.genres}</p>
-                <p className="text-[11.5px] text-white/60 leading-relaxed flex-1 line-clamp-3">{b.desc}</p>
+                {/* PREMIUM YAZAR etiketi */}
+                <p className="text-[9px] font-black uppercase tracking-[0.28em] mb-2" style={{ color: GOLD }}>
+                  Premium Yazar
+                </p>
 
-                {/* Video önizleme thumbnails */}
-                <div className="flex gap-2 mb-3 mt-2">
-                  <div
-                    className="flex-1 rounded-xl flex items-end p-2"
-                    style={{ height: 64, background: b.thumbBg1, border: "1px solid rgba(255,255,255,0.07)" }}
-                  >
-                    <div className="flex items-center gap-1">
-                      <Play className="w-3 h-3 text-white/60 fill-white/60" />
-                      <span className="text-[9px] text-white/50">Oynuyor</span>
-                    </div>
-                  </div>
-                  <div
-                    className="rounded-xl"
-                    style={{ width: 52, height: 64, background: b.thumbBg2, border: "1px solid rgba(255,255,255,0.07)" }}
+                {/* Kitap adı — serif */}
+                <p
+                  className="text-white leading-none mb-1.5"
+                  style={{ fontSize: 30, fontFamily: "Georgia, 'Times New Roman', serif", fontWeight: 700 }}
+                >
+                  {b.title}
+                </p>
+
+                {/* Türler */}
+                <p className="text-[12px] text-white/40 mb-3">{b.genres}</p>
+
+                {/* Açıklama */}
+                <p className="text-[12px] text-white/60 leading-relaxed mb-4 line-clamp-2 flex-1">{b.desc}</p>
+
+                {/* ── Video alanı ─────────────────────────────────── */}
+                {/* Büyük aktif + küçük pasif (sağ üst) */}
+                <div className="flex gap-2 items-start mb-2">
+                  <VideoThumb
+                    bg={b.videos[videoIdx].bg}
+                    active={true}
+                    large={true}
+                    onClick={() => {}}
+                    showLabel={true}
+                    videoIdx={videoIdx}
+                    totalVideos={b.videos.length}
                   />
+                  {/* Pasif video — sağ üst */}
+                  {b.videos.map((v, vi) => {
+                    if (vi === videoIdx) return null;
+                    return (
+                      <VideoThumb
+                        key={vi}
+                        bg={v.bg}
+                        active={false}
+                        large={false}
+                        onClick={() => setVideoIdx(vi)}
+                        showLabel={false}
+                        videoIdx={vi}
+                        totalVideos={b.videos.length}
+                      />
+                    );
+                  }).filter(Boolean).slice(0, 1)}
                 </div>
+                {/* Alt küçük video (varsa) */}
+                {b.videos.length > 2 && b.videos.map((v, vi) => {
+                  if (vi === videoIdx) return null;
+                  return (
+                    <VideoThumb
+                      key={`bot-${vi}`}
+                      bg={v.bg}
+                      active={false}
+                      large={false}
+                      onClick={() => setVideoIdx(vi)}
+                      showLabel={false}
+                      videoIdx={vi}
+                      totalVideos={b.videos.length}
+                    />
+                  );
+                }).filter(Boolean).slice(1, 2)}
 
-                {/* Eylem butonları */}
-                <div className="flex gap-2">
+                {/* ── Eylem butonları ─────────────────────────────── */}
+                <div className="flex gap-2 mt-3">
                   <button
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold text-white flex-1 justify-center"
-                    style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.15)" }}
+                    className="flex items-center gap-1.5 py-2 rounded-full text-[12px] font-bold text-white flex-1 justify-center"
+                    style={{ background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.18)" }}
                   >
                     Kitaba git <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold text-white/70"
-                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-full text-[12px] font-bold"
+                    style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.65)" }}
                   >
                     <Images className="w-3.5 h-3.5" /> Görseller
                   </button>
@@ -442,15 +577,25 @@ function PremiumSection() {
         ))}
       </div>
 
-      {/* Dots */}
+      {/* Dış pagination dots — neon gold */}
       <div className="flex items-center justify-center gap-2 pb-5">
         {PREMIUM_BOOKS.map((_, i) => (
           <button
             key={i}
-            onClick={() => { scrollRef.current?.scrollTo({ left: scrollRef.current.clientWidth * i, behavior: "smooth" }); }}
+            onClick={() => {
+              scrollRef.current?.scrollTo({ left: scrollRef.current.clientWidth * i, behavior: "smooth" });
+              setVideoIdx(0);
+            }}
             style={{
-              width: i === active ? 28 : 10, height: 10, borderRadius: 99, border: "none", cursor: "pointer",
-              background: i === active ? "#fbbf24" : "rgba(255,255,255,0.2)", transition: "all 0.3s", padding: 0,
+              width:      i === bookIdx ? 28 : 10,
+              height:     10,
+              borderRadius: 99,
+              border:     "none",
+              cursor:     "pointer",
+              background: i === bookIdx ? GOLD : "rgba(255,255,255,0.18)",
+              boxShadow:  i === bookIdx ? `0 0 8px ${GOLD}` : "none",
+              transition: "all 0.3s",
+              padding:    0,
             }}
           />
         ))}
