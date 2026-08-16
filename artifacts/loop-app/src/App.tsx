@@ -43,7 +43,6 @@ function Router() {
       <Route path="/bookmarks" component={Bookmarks} />
       <Route path="/post/:postId" component={PostDetail} />
       <Route path="/notebook" component={Notebook} />
-      <Route path="/notebook/:tab" component={Notebook} />
       <Route component={NotFound} />
     </Switch>
   );
