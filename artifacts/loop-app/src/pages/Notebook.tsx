@@ -327,23 +327,7 @@ export default function WriteBook() {
     }
   }, [search]);
 
-  useEffect(() => {
-    const carousel = storyCarouselRef.current;
-    if (!carousel) return;
-
-    const updateSelectedStory = () => {
-      const cards = Array.from(carousel.children) as HTMLElement[];
-      const closestIndex = cards.reduce((closest, card, index) => {
-        const currentDistance = Math.abs(card.offsetLeft - carousel.scrollLeft);
-        const closestDistance = Math.abs(cards[closest]?.offsetLeft - carousel.scrollLeft);
-        return currentDistance < closestDistance ? index : closest;
-      }, 0);
-      setSelectedStoryIndex(closestIndex);
-    };
-
-    carousel.addEventListener("scroll", updateSelectedStory, { passive: true });
-    return () => carousel.removeEventListener("scroll", updateSelectedStory);
-  }, []);
+  // Scroll listener removed — thumbnail strip now uses click-based navigation only.
 
   const selectStory = (index: number) => {
     const card = storyCarouselRef.current?.children[index] as HTMLElement | undefined;

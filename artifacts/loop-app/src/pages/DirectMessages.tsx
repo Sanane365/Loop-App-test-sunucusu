@@ -1804,7 +1804,7 @@ export default function DirectMessages() {
           </div>
 
           {/* ── Mesajlar + Floating Companion ── */}
-          <div className="relative flex-1 min-h-0">
+          <div className="relative flex-1 min-h-0 overflow-hidden">
           {/* Floating yoldaş maskotu */}
           {companion && companionImgUrl && (
             <CompanionMascot
