@@ -954,69 +954,161 @@ export default function WriteBook() {
 
           {(() => {
             const premium = premiumBooks[premiumIndex];
-            const book = premium;
             return (
-              <section ref={premiumAreaRef} className="relative isolate overflow-hidden rounded-[2rem] bg-[#090807] p-4 text-white shadow-[0_30px_100px_rgba(120,53,15,0.2)] sm:p-6">
-                <img src={premium.backdrop} alt="" className="absolute inset-0 -z-20 h-full w-full scale-110 object-cover opacity-40 blur-2xl" />
-                <div className="absolute inset-0 -z-10 bg-gradient-to-br from-black/85 via-black/65 to-amber-950/60" />
-                <div className="relative mb-5 flex items-end justify-between gap-3">
+              <section
+                ref={premiumAreaRef}
+                className="relative isolate overflow-hidden rounded-[2rem] text-white"
+                style={{ boxShadow: "0 32px 110px rgba(120,53,15,0.28)" }}
+              >
+                {/* ── Stacked cinematic backdrops (opacity only, no src swap) ── */}
+                {premiumBooks.map((pb, i) => (
+                  <img
+                    key={pb.backdrop} src={pb.backdrop} alt="" aria-hidden
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{
+                      zIndex: -20,
+                      transform: "scale(1.18)",
+                      filter: "blur(24px)",
+                      opacity: i === premiumIndex ? 1 : 0,
+                      transition: "opacity 0.85s ease",
+                      willChange: "opacity",
+                    }}
+                  />
+                ))}
+                <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/80 via-black/65 to-[#180d00]/90" />
+
+                {/* ── Header ───────────────────────────────────────────────── */}
+                <div className="flex items-center justify-between px-4 pt-4">
                   <div>
-                    <p className="text-[10px] uppercase tracking-[0.3em] text-amber-300">Loop seçkisi · özel salon</p>
-                    <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Premium Yazarlardan Kitaplar</h2>
-                    <p className="mt-1 text-xs text-amber-100/60">Sınırlı seçki · sinematik anlatılar</p>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.38em] text-amber-400/75">Loop Seçkisi · Özel Salon</p>
+                    <h2 className="mt-0.5 text-[17px] font-black tracking-tight leading-tight">Premium Yazarlardan Kitaplar</h2>
                   </div>
-                  <span className="rounded-full border border-amber-200/60 bg-white/10 px-3 py-1.5 font-serif text-sm text-amber-100 backdrop-blur">Pro</span>
+                  <span className="shrink-0 rounded-full border border-amber-300/55 bg-amber-950/55 px-3 py-1.5 text-[11px] font-black text-amber-200 backdrop-blur">✦ Pro</span>
                 </div>
-                            <article key={premium.title} className="grid w-full min-w-0 max-w-full grid-cols-1 overflow-hidden rounded-[1.5rem] border border-amber-100/20 bg-black/25 shadow-2xl backdrop-blur-sm sm:grid-cols-[0.75fr_1.25fr]">
-                              <div className="relative h-48 min-w-0 overflow-hidden sm:h-auto sm:min-h-80">
-                        <img src={book.cover} alt={`${book.title} kitap kapağı`} className="absolute inset-0 h-full w-full object-cover" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-                        <span className="absolute left-4 top-4 rounded-full border border-amber-200/50 bg-black/35 px-3 py-1 text-xs font-bold text-amber-100 backdrop-blur">{book.rank}</span>
-                        <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-black/30 p-1.5 pr-3 ring-1 ring-white/25 backdrop-blur-md">
-                          <img src={book.authorAvatar} alt={`${book.author} profil fotoğrafı`} className="h-9 w-9 rounded-full object-cover ring-1 ring-amber-100/80" />
-                          <span className="text-xs font-semibold text-white/90">{book.author}</span>
-                        </div>
-                      </div>
-                      <div className="flex min-w-0 max-w-full flex-col overflow-hidden p-4 sm:p-8">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">{book.label}</p>
-                          <h3 className="mt-2 font-serif text-3xl font-bold leading-tight text-white sm:mt-3 sm:text-5xl">{book.title}</h3>
-                          <p className="mt-1 text-[10px] font-semibold text-amber-100/70 sm:mt-2 sm:text-sm">{book.genre}</p>
-                          <p className="mt-3 line-clamp-3 max-w-xl text-sm leading-6 text-slate-200 sm:mt-5 sm:text-base sm:leading-7">{book.description}</p>
-                          <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5" style={{ touchAction: "pan-y" }} onPointerDown={(event) => event.stopPropagation()} onTouchStart={(event) => event.stopPropagation()}>
-                            {book.trailers.map((trailer, trailerIndex) => {
-                              const isActiveTrailer = trailerIndex === activeTrailerIndex;
-                              return (
-                                <button key={`${book.title}-${trailerIndex}`} type="button" aria-label={`${book.title} fragman ${trailerIndex + 1}`} onClick={() => setActiveTrailerIndex(trailerIndex)} className={`group/trailer relative min-w-0 overflow-hidden rounded-lg border transition-all duration-700 ${isActiveTrailer ? "col-span-2 h-28 border-amber-200/70 shadow-[0_0_25px_rgba(251,191,36,0.2)] sm:h-40" : "h-16 border-white/10 opacity-65 hover:opacity-100 sm:h-24"}`}>
-                                  {isActiveTrailer ? <video key={`${book.title}-${trailerIndex}`} className="h-full w-full object-cover" muted autoPlay playsInline loop={book.trailers.length === 1} onEnded={() => book.trailers.length > 1 && setActiveTrailerIndex((trailerIndex + 1) % book.trailers.length)} src={trailer} /> : <img src={book.cover} alt={`${book.title} fragman ${trailerIndex + 1}`} className="h-full w-full object-cover transition duration-500 group-hover/trailer:scale-110" />}
-                                  <span className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
-                                  <span className={`absolute bottom-2 left-2 inline-flex items-center gap-1 text-[10px] font-bold text-amber-100 ${isActiveTrailer ? "opacity-100" : "opacity-0 group-hover/trailer:opacity-100"}`}><Play className="h-3 w-3 fill-current" /> {isActiveTrailer ? "Oynuyor" : `Fragman ${trailerIndex + 1}`}</span>
-                                  {isActiveTrailer && book.trailers.length > 1 && <span className="absolute bottom-2 right-2 flex gap-1 rounded-full bg-black/45 px-2 py-1 backdrop-blur">
-                                    {book.trailers.map((trailerDot, dotIndex) => <i key={trailerDot} className={`h-1.5 rounded-full transition-all ${dotIndex === activeTrailerIndex ? "w-4 bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.9)]" : "w-1.5 bg-white/60"}`} />)}
-                                  </span>}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div className="mt-4 flex items-center justify-between gap-2 sm:mt-6 sm:gap-3">
-                          <button type="button" className="whitespace-nowrap rounded-full border border-amber-100/30 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/15 sm:px-4 sm:py-2.5 sm:text-sm">Kitaba git <ArrowRight className="ml-1 inline h-4 w-4" /></button>
-                          <button type="button" onClick={() => setShowPremiumMedia(true)} className="relative inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border border-white/30 bg-white/10 px-3 py-2 text-xs font-bold text-amber-100 shadow-[4px_4px_0_rgba(251,191,36,0.2)] backdrop-blur transition hover:bg-white/20 sm:gap-2 sm:px-4 sm:py-2.5 sm:text-sm" aria-label="Kitap görsellerini aç"><span className="relative flex -space-x-2"><span className="h-4 w-4 rounded bg-white/30 ring-1 ring-white/60 sm:h-5 sm:w-5" /><span className="h-4 w-4 -rotate-6 rounded bg-amber-200/70 ring-1 ring-white/70 sm:h-5 sm:w-5" /></span> Görseller</button>
-                        </div>
-                      </div>
-                    </article>
-                    
-                <div className="relative mt-4 flex items-center justify-center gap-2">
-                  {premiumBooks.map((book, index) => (
-                    <button key={book.title} type="button" aria-label={`${book.title} premium kitabını göster`} aria-current={premiumIndex === index ? "true" : undefined} onClick={() => selectPremium(index)} className={`h-2.5 rounded-full transition-all duration-300 ${premiumIndex === index ? "w-8 bg-amber-300 shadow-[0_0_10px_rgba(252,211,77,0.8)]" : "w-2.5 bg-white/30 hover:w-5 hover:bg-amber-100/70"}`} />
+
+                {/* ── Cover + Info row ─────────────────────────────────────── */}
+                <div className="mt-3 flex gap-3 px-4">
+                  {/* Left: stacked covers */}
+                  <div
+                    className="relative shrink-0 overflow-hidden rounded-2xl"
+                    style={{ width: 108, aspectRatio: "2/3", boxShadow: "0 14px 48px rgba(0,0,0,0.65)" }}
+                  >
+                    {premiumBooks.map((pb, i) => (
+                      <img
+                        key={pb.cover} src={pb.cover} alt={pb.title}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        style={{ opacity: i === premiumIndex ? 1 : 0, transition: "opacity 0.65s ease" }}
+                      />
+                    ))}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+                    <span className="absolute left-2 top-2 rounded-full border border-amber-300/65 bg-black/55 px-2 py-0.5 text-[10px] font-black text-amber-200 backdrop-blur">
+                      {premium.rank}
+                    </span>
+                    <div
+                      className="absolute bottom-2 left-1/2 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 ring-1 ring-white/20 backdrop-blur"
+                      style={{ transform: "translateX(-50%)", whiteSpace: "nowrap" }}
+                    >
+                      <img src={premium.authorAvatar} alt={premium.author} className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-amber-300/70" />
+                      <span className="max-w-[58px] truncate text-[9px] font-bold text-white/90">{premium.author}</span>
+                    </div>
+                  </div>
+
+                  {/* Right: info */}
+                  <div className="flex min-w-0 flex-1 flex-col justify-between">
+                    <div>
+                      <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-900/35 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
+                        {premium.label}
+                      </span>
+                      <h3 className="mt-2 font-serif text-[22px] font-black leading-[1.15] text-white line-clamp-2">{premium.title}</h3>
+                      <p className="mt-1 text-[10px] font-semibold tracking-wide text-amber-200/65">{premium.genre}</p>
+                      <p className="mt-2 line-clamp-4 text-[11px] leading-[1.65] text-slate-300/90">{premium.description}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-3 self-start rounded-full px-4 py-2 text-[11px] font-black text-black transition active:scale-95"
+                      style={{ background: "linear-gradient(135deg,#fcd34d,#f59e0b)" }}
+                    >
+                      Kitaba Git <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* ── Trailer strip ────────────────────────────────────────── */}
+                <div
+                  className="mt-3 grid grid-cols-3 gap-2 px-4"
+                  style={{ touchAction: "pan-y" }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onTouchStart={e => e.stopPropagation()}
+                >
+                  {premium.trailers.map((trailer, ti) => {
+                    const isActive = ti === activeTrailerIndex;
+                    return (
+                      <button
+                        key={`${premium.title}-${ti}`}
+                        type="button"
+                        aria-label={`${premium.title} fragman ${ti + 1}`}
+                        onClick={() => setActiveTrailerIndex(ti)}
+                        className={`group/tr relative overflow-hidden rounded-xl border transition-all duration-500 ${isActive ? "col-span-2 border-amber-300/65 shadow-[0_0_22px_rgba(251,191,36,0.18)]" : "border-white/10 opacity-50 hover:opacity-75"}`}
+                        style={{ height: isActive ? 96 : 56 }}
+                      >
+                        {isActive
+                          ? <video key={`${premium.title}-v${ti}`} src={trailer} className="h-full w-full object-cover" muted autoPlay playsInline loop={premium.trailers.length === 1} onEnded={() => premium.trailers.length > 1 && setActiveTrailerIndex((ti + 1) % premium.trailers.length)} />
+                          : <img src={premium.cover} alt="" className="h-full w-full object-cover transition duration-500 group-hover/tr:scale-110" />
+                        }
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        {isActive
+                          ? <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[9px] font-bold text-amber-200"><Play className="h-2.5 w-2.5 fill-current" /> Oynuyor</span>
+                          : <span className="absolute bottom-1.5 left-2 text-[9px] font-bold text-white/60 opacity-0 transition group-hover/tr:opacity-100">Fragman {ti + 1}</span>
+                        }
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* ── Book thumbnail nav (kapak görselleriyle) ─────────────── */}
+                <div className="mt-3 flex gap-2 px-4 pb-4">
+                  {premiumBooks.map((pb, i) => (
+                    <button
+                      key={pb.title}
+                      type="button"
+                      aria-label={`${pb.title} kitabını göster`}
+                      aria-current={i === premiumIndex ? "true" : undefined}
+                      onClick={() => selectPremium(i)}
+                      className="relative flex-1 overflow-hidden rounded-xl transition-all duration-300"
+                      style={{
+                        height: 52,
+                        border: i === premiumIndex ? "2px solid #fcd34d" : "2px solid rgba(255,255,255,0.1)",
+                        opacity: i === premiumIndex ? 1 : 0.42,
+                        boxShadow: i === premiumIndex ? "0 0 14px rgba(252,211,77,0.35)" : "none",
+                      }}
+                    >
+                      <img src={pb.cover} alt={pb.title} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <span className="absolute bottom-1 left-1.5 text-[8px] font-black text-amber-300">{pb.rank}</span>
+                      <span className="absolute bottom-1 right-1.5 max-w-[52px] truncate text-[7px] font-semibold text-white/65">{pb.title}</span>
+                    </button>
                   ))}
                 </div>
-                {showPremiumMedia && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${premium.title} görselleri`}>
-                  <div className="w-full max-w-2xl rounded-[1.5rem] border border-amber-200/30 bg-[#15100b] p-4 text-white shadow-2xl sm:p-6">
-                    <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">{premium.author}</p><h3 className="mt-1 text-xl font-bold">{premium.title} görselleri</h3></div><button type="button" onClick={() => setShowPremiumMedia(false)} aria-label="Görselleri kapat" className="rounded-full bg-white/10 p-2 hover:bg-white/20"><X className="h-5 w-5" /></button></div>
-                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{premium.media.map((image) => <img key={image} src={image} alt={`${premium.title} görseli`} className="h-32 w-full rounded-xl object-cover sm:h-44" />)}</div>
+
+                {/* ── Media modal ──────────────────────────────────────────── */}
+                {showPremiumMedia && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${premium.title} görselleri`}>
+                    <div className="w-full max-w-2xl rounded-[1.5rem] border border-amber-200/30 bg-[#15100b] p-4 text-white shadow-2xl">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">{premium.author}</p>
+                          <h3 className="mt-1 text-xl font-bold">{premium.title} görselleri</h3>
+                        </div>
+                        <button type="button" onClick={() => setShowPremiumMedia(false)} aria-label="Kapat" className="rounded-full bg-white/10 p-2 hover:bg-white/20">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {premium.media.map(img => <img key={img} src={img} alt={`${premium.title} görseli`} className="h-32 w-full rounded-xl object-cover sm:h-44" />)}
+                      </div>
+                    </div>
                   </div>
-                </div>}
+                )}
               </section>
             );
           })()}
