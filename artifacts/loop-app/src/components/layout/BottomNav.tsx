@@ -1,5 +1,5 @@
 import { Link, useLocation, useSearch } from "wouter";
-import { Home, Search, PlusCircle, MessageCircle, Mic, User, BookOpen, Tag, Activity, BookMarked, CalendarDays, Pen, FileText, Feather, Rss, X } from "lucide-react";
+import { Home, Search, Clapperboard, MessageCircle, Mic, User, BookOpen, Tag, Activity, BookMarked, CalendarDays, Pen, FileText, Feather, Rss, X, BriefcaseBusiness } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -15,9 +15,10 @@ const NOTEBOOK_TABS = [
 
 /* ── Kalem fan-menü seçenekleri ──────────────────────────────────────── */
 const PEN_ACTIONS = [
-  { label: "Taslak",    Icon: FileText, href: "/notebook/yeni?type=draft",  color: "#a78bfa" },
-  { label: "Yaz",       Icon: Feather,  href: "/notebook/yeni?type=write",  color: "#f59e0b" },
-  { label: "Akış Ekle", Icon: Rss,      href: "/notebook/yeni?type=feed",   color: "#34d399" },
+  { label: "Taslak",       Icon: FileText,        href: "/notebook/yeni?type=draft",  color: "#a78bfa" },
+  { label: "Yaz",          Icon: Feather,          href: "/notebook/yeni?type=write",  color: "#f59e0b" },
+  { label: "Akış Ekle",    Icon: Rss,              href: "/notebook/yeni?type=feed",   color: "#34d399" },
+  { label: "Çalışmalarım", Icon: BriefcaseBusiness, href: "/notebook/calismalari",     color: "#f472b6" },
 ];
 
 /* ── Fan menü bileşeni ───────────────────────────────────────────────── */
@@ -166,8 +167,9 @@ export function BottomNav() {
       <Link href="/explore" className={`p-3 flex flex-col items-center gap-1 ${location === '/explore' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="nav-explore">
         <Search className="w-6 h-6" />
       </Link>
-      <Link href="/create" className="p-2 -mt-6 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 hover:scale-105 transition-transform" data-testid="nav-create">
-        <PlusCircle className="w-10 h-10" />
+      <Link href="/loops" className="p-2 -mt-6 bg-primary text-primary-foreground rounded-full shadow-lg shadow-primary/30 hover:scale-105 transition-transform flex flex-col items-center gap-0.5" data-testid="nav-loops">
+        <Clapperboard className="w-7 h-7" />
+        <span className="text-[9px] font-black tracking-wide leading-none">Loops</span>
       </Link>
       <Link href="/chat" className={`p-3 flex flex-col items-center gap-1 ${location === '/chat' ? 'text-primary' : 'text-muted-foreground'}`} data-testid="nav-chat">
         <MessageCircle className="w-6 h-6" />

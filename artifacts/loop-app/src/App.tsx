@@ -20,6 +20,7 @@ import DirectMessages from "@/pages/DirectMessages";
 import Bookmarks from "@/pages/Bookmarks";
 import PostDetail from "@/pages/PostDetail";
 import Notebook from "@/pages/Notebook";
+import Loops from "@/pages/Loops";
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,7 @@ function Router() {
       <Route path="/bookmarks" component={Bookmarks} />
       <Route path="/post/:postId" component={PostDetail} />
       <Route path="/notebook" component={Notebook} />
+      <Route path="/loops" component={Loops} />
       <Route component={NotFound} />
     </Switch>
   );
