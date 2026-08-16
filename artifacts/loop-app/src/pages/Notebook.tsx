@@ -1017,19 +1017,33 @@ export default function WriteBook() {
                   <div className="flex min-w-0 flex-1 flex-col justify-between">
                     <div>
                       <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-900/35 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
-                        {premium.label}
+                        Premium Yazar
                       </span>
                       <h3 className="mt-2 font-serif text-[22px] font-black leading-[1.15] text-white line-clamp-2">{premium.title}</h3>
                       <p className="mt-1 text-[10px] font-semibold tracking-wide text-amber-200/65">{premium.genre}</p>
                       <p className="mt-2 line-clamp-4 text-[11px] leading-[1.65] text-slate-300/90">{premium.description}</p>
                     </div>
-                    <button
-                      type="button"
-                      className="mt-3 self-start rounded-full px-4 py-2 text-[11px] font-black text-black transition active:scale-95"
-                      style={{ background: "linear-gradient(135deg,#fcd34d,#f59e0b)" }}
-                    >
-                      Kitaba Git <ArrowRight className="ml-0.5 inline h-3 w-3" />
-                    </button>
+                    <div className="mt-3 flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="rounded-full px-4 py-2 text-[11px] font-black text-black transition active:scale-95"
+                        style={{ background: "linear-gradient(135deg,#fcd34d,#f59e0b)" }}
+                      >
+                        Kitaba Git <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPremiumMedia(true)}
+                        className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-2 text-[11px] font-bold text-amber-100 backdrop-blur transition hover:bg-white/18 active:scale-95"
+                        aria-label="Kitap görsellerini aç"
+                      >
+                        <span className="flex -space-x-1.5">
+                          <span className="h-3.5 w-3.5 rounded bg-white/30 ring-1 ring-white/50" />
+                          <span className="h-3.5 w-3.5 -rotate-6 rounded bg-amber-200/70 ring-1 ring-white/60" />
+                        </span>
+                        Görseller
+                      </button>
+                    </div>
                   </div>
                 </div>
 
