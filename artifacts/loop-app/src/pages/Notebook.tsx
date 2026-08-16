@@ -831,43 +831,129 @@ export default function WriteBook() {
             <span className="inline-flex items-center gap-2 text-violet-700">Alanı aç <ChevronDown className="h-4 w-4" /></span>
           </button>}
 
-          <section className="overflow-hidden rounded-[1.5rem] bg-[#090909] p-4 text-white shadow-[0_28px_90px_rgba(15,23,42,0.22)] sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">Loop seçkisi</p>
-                <h2 className="mt-1 text-xl font-bold text-white">Öne Çıkan Hikayeler</h2>
+          {/* ── Öne Çıkan Hikayeler ── */}
+          <section className="relative overflow-hidden rounded-[2rem] shadow-[0_32px_100px_rgba(0,0,0,0.35)]">
+            {/* Blurred backdrop from active story */}
+            <div className="absolute inset-0 -z-0">
+              <img
+                src={featuredStories[selectedStoryIndex].cover}
+                alt=""
+                className="h-full w-full object-cover scale-110 blur-2xl opacity-30 transition-all duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d12]/80 via-[#0d0d12]/70 to-[#0d0d12]/95" />
+            </div>
+
+            {/* Header */}
+            <div className="relative z-10 flex items-center justify-between px-5 pt-5 sm:px-7 sm:pt-6">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-400/20 ring-1 ring-amber-400/40">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                </span>
+                <div>
+                  <p className="text-[9px] uppercase tracking-[0.35em] text-amber-300/80 font-semibold">Loop Seçkisi</p>
+                  <h2 className="text-sm font-bold text-white leading-tight">Öne Çıkan Hikayeler</h2>
+                </div>
               </div>
-              <button type="button" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-xs font-bold text-white ring-1 ring-white/10 transition hover:bg-white/15">
-                Tümünü Gör <ArrowRight className="h-4 w-4 text-amber-300" />
+              <button type="button" className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-sm transition hover:bg-white/15 hover:text-white">
+                Tümü <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
-            <div ref={storyCarouselRef} className="scrollbar-hide mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+
+            {/* Active story — hero */}
+            <div className="relative z-10 px-5 pt-5 sm:px-7">
+              {(() => {
+                const story = featuredStories[selectedStoryIndex];
+                return (
+                  <div className="flex gap-4 sm:gap-6">
+                    {/* Cover */}
+                    <div className="relative flex-shrink-0 w-28 sm:w-36">
+                      <div className="relative h-40 sm:h-52 w-full overflow-hidden rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
+                        <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition-all duration-500" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                      </div>
+                      {/* Rank badge */}
+                      <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-black shadow-lg">
+                        #{selectedStoryIndex + 1}
+                      </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="flex flex-1 min-w-0 flex-col justify-between py-1">
+                      <div className="space-y-2">
+                        <span className="inline-flex items-center rounded-full bg-violet-500/20 border border-violet-400/30 px-2.5 py-0.5 text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                          {story.genre}
+                        </span>
+                        <h3 className="text-xl sm:text-2xl font-black text-white leading-tight line-clamp-2">{story.title}</h3>
+                        <p className="text-[11px] sm:text-xs text-slate-400 leading-5 line-clamp-3">{story.description}</p>
+                      </div>
+
+                      {/* Author row */}
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
+                          {story.author[0]}
+                        </div>
+                        <span className="text-xs text-slate-400 truncate">{story.author}</span>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="mt-3 flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-white/8 border border-white/10 px-2.5 py-1 text-[10px] text-slate-300">
+                          <Eye className="h-3 w-3" /> {story.reads}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 border border-rose-400/20 px-2.5 py-1 text-[10px] text-rose-300">
+                          <Heart className="h-3 w-3 fill-rose-400 text-rose-400" /> {story.likes}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 text-[10px] font-semibold text-amber-300">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {story.rating}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Thumbnail strip */}
+            <div
+              ref={storyCarouselRef}
+              className="relative z-10 mt-5 flex gap-2.5 overflow-x-auto px-5 pb-5 sm:px-7 sm:pb-6"
+              style={{ scrollbarWidth: "none" }}
+            >
               {featuredStories.map((story, index) => (
-                <article key={`${story.title}-${index}`} onClick={() => selectStory(index)} className={`grid min-w-[calc(100%-1.25rem)] snap-start grid-cols-[minmax(108px,0.72fr)_1.28fr] overflow-hidden rounded-[1.25rem] bg-gradient-to-br from-[#171313] via-[#080808] to-black shadow-[0_18px_60px_rgba(0,0,0,0.5)] transition sm:grid-cols-[minmax(150px,0.72fr)_1.28fr] ${selectedStoryIndex === index ? "ring-1 ring-amber-400/70" : "ring-1 ring-white/10"}`}>
-                  <div className="relative min-h-52 overflow-hidden sm:min-h-64">
-                    <img src={story.cover} alt={`${story.title} kitap kapağı`} className="absolute inset-0 h-full w-full object-cover" />
-                    <div className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500 text-lg text-slate-950 shadow-lg">♛</div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/80 sm:bg-gradient-to-t sm:from-black/60 sm:via-transparent sm:to-transparent" />
-                  </div>
-                  <div className="relative flex min-w-0 flex-col justify-between p-3 sm:p-7">
-                    <button type="button" aria-label={`${story.title} hikâye seçenekleri`} onClick={(event) => event.stopPropagation()} className="absolute right-3 top-3 rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-white"><MoreVertical className="h-5 w-5" /></button>
-                    <div className="pr-7">
-                      <h3 className="text-lg font-black uppercase leading-tight tracking-tight text-white sm:text-4xl">{story.title}</h3>
-                      <p className="mt-2 line-clamp-4 max-w-xl text-xs leading-5 text-slate-300 sm:mt-4 sm:text-base sm:leading-7">{story.description}</p>
-                      <span className="mt-3 inline-flex max-w-full rounded-full border border-amber-400 px-2 py-1 text-[10px] font-bold text-amber-300 sm:mt-5 sm:px-3 sm:py-1.5 sm:text-sm">#25 içinde {story.genre}</span>
+                <button
+                  key={`thumb-${index}`}
+                  type="button"
+                  onClick={() => selectStory(index)}
+                  className={`group relative flex-shrink-0 overflow-hidden rounded-xl transition-all duration-300 ${
+                    selectedStoryIndex === index
+                      ? "w-24 sm:w-28 ring-2 ring-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.3)]"
+                      : "w-16 sm:w-20 opacity-50 hover:opacity-80 ring-1 ring-white/10"
+                  }`}
+                >
+                  <img src={story.cover} alt={story.title} className="h-20 sm:h-24 w-full object-cover transition duration-500 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  {selectedStoryIndex === index && (
+                    <div className="absolute bottom-1.5 left-0 right-0 px-1.5">
+                      <p className="text-[8px] font-bold text-white/90 line-clamp-1 text-center">{story.title}</p>
                     </div>
-                    <div className="mt-3 grid grid-cols-2 items-center gap-2 text-[10px] text-slate-300 sm:mt-6 sm:flex sm:flex-nowrap sm:gap-3 sm:text-sm">
-                      <span className="col-span-2 inline-flex min-w-0 items-center rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-slate-300 backdrop-blur sm:col-span-1">{story.reads} <span className="ml-1 text-slate-500">okuma</span></span>
-                      <span className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border border-rose-300/25 bg-rose-300/10 px-2.5 py-1.5 font-semibold text-rose-100 backdrop-blur"><Heart className="h-4 w-4 shrink-0 fill-rose-300 text-rose-300" /> {story.likes}</span>
-                      <span className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-full border border-amber-300/35 bg-amber-300/10 px-2.5 py-1.5 font-bold text-amber-100 backdrop-blur"><Star className="h-4 w-4 shrink-0 fill-amber-400 text-amber-300" /> <strong>{story.rating}</strong><span className="text-amber-200/60">/ 5</span></span>
-                    </div>
-                  </div>
-                </article>
+                  )}
+                </button>
               ))}
             </div>
-            <div className="mt-3 flex items-center justify-center gap-2">
-              {featuredStories.map((story, index) => (
-                <button key={`${story.title}-${index}`} type="button" aria-label={`${story.title} hikâyesini göster`} onClick={() => selectStory(index)} className={`h-2.5 rounded-full transition-all ${selectedStoryIndex === index ? "w-6 bg-amber-400" : "w-2.5 bg-slate-600 hover:bg-slate-400"}`} />
+
+            {/* Progress dots */}
+            <div className="relative z-10 flex items-center justify-center gap-1.5 pb-4">
+              {featuredStories.map((_, index) => (
+                <button
+                  key={`dot-${index}`}
+                  type="button"
+                  onClick={() => selectStory(index)}
+                  className={`rounded-full transition-all duration-300 ${
+                    selectedStoryIndex === index
+                      ? "w-6 h-1.5 bg-amber-400"
+                      : "w-1.5 h-1.5 bg-white/20 hover:bg-white/40"
+                  }`}
+                />
               ))}
             </div>
           </section>
