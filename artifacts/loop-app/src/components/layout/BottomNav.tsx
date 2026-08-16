@@ -1,5 +1,5 @@
 import { Link, useLocation, useSearch } from "wouter";
-import { Home, Search, PlusCircle, MessageCircle, Mic, User, BookOpen, Tag, Activity, BookMarked, CalendarDays } from "lucide-react";
+import { Home, Search, PlusCircle, MessageCircle, Mic, User, BookOpen, Tag, Activity, BookMarked, CalendarDays, Pen } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -34,7 +34,30 @@ export function BottomNav() {
   if (isNotebook) {
     const currentTab = new URLSearchParams(search).get("tab");
     return (
-      <div className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex items-center justify-around px-2 z-50 md:hidden">
+      <>
+        {/* Şeffaf kalem + ana sayfa butonları — nav bar'ın hemen üstünde sabit */}
+        <div className="fixed bottom-16 left-0 right-0 flex items-end justify-between px-5 pb-2 z-50 pointer-events-none md:hidden">
+          <Link href="/notebook/yeni" className="pointer-events-auto">
+            <button
+              type="button"
+              title="Yeni kitap yaz"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-violet-200/80 bg-white/75 backdrop-blur-md text-violet-600 shadow-[0_4px_18px_rgba(109,40,217,0.15)] active:scale-95 transition-all duration-150"
+            >
+              <Pen className="h-5 w-5" strokeWidth={1.8} />
+            </button>
+          </Link>
+          <Link href="/" className="pointer-events-auto">
+            <button
+              type="button"
+              title="Ana sayfaya dön"
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/75 backdrop-blur-md text-violet-600 shadow-[0_4px_18px_rgba(15,23,42,0.10)] active:scale-95 transition-all duration-150"
+            >
+              <Home className="h-5 w-5" strokeWidth={1.8} />
+            </button>
+          </Link>
+        </div>
+
+        <div className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex items-center justify-around px-2 z-50 md:hidden">
         {NOTEBOOK_TABS.map(({ href, label, Icon, tabParam }) => {
           const active = tabParam === null ? currentTab === null : currentTab === tabParam;
           if (tabParam === "etkinlikler") {
@@ -63,7 +86,8 @@ export function BottomNav() {
             </Link>
           );
         })}
-      </div>
+        </div>
+      </>
     );
   }
 

@@ -1685,31 +1685,6 @@ export default function WriteBook() {
             </aside>
           </main>
 
-          {/* ── Şeffaf aksiyon çubuğu: Kalem (sol) + Ana Sayfa (orta) ── */}
-          <div className="relative flex items-center justify-center py-3">
-            {/* Sol: Kalem butonu — icon only circle */}
-            <Link href="/notebook/yeni" className="absolute left-0">
-              <button
-                type="button"
-                title="Yeni kitap yaz"
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-violet-200/70 bg-white/70 backdrop-blur-md text-violet-600 shadow-[0_4px_18px_rgba(109,40,217,0.13)] hover:bg-white/90 hover:border-violet-300 hover:shadow-[0_6px_24px_rgba(109,40,217,0.2)] active:scale-95 transition-all duration-200"
-              >
-                <Pen className="h-5 w-5" strokeWidth={1.8} />
-              </button>
-            </Link>
-
-            {/* Orta: Ana sayfa butonu — icon only circle */}
-            <Link href="/">
-              <button
-                type="button"
-                title="Ana sayfaya dön"
-                className="flex h-12 w-12 items-center justify-center rounded-full border border-slate-200/70 bg-white/70 backdrop-blur-md text-violet-600 shadow-[0_4px_18px_rgba(15,23,42,0.09)] hover:bg-white/90 hover:border-slate-300 hover:shadow-[0_6px_24px_rgba(15,23,42,0.14)] active:scale-95 transition-all duration-200"
-              >
-                <Home className="h-5 w-5" strokeWidth={1.8} />
-              </button>
-            </Link>
-          </div>
-
           <section className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
               <div>
