@@ -24,6 +24,7 @@ interface Cell { letter: string; status: LetterStatus }
 
 interface Props {
   targetWord?:    string;
+  wordList?:      string[];          // admin + base combined (doğrulama için)
   alreadyPlayed?: { result: "won" | "lost"; attempts: number } | null;
   onGameEnd:      (won: boolean, attempts: number) => void;
 }
@@ -56,8 +57,9 @@ function emptyBoard(): Cell[][] {
   );
 }
 
-export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Props) {
-  const target = (targetWord ?? getDailyWord()).toUpperCase();
+export default function WordleGame({ targetWord, wordList, alreadyPlayed, onGameEnd }: Props) {
+  const target      = (targetWord ?? getDailyWord()).toUpperCase();
+  const validWords  = wordList ?? WORDLE_WORDS;
 
   const [board,       setBoard]      = useState<Cell[][]>(emptyBoard);
   const [currentRow,  setCurrentRow] = useState(0);
@@ -118,7 +120,7 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
       showMsg("5 harf gerekli!"); return;
     }
     const guess = board[currentRow].map(c => c.letter).join("");
-    if (!WORDLE_WORDS.includes(guess)) {
+    if (!validWords.includes(guess)) {
       setShakeRow(currentRow); setTimeout(() => setShakeRow(null), 450);
       showMsg("Kelime listesinde yok"); return;
     }

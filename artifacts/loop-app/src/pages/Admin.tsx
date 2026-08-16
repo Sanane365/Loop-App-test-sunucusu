@@ -37,6 +37,9 @@ import {
   PawPrint,
   Upload,
   Plus,
+  Gamepad2,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
@@ -105,6 +108,46 @@ export default function Admin() {
 
   const [resetPassUser, setResetPassUser] = useState<AdminUser | null>(null);
   const [newPassword, setNewPassword] = useState("");
+
+  // Wordle kelime yönetimi
+  const [wordleWords,    setWordleWords]    = useState<string[]>([]);
+  const [wordleInput,    setWordleInput]    = useState("");
+  const [wordleAdding,   setWordleAdding]   = useState(false);
+  const [wordleDeleting, setWordleDeleting] = useState<string | null>(null);
+
+  const fetchWordleWords = async () => {
+    const r = await fetch("/api/admin/wordle-words");
+    if (r.ok) setWordleWords(await r.json());
+  };
+
+  const handleAddWord = async () => {
+    const w = wordleInput.trim().toUpperCase();
+    if (w.length !== 5) { toast({ title: "Kelime tam 5 harf olmalı", variant: "destructive" }); return; }
+    setWordleAdding(true);
+    try {
+      const r = await fetch("/api/admin/wordle-words", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: w }),
+      });
+      if (r.ok) {
+        toast({ title: `✅ "${w}" eklendi`, duration: 2000 });
+        setWordleInput("");
+        fetchWordleWords();
+      } else {
+        const e = await r.json();
+        toast({ title: e.error, variant: "destructive" });
+      }
+    } finally { setWordleAdding(false); }
+  };
+
+  const handleDeleteWord = async (word: string) => {
+    setWordleDeleting(word);
+    try {
+      const r = await fetch(`/api/admin/wordle-words/${encodeURIComponent(word)}`, { method: "DELETE" });
+      if (r.ok) { toast({ title: `"${word}" silindi`, duration: 1500 }); fetchWordleWords(); }
+    } finally { setWordleDeleting(null); }
+  };
 
   // Yoldaş yönetimi
   interface CompanionRow { id: number; slug: string; name: string; description: string | null; imageUrl: string; published: boolean; }
@@ -197,7 +240,7 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (isMod) { fetchAll(); fetchCompanions(); }
+    if (isMod) { fetchAll(); fetchCompanions(); fetchWordleWords(); }
   }, [isMod]);
 
   const fetchUsers = async () => {
@@ -394,11 +437,14 @@ export default function Admin() {
         )}
 
         <Tabs defaultValue="users">
-          <TabsList className="w-full grid grid-cols-3">
+          <TabsList className="w-full grid grid-cols-4">
             <TabsTrigger value="users">Kullanıcılar</TabsTrigger>
             <TabsTrigger value="bans">Yasaklar</TabsTrigger>
             <TabsTrigger value="companions" className="flex items-center gap-1">
-              <PawPrint className="w-3.5 h-3.5" />Yoldaşlar
+              <PawPrint className="w-3.5 h-3.5" />Yoldaş
+            </TabsTrigger>
+            <TabsTrigger value="wordle" className="flex items-center gap-1">
+              <Gamepad2 className="w-3.5 h-3.5" />Wordle
             </TabsTrigger>
           </TabsList>
 
@@ -746,6 +792,75 @@ export default function Admin() {
                   </div>
                 </div>
               ))}
+            </div>
+          </TabsContent>
+
+          {/* ── Wordle Kelime Yönetimi ──────────────────────────────── */}
+          <TabsContent value="wordle" className="space-y-4 mt-4">
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Gamepad2 className="w-4 h-4 text-green-500" />
+                Admin Kelime Ekle
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Eklediğin kelimeler günlük Wordle havuzuna girer. Tam 5 harf, Türkçe karakter kullanabilirsin.
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  value={wordleInput}
+                  onChange={e => setWordleInput(e.target.value.toUpperCase())}
+                  onKeyDown={e => e.key === "Enter" && handleAddWord()}
+                  placeholder="KELIM"
+                  maxLength={5}
+                  className="font-mono uppercase tracking-widest flex-1"
+                />
+                <Button
+                  onClick={handleAddWord}
+                  disabled={wordleAdding || wordleInput.trim().length !== 5}
+                  className="gap-1"
+                >
+                  <Plus className="w-4 h-4" />
+                  {wordleAdding ? "Ekleniyor…" : "Ekle"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-sm">Admin Eklenen Kelimeler</h3>
+                <Badge variant="secondary">{wordleWords.length} kelime</Badge>
+              </div>
+              {wordleWords.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">
+                  Henüz admin kelimesi eklenmemiş.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {wordleWords.map(word => (
+                    <div
+                      key={word}
+                      className="flex items-center gap-1.5 rounded-lg border bg-background px-2.5 py-1.5"
+                    >
+                      <span className="font-mono text-sm font-bold tracking-widest text-green-600">{word}</span>
+                      <button
+                        onClick={() => handleDeleteWord(word)}
+                        disabled={wordleDeleting === word}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                        title="Sil"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground flex items-start gap-2">
+                <CheckCircle2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-green-500" />
+                Eklenen kelimeler anında aktif olur — oyuncular doğrulamayla bu kelimeleri girebilir ve günlük çekiliş havuzuna katılır.
+              </p>
             </div>
           </TabsContent>
         </Tabs>

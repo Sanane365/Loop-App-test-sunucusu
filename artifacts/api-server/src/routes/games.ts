@@ -14,6 +14,19 @@ import { db }     from "@workspace/db";
 import { gameScoresTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
+import fs   from "fs";
+import path from "path";
+
+/* ── Wordle kelime listesi (disk ↔ memory) ───────────────────────────── */
+const WORDS_FILE = path.join(__dirname, "../data/wordle-words.json");
+
+function readAdminWords(): string[] {
+  try { return JSON.parse(fs.readFileSync(WORDS_FILE, "utf8")); }
+  catch { return []; }
+}
+function writeAdminWords(words: string[]) {
+  fs.writeFileSync(WORDS_FILE, JSON.stringify(words, null, 2), "utf8");
+}
 
 const router = Router();
 
@@ -116,6 +129,28 @@ router.post("/games/records", requireAuth, async (req, res) => {
   }
 
   res.json(row);
+});
+
+/* ── GET /api/games/wordle-words — tüm kelimeler (base + admin) ──────── */
+router.get("/games/wordle-words", async (_req, res) => {
+  const BASE_WORDS = [
+    "ARABA","ASLAN","ALARM","ALTIN","ARMUT","BADEM","BAHÇE","BAHAR","BALIK","BANKA",
+    "BEYAZ","BÖREK","BRONZ","BÜYÜK","CADDE","CEKET","CEVİZ","ÇADIR","ÇANTA","ÇARŞI",
+    "ÇAYIR","ÇİZME","ÇORBA","DEVAM","DOLMA","DOMUZ","DUVAR","DÜNYA","EKMEK","ELMAS",
+    "FIRIN","FULAR","GİTAR","GÖLET","GÜMÜŞ","GÜNEŞ","GÜNEY","HABER","HAVUÇ","HAYAT",
+    "HAYAL","HEKİM","HİNDİ","HOROZ","İNCİR","KABAK","KABLO","KAHVE","KALEM","KARGA",
+    "KASAP","KAVUN","KAYIK","KAZAK","KEBAP","KEMAN","KİRAZ","KİTAP","KÖFTE","KÖPEK",
+    "KÖPRÜ","KOŞMA","KOYUN","KORKU","KURUM","KUZEY","KÜÇÜK","KİRPİ","KIRAZ","LİMAN",
+    "MARKA","MEYVE","MISIR","MÜZİK","MUTLU","NEHİR","OKUMA","ORMAN","PAZAR","PEMBE",
+    "PERDE","PİLAV","POLİS","PILOT","RADYO","SAHİL","SALON","SANAT","SARMA","SEBZE",
+    "SERÇE","SEVGİ","SİYAH","SICAK","SOKAK","SOĞUK","ŞEKER","ŞOFÖR","TABLO","TAHTA",
+    "TAKIM","TARLA","TATLI","TAVAN","TAVUK","TEKNE","TENİS","TÜNEL","TULUM","ÜZGÜN",
+    "VİDEO","VİŞNE","YAZAR","YATAK","YAYLA","YAZMA","YEŞİL","YOKUŞ","YÜZME","ZAMAN",
+    "ZEMİN","ASKER","BORSA","SERIN",
+  ];
+  const adminWords = readAdminWords();
+  const all = [...new Set([...BASE_WORDS, ...adminWords.map((w: string) => w.toUpperCase())])];
+  res.json(all);
 });
 
 export default router;

@@ -1157,29 +1157,68 @@ export default function WriteBook() {
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-[1.5rem] bg-gradient-to-br from-slate-950 via-slate-900 to-violet-950 p-4 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)] sm:p-6">
-            <div className="flex items-center justify-between gap-3">
+          <section className="overflow-hidden rounded-[2rem] text-white" style={{ background: "linear-gradient(145deg,#0f0c1a 0%,#12102a 55%,#1a0f2e 100%)", boxShadow: "0 24px 80px rgba(109,40,217,0.18)" }}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 pt-4 pb-0">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">Bu haftanın seçkisi</p>
-                <h2 className="mt-1 text-xl font-bold">Trend Olanlar</h2>
+                <p className="text-[9px] font-bold uppercase tracking-[0.38em] text-violet-400/75">Bu Haftanın Seçkisi</p>
+                <h2 className="mt-0.5 text-[17px] font-black tracking-tight leading-tight flex items-center gap-2">
+                  Trend Olanlar
+                  <span className="text-base">🔥</span>
+                </h2>
               </div>
-              <span className="rounded-full bg-amber-400/15 px-3 py-1.5 text-xs font-bold text-amber-200 ring-1 ring-amber-300/30">↗ Yükselişte</span>
+              <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1.5 text-[10px] font-bold text-violet-300">↗ Yükselişte</span>
             </div>
-            <div className="scrollbar-hide mt-5 flex gap-4 overflow-x-auto pb-2">
-              {trendingBooks.map((book, index) => (
-                <article key={book.title} className="group w-32 flex-none sm:w-40">
-                  <div className="relative h-48 overflow-hidden rounded-xl bg-slate-800 shadow-lg sm:h-60">
-                    <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                    <div className="absolute left-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-amber-400 text-xs font-black text-slate-950 shadow-lg">{index + 1}</div>
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-transparent p-3 pt-12">
-                      <span className="text-[10px] font-semibold text-amber-200">{book.genre}</span>
+
+            {/* #1 hero card */}
+            {(() => {
+              const top = trendingBooks[0];
+              return (
+                <div className="mt-3 mx-4 relative overflow-hidden rounded-2xl" style={{ height: 130 }}>
+                  <img src={top.cover} alt={top.title} className="absolute inset-0 h-full w-full object-cover scale-110" style={{ filter: "blur(2px)" }} />
+                  <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.2) 100%)" }} />
+                  {/* rank watermark */}
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[72px] font-black leading-none select-none" style={{ color: "rgba(255,255,255,0.06)" }}>1</span>
+                  <div className="relative flex h-full items-center gap-3 px-3">
+                    <img src={top.cover} alt={top.title} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-lg ring-2 ring-amber-400/60" />
+                    <div className="min-w-0">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-black">#1 Bu Hafta</span>
+                      <h3 className="mt-1.5 text-[17px] font-black leading-tight text-white line-clamp-1">{top.title}</h3>
+                      <p className="mt-0.5 text-[11px] text-slate-300/80">{top.author} · <span className="text-violet-300">{top.genre}</span></p>
+                      <div className="mt-2 flex items-center gap-3">
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300">
+                          <Eye className="h-3 w-3" />{top.reads}
+                        </span>
+                        <button type="button" className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/20 transition-colors">
+                          Oku
+                        </button>
+                      </div>
                     </div>
                   </div>
-                  <h3 className="mt-2 truncate text-sm font-bold text-white group-hover:text-amber-200">{book.title}</h3>
-                  <div className="mt-1 flex items-center justify-between gap-2 text-xs text-slate-400">
-                    <span className="truncate">{book.author}</span>
-                    <span className="shrink-0 text-amber-300">{book.reads}</span>
+                </div>
+              );
+            })()}
+
+            {/* #2–5 horizontal scroll */}
+            <div className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto px-4 pb-4">
+              {trendingBooks.slice(1).map((book, i) => (
+                <article key={book.title} className="group w-28 flex-none">
+                  <div className="relative h-40 overflow-hidden rounded-xl bg-slate-800 shadow-lg">
+                    <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-106" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                    {/* rank */}
+                    <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black shadow-lg" style={{ background: "rgba(109,40,217,0.85)", color: "#e9d5ff" }}>
+                      {i + 2}
+                    </span>
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <span className="block text-[8px] font-semibold text-violet-300 uppercase tracking-wide truncate">{book.genre}</span>
+                      <span className="mt-0.5 flex items-center gap-1 text-[9px] text-amber-300 font-bold">
+                        <Eye className="h-2.5 w-2.5" />{book.reads}
+                      </span>
+                    </div>
                   </div>
+                  <h3 className="mt-1.5 truncate text-[12px] font-bold text-white/90 group-hover:text-violet-300 transition-colors">{book.title}</h3>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">{book.author}</p>
                 </article>
               ))}
             </div>

@@ -3,6 +3,18 @@ import { db } from "@workspace/db";
 import { usersTable, bansTable } from "@workspace/db";
 import { eq, ilike, and } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
+import fs   from "fs";
+import path from "path";
+
+const WORDS_FILE = path.join(__dirname, "../data/wordle-words.json");
+function readAdminWords(): string[] {
+  try { return JSON.parse(fs.readFileSync(WORDS_FILE, "utf8")); }
+  catch { return []; }
+}
+function writeAdminWords(words: string[]) {
+  fs.mkdirSync(path.dirname(WORDS_FILE), { recursive: true });
+  fs.writeFileSync(WORDS_FILE, JSON.stringify(words, null, 2), "utf8");
+}
 
 const router = Router();
 
@@ -176,6 +188,39 @@ router.post("/users/:id/reset-password", requireAuth, requireAdmin, async (req, 
     console.error("Admin reset-password error:", error);
     res.status(500).json({ error: "Sunucu hatası" });
   }
+});
+
+/* ── GET /admin/wordle-words ─────────────────────────────────────────── */
+router.get("/wordle-words", requireAuth, requireAdmin, (_req, res) => {
+  res.json(readAdminWords());
+});
+
+/* ── POST /admin/wordle-words ────────────────────────────────────────── */
+router.post("/wordle-words", requireAuth, requireAdmin, (req, res) => {
+  const { word } = req.body as { word?: string };
+  if (!word || word.trim().length !== 5) {
+    res.status(400).json({ error: "Kelime tam 5 harf olmalı" }); return;
+  }
+  const upper = word.trim().toUpperCase();
+  const words = readAdminWords();
+  if (words.includes(upper)) {
+    res.status(409).json({ error: "Bu kelime zaten listede" }); return;
+  }
+  words.push(upper);
+  writeAdminWords(words);
+  res.json({ success: true, word: upper, total: words.length });
+});
+
+/* ── DELETE /admin/wordle-words/:word ────────────────────────────────── */
+router.delete("/wordle-words/:word", requireAuth, requireAdmin, (req, res) => {
+  const upper = req.params["word"].toUpperCase();
+  const words = readAdminWords();
+  const next  = words.filter((w: string) => w !== upper);
+  if (next.length === words.length) {
+    res.status(404).json({ error: "Kelime bulunamadı" }); return;
+  }
+  writeAdminWords(next);
+  res.json({ success: true });
 });
 
 export default router;

@@ -115,6 +115,7 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
   const [myScore,    setMyScore]    = useState<ScoreRow>(EMPTY_SCORE);
   const [otherScore, setOtherScore] = useState<ScoreRow>(EMPTY_SCORE);
   const [loading,    setLoading]    = useState(false);
+  const [wordList,   setWordList]   = useState<string[] | null>(null);
 
   /* Panel kapanınca seçici'ye dön */
   useEffect(() => { if (!isOpen) setView("select"); }, [isOpen]);
@@ -137,6 +138,15 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
 
   useEffect(() => { fetchScores(); }, [fetchScores]);
 
+  /* Kelime listesini çek */
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch("/api/games/wordle-words")
+      .then(r => r.ok ? r.json() : null)
+      .then(list => { if (list) setWordList(list); })
+      .catch(() => {});
+  }, [isOpen]);
+
   /* Oyun bitti */
   const handleGameEnd = async (won: boolean, attempts: number) => {
     await fetch("/api/games/records", {
@@ -154,6 +164,16 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
   const alreadyPlayed = myScore.lastPlayedDate === todayStr()
     ? { result: myScore.lastResult as "won" | "lost", attempts: myScore.lastAttempts ?? 6 }
     : null;
+
+  /* Günlük kelimeyi tam listeden hesapla */
+  const effectiveWordList = wordList ?? undefined;
+  const targetWord = (() => {
+    const list = effectiveWordList ?? [getDailyWord()];
+    const epoch  = new Date("2024-01-01T00:00:00Z").getTime();
+    const now    = new Date(); now.setHours(0, 0, 0, 0);
+    const dayIdx = Math.floor((now.getTime() - epoch) / 86_400_000);
+    return list[((dayIdx % list.length) + list.length) % list.length];
+  })();
 
   if (!isOpen) return null;
 
@@ -282,7 +302,8 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
         {view === "wordle" && (
           <div className="h-full flex flex-col overflow-hidden px-4 pb-4 pt-1">
             <WordleGame
-              targetWord={getDailyWord()}
+              targetWord={targetWord}
+              wordList={effectiveWordList}
               alreadyPlayed={alreadyPlayed}
               onGameEnd={handleGameEnd}
             />
