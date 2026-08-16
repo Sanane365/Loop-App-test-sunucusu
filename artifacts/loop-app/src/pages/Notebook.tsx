@@ -1,5 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ArrowRight, BookOpen, Bookmark, ChevronDown, ChevronUp, Eye, Globe2, Heart, Images, MapPin, MoreVertical, Play, Search, Sparkles, Star, UserPlus, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Bookmark, ChevronDown, ChevronUp, Eye, Globe2, Heart, Home, Images, MapPin, MoreVertical, Pen, Play, Search, Sparkles, Star, UserPlus, Users, X } from "lucide-react";
 import { useState } from "react";
 import { useEffect, useRef } from "react";
 import { useSearch, Link } from "wouter";
@@ -276,6 +276,8 @@ export default function WriteBook() {
   const [shelfCategory, setShelfCategory] = useState("Tümü");
   const [selectedUniverse, setSelectedUniverse] = useState<(typeof loopUniverses)[number] | null>(null);
   const [libraryView, setLibraryView] = useState<"books" | "categories" | "flow">("books");
+  const [catSearchQuery, setCatSearchQuery] = useState("");
+  const [catSearchMode, setCatSearchMode] = useState<"books" | "authors">("books");
   const universePressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storyCarouselRef = useRef<HTMLDivElement>(null);
 
@@ -427,6 +429,21 @@ export default function WriteBook() {
     );
   });
 
+  // Categories tab — independent search
+  const catQuery = catSearchQuery.trim().toLocaleLowerCase("tr-TR");
+  const catFilteredBooks = libraryCollection.filter((book) => {
+    if (!catQuery) return true;
+    return [book.title, book.author, book.genre].some((v) =>
+      v.toLocaleLowerCase("tr-TR").includes(catQuery),
+    );
+  });
+  const catFilteredAuthors = featuredAuthors.filter((user) => {
+    if (!catQuery) return true;
+    return [user.name, user.role, user.genre, user.bio, user.city].some((v) =>
+      v.toLocaleLowerCase("tr-TR").includes(catQuery),
+    );
+  });
+
   const libraryShelves = Object.entries(
     libraryCollection.reduce((acc, book) => {
       if (!acc[book.genre]) acc[book.genre] = [];
@@ -453,6 +470,90 @@ export default function WriteBook() {
               <p className="text-[10px] uppercase tracking-[0.35em] text-violet-600 font-semibold">📚 Loop Kitaplık</p>
               <h1 className="mt-2 text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-950">Tüm Kategoriler</h1>
               <p className="mt-3 text-sm sm:text-base text-slate-600 max-w-2xl">Milyonlarca kitap arasında keşfet. Kategorilerimiz arasında dolaş ve seni çeken türleri bul.</p>
+            </div>
+
+            {/* ── Bağımsız arama ── */}
+            <div className="mb-8 rounded-[1.75rem] bg-white shadow-[0_8px_32px_rgba(109,40,217,0.08)] border border-violet-100 p-4 sm:p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center flex-1 gap-3 rounded-[1.25rem] bg-slate-50 border border-slate-200 px-4 py-3 focus-within:border-violet-400 focus-within:shadow-[0_0_0_3px_rgba(139,92,246,0.12)] transition-all">
+                  <Search className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                  <input
+                    type="search"
+                    placeholder={catSearchMode === "books" ? "Kitap adı veya yazar ara…" : "Yazar adı, tür veya şehir ara…"}
+                    value={catSearchQuery}
+                    onChange={(e) => setCatSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 outline-none"
+                  />
+                  {catSearchQuery && (
+                    <button type="button" onClick={() => setCatSearchQuery("")} className="text-slate-400 hover:text-slate-600 transition">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex rounded-[1.25rem] bg-slate-100 p-1 gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCatSearchMode("books")}
+                    className={`rounded-[1rem] px-4 py-2 text-sm font-semibold transition ${catSearchMode === "books" ? "bg-violet-700 text-white shadow" : "text-slate-600 hover:bg-slate-200"}`}
+                  >Kitap</button>
+                  <button
+                    type="button"
+                    onClick={() => setCatSearchMode("authors")}
+                    className={`rounded-[1rem] px-4 py-2 text-sm font-semibold transition ${catSearchMode === "authors" ? "bg-violet-700 text-white shadow" : "text-slate-600 hover:bg-slate-200"}`}
+                  >Yazar</button>
+                </div>
+              </div>
+
+              {catSearchQuery ? (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {catSearchMode === "books" ? "Kitap sonuçları" : "Yazar sonuçları"}
+                    </p>
+                    <span className="text-xs uppercase tracking-[0.25em] text-slate-500">
+                      {catSearchMode === "books" ? `${catFilteredBooks.length} adet` : `${catFilteredAuthors.length} adet`}
+                    </span>
+                  </div>
+
+                  {catSearchMode === "books" ? (
+                    <div className="grid gap-2">
+                      {catFilteredBooks.slice(0, 8).map((book) => (
+                        <div key={book.title} className="flex items-center gap-4 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-3 hover:border-violet-200 hover:bg-violet-50/50 transition">
+                          <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg shadow-sm">
+                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-900 truncate">{book.title}</p>
+                            <p className="text-xs text-slate-500 truncate">{book.author} · {book.genre}</p>
+                          </div>
+                          <span className="ml-auto flex-shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-semibold text-violet-700">{book.genre}</span>
+                        </div>
+                      ))}
+                      {catFilteredBooks.length === 0 && (
+                        <p className="py-6 text-center text-sm text-slate-500">"{catSearchQuery}" için kitap bulunamadı.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {catFilteredAuthors.slice(0, 6).map((author) => (
+                        <div key={author.name} className="flex items-center gap-3 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-3 hover:border-violet-200 hover:bg-violet-50/50 transition">
+                          <img src={author.avatar} alt={author.name} className="h-10 w-10 flex-shrink-0 rounded-full object-cover shadow-sm" />
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-900 truncate">{author.name}</p>
+                            <p className="text-xs text-slate-500 truncate">{author.genre} · {author.city}</p>
+                          </div>
+                          <span className="ml-auto flex-shrink-0 text-xs text-slate-400">{author.followers}</span>
+                        </div>
+                      ))}
+                      {catFilteredAuthors.length === 0 && (
+                        <p className="py-6 text-center text-sm text-slate-500 col-span-2">"{catSearchQuery}" için yazar bulunamadı.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">Kitap adı, yazar veya tür girerek ara.</p>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -1583,6 +1684,33 @@ export default function WriteBook() {
               </div>
             </aside>
           </main>
+
+          {/* ── Şeffaf aksiyon çubuğu: Kalem (sol) + Ana Sayfa (orta) ── */}
+          <div className="relative flex items-center justify-center py-2">
+            {/* Sol: Kalem butonu */}
+            <Link href="/notebook/yeni">
+              <button
+                type="button"
+                title="Yeni kitap yaz"
+                className="absolute left-0 inline-flex items-center gap-2 rounded-full border border-violet-300/60 bg-white/60 backdrop-blur-md px-5 py-2.5 text-sm font-semibold text-violet-700 shadow-[0_4px_20px_rgba(109,40,217,0.12)] hover:bg-white/80 hover:border-violet-400 hover:shadow-[0_6px_24px_rgba(109,40,217,0.18)] transition-all duration-200"
+              >
+                <Pen className="h-4 w-4" />
+                Yaz
+              </button>
+            </Link>
+
+            {/* Orta: Ana sayfa butonu */}
+            <Link href="/">
+              <button
+                type="button"
+                title="Ana sayfaya dön"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-300/60 bg-white/60 backdrop-blur-md px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-[0_4px_20px_rgba(15,23,42,0.08)] hover:bg-white/80 hover:border-slate-400 hover:text-slate-900 hover:shadow-[0_6px_24px_rgba(15,23,42,0.13)] transition-all duration-200"
+              >
+                <Home className="h-4 w-4" />
+                Ana Sayfa
+              </button>
+            </Link>
+          </div>
 
           <section className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
             <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
