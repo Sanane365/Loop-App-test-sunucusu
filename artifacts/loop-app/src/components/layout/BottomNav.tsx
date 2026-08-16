@@ -2,6 +2,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Home, Search, PlusCircle, MessageCircle, Mic, User, BookOpen, Tag, Activity, BookMarked, CalendarDays } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 /* ── Kitaplık sekmesi tanımları ─────────────────────────────────────── */
 const NOTEBOOK_TABS = [
@@ -36,6 +37,19 @@ export function BottomNav() {
       <div className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-border flex items-center justify-around px-2 z-50 md:hidden">
         {NOTEBOOK_TABS.map(({ href, label, Icon, tabParam }) => {
           const active = tabParam === null ? currentTab === null : currentTab === tabParam;
+          if (tabParam === "etkinlikler") {
+            return (
+              <button
+                key={href}
+                type="button"
+                onClick={() => toast("🎉 Etkinlikler yakında sizlerle", { duration: 3000 })}
+                className={`flex flex-col items-center gap-0.5 px-2 py-1 transition-colors ${active ? "text-primary" : "text-muted-foreground"}`}
+              >
+                <Icon className="w-5 h-5" strokeWidth={1.8} />
+                <span className="text-[10px] font-semibold leading-none">{label}</span>
+              </button>
+            );
+          }
           return (
             <Link
               key={href}
