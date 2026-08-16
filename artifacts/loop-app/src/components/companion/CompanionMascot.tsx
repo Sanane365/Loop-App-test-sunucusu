@@ -457,18 +457,37 @@ export default function CompanionMascot({
   /* ── tap ─────────────────────────────────────────────────────────── */
   const ANGRY_DUR = 0.38 * 5 * 1000; // 5 iter × 380 ms
 
+  const startWalkNow = () => {
+    clearTimeout(walkTimer.current);
+    clearTimeout(animTimer.current);
+    const cw      = cwRef.current;
+    const cur     = posXRef.current;
+    const goRight = cur < cw / 2;
+    const target  = goRight ? Math.max(0, cw - BEAR_W - 8) : 8;
+    const dist    = Math.abs(target - cur);
+    const walkMs  = Math.max(2200, dist * 6);
+    posXRef.current = target;
+    setPosX(target);
+    setFlipped(!goRight);
+    setAnim(goRight ? "walk-right" : "walk-left");
+    resetSleep();
+    animTimer.current = setTimeout(() => {
+      setAnim("idle");
+      setFlipped(false);
+      scheduleWalk();
+    }, walkMs);
+  };
+
   const handleTap = () => {
     setQuestion(null);
     if (anim === "sleep") {
-      /* Uykudan uyandırıldı → sinirli titreme, sonra normal döngüye dön */
+      /* Uykudan uyandırıldı → sinirli titreme, ardından hemen yürümeye başla */
       setZzz(false);
       clearTimeout(sleepTimer.current);
       clearTimeout(animTimer.current);
       setAnim("angry");
       animTimer.current = setTimeout(() => {
-        setAnim("idle");
-        resetSleep();
-        scheduleWalk();
+        startWalkNow();
       }, ANGRY_DUR);
       return;
     }

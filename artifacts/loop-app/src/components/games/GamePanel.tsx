@@ -278,20 +278,14 @@ export default function GamePanel({ isOpen, onClose, me, other }: Props) {
           </div>
         )}
 
-        {/* WORDLE OYUNU */}
+        {/* WORDLE OYUNU — loading durumu WordleGame'i asla unmount etmemeli */}
         {view === "wordle" && (
           <div className="h-full flex flex-col overflow-hidden px-4 pb-4 pt-1">
-            {loading ? (
-              <div className="flex-1 flex items-center justify-center text-white/30 text-sm">
-                Yükleniyor…
-              </div>
-            ) : (
-              <WordleGame
-                targetWord={getDailyWord()}
-                alreadyPlayed={alreadyPlayed}
-                onGameEnd={handleGameEnd}
-              />
-            )}
+            <WordleGame
+              targetWord={getDailyWord()}
+              alreadyPlayed={alreadyPlayed}
+              onGameEnd={handleGameEnd}
+            />
           </div>
         )}
       </div>
