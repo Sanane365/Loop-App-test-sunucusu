@@ -8,6 +8,7 @@ import {
   CheckCircle2, Circle, Clock, ChevronDown, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
+import { saveDraft, calcWordCount } from "@/lib/draftStore";
 
 /* ── Sabitler ────────────────────────────────────────────────────────── */
 const GENRES = [
@@ -265,6 +266,7 @@ export default function MetinHikayesi() {
   /* Adım 4 — Yayınla */
   const [visibility, setVisibility] = useState("public");
   const [isPremium,  setIsPremium]  = useState(false);
+  const [draftId,    setDraftId]    = useState<string | undefined>(undefined);
 
   const coverRef    = useRef<HTMLInputElement>(null);
   const trailerRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
@@ -291,9 +293,32 @@ export default function MetinHikayesi() {
     }));
   }, []);
 
-  const handleSave = () => {
-    toast.success("Taslak kaydedildi", { icon: "💾" });
-  };
+  const handleSave = useCallback((status: "draft" | "published" = "draft") => {
+    const saved = saveDraft({
+      id:         draftId,
+      type:       "metin",
+      status,
+      title,
+      subtitle,
+      cover,
+      trailers,
+      genres,
+      synopsis,
+      ageRating,
+      fontId:     font.id,
+      themeId:    theme.id,
+      fontSize,
+      textAlign,
+      chapters,
+      wordCount:  calcWordCount(chapters),
+    });
+    setDraftId(saved.id);
+    toast.success(
+      status === "published" ? "Yayınlandı! 🎉" : "Taslak kaydedildi 💾",
+      { description: title || "Başlıksız", duration: 2500 }
+    );
+    return saved;
+  }, [draftId, title, subtitle, cover, trailers, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters]);
 
   /* ── ADIM 1: Kapak & Bilgi ─────────────────────────────────────────── */
   const renderStep0 = () => (
@@ -641,7 +666,7 @@ export default function MetinHikayesi() {
       {/* Yayınla butonu */}
       <button
         type="button"
-        onClick={() => { handleSave(); toast.success("Kitap yayınlandı! 🎉", { duration: 3000 }); setTimeout(() => setLocation("/notebook"), 1500); }}
+        onClick={() => { handleSave("published"); setTimeout(() => setLocation("/notebook/calismalari"), 1200); }}
         className="w-full rounded-2xl py-4 font-black text-[15px] text-white transition-all active:scale-95"
         style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7,#7c3aed)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
       >
@@ -650,7 +675,7 @@ export default function MetinHikayesi() {
 
       <button
         type="button"
-        onClick={handleSave}
+        onClick={() => handleSave("draft")}
         className="w-full rounded-2xl py-3.5 font-bold text-[14px] text-violet-300 border border-violet-400/30 hover:border-violet-400/60 transition-colors"
       >
         Taslak Olarak Kaydet
@@ -674,7 +699,7 @@ export default function MetinHikayesi() {
           <p className="text-[15px] font-black text-white tracking-tight">Metin Hikayesi</p>
           <p className="text-[10px] text-slate-500 -mt-0.5">{STEPS[step]}</p>
         </div>
-        <button type="button" onClick={handleSave}
+        <button type="button" onClick={() => handleSave("draft")}
           className="flex h-9 items-center gap-1.5 rounded-full bg-violet-500/20 px-3 text-violet-300 text-[12px] font-bold hover:bg-violet-500/30 transition-colors">
           <Save className="h-3.5 w-3.5" /> Kaydet
         </button>
@@ -744,6 +769,7 @@ export default function MetinHikayesi() {
               className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-[12px] font-black text-white">
               <Save className="h-3.5 w-3.5" /> Kaydet
             </button>
+            
           </div>
         </div>
       )}
