@@ -245,8 +245,9 @@ export default function WordleGame({ targetWord, alreadyPlayed, onGameEnd }: Pro
                   background:     STATUS_BG[cell.status],
                   border:         `2px solid ${STATUS_BD[cell.status]}`,
                   borderRadius:   7,
-                  transition:     "background 0.28s, border-color 0.28s",
-                  animation:      flipRow === ri ? `wflip 0.55s ease ${ci * 0.08}s` : undefined,
+                  /* Flip satırında transition kapalı — renk scaleY(0) anında anında değişir */
+                  transition:     flipRow === ri ? "none" : "background 0.28s, border-color 0.28s",
+                  animation:      flipRow === ri ? `wflip 0.55s ease ${ci * 0.08}s both` : undefined,
                 }}>
                   {cell.letter}
                 </div>

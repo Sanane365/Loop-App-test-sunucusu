@@ -15,7 +15,7 @@
 import { useState, useEffect, useRef, useCallback, CSSProperties } from "react";
 import { Check, Moon, Pencil, X } from "lucide-react";
 
-type AnimState = "idle" | "walk-right" | "walk-left" | "peek" | "wave" | "happy" | "sleep";
+type AnimState = "idle" | "walk-right" | "walk-left" | "peek" | "wave" | "happy" | "sleep" | "angry";
 
 interface Props {
   imgUrl:        string;
@@ -252,6 +252,20 @@ const KF = `
 @keyframes cq-dot        { 0%,80%,100%{transform:translateY(0)}  40%{transform:translateY(-4px)} }
 @keyframes cm-turn-right { 0%{transform:scaleX(-1) scaleY(1)} 45%{transform:scaleX(0) scaleY(1.1)} 100%{transform:scaleX(1)  scaleY(1)} }
 @keyframes cm-turn-left  { 0%{transform:scaleX(1)  scaleY(1)} 45%{transform:scaleX(0) scaleY(1.1)} 100%{transform:scaleX(-1) scaleY(1)} }
+@keyframes cm-angry {
+  0%,100%{ transform: rotate(0deg)   translateX(0)    translateY(0); }
+  8%     { transform: rotate(-9deg)  translateX(-4px) translateY(-2px); }
+  16%    { transform: rotate(9deg)   translateX(4px)  translateY(-3px); }
+  24%    { transform: rotate(-8deg)  translateX(-3px) translateY(-1px); }
+  32%    { transform: rotate(8deg)   translateX(3px)  translateY(-2px); }
+  40%    { transform: rotate(-6deg)  translateX(-3px) translateY(-1px); }
+  48%    { transform: rotate(6deg)   translateX(3px)  translateY(-1px); }
+  56%    { transform: rotate(-4deg)  translateX(-2px) translateY(0); }
+  64%    { transform: rotate(4deg)   translateX(2px)  translateY(0); }
+  72%    { transform: rotate(-2deg)  translateX(-1px) translateY(0); }
+  80%    { transform: rotate(2deg)   translateX(1px)  translateY(0); }
+  90%    { transform: rotate(-1deg)  translateX(0)    translateY(0); }
+}
 `;
 
 /* ── animation config ────────────────────────────────────────────────── */
@@ -263,6 +277,7 @@ const ANIM_CFG: Record<AnimState, { name: string; dur: string; iter: string; eas
   happy:        { name:"cm-happy", dur:"0.44s", iter:"4",        easing:"ease-in-out" },
   peek:         { name:"cm-peek",  dur:"2.1s",  iter:"infinite", easing:"ease-in-out" },
   sleep:        { name:"cm-sleep", dur:"5s",    iter:"infinite", easing:"ease-in-out" },
+  angry:        { name:"cm-angry", dur:"0.38s", iter:"5",        easing:"ease-in-out" },
 };
 
 /* ══════════════════════════════════════════════════════════════════════ */
@@ -440,9 +455,24 @@ export default function CompanionMascot({
   }, [onMessageSent]);
 
   /* ── tap ─────────────────────────────────────────────────────────── */
+  const ANGRY_DUR = 0.38 * 5 * 1000; // 5 iter × 380 ms
+
   const handleTap = () => {
-    resetSleep(); setZzz(false); setQuestion(null);
-    if (anim === "sleep") { setAnim("idle"); return; }
+    setQuestion(null);
+    if (anim === "sleep") {
+      /* Uykudan uyandırıldı → sinirli titreme, sonra normal döngüye dön */
+      setZzz(false);
+      clearTimeout(sleepTimer.current);
+      clearTimeout(animTimer.current);
+      setAnim("angry");
+      animTimer.current = setTimeout(() => {
+        setAnim("idle");
+        resetSleep();
+        scheduleWalk();
+      }, ANGRY_DUR);
+      return;
+    }
+    resetSleep();
     if (anim !== "walk-right" && anim !== "walk-left") {
       clearTimeout(animTimer.current);
       setAnim("wave");
