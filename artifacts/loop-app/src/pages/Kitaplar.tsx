@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, Link } from "wouter";
 import {
   ArrowLeft, Search, BookOpen, Clock, Hash,
@@ -94,15 +94,26 @@ export default function Kitaplar() {
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  useEffect(() => { setBooks(getPublishedBooks()); }, []);
+  const refresh = useCallback(() => setBooks(getPublishedBooks()), []);
+
+  useEffect(() => {
+    refresh();
+    // Kullanıcı başka sekmeden/sayfadan döndüğünde yenile
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [refresh]);
 
   const filtered = books.filter(b => {
-    const matchGenre = genre === "Tümü" || b.genres?.includes(genre);
-    const q = query.toLowerCase();
-    const matchQ = !q ||
-      (b.title || "").toLowerCase().includes(q) ||
-      (b.synopsis || "").toLowerCase().includes(q) ||
-      b.genres?.some(g => g.toLowerCase().includes(q));
+    const genres = Array.isArray(b.genres) ? b.genres : [];
+    const matchGenre =
+      genre === "Tümü" ||
+      genres.some(g => g.trim().toLowerCase() === genre.trim().toLowerCase());
+    const q = query.trim().toLowerCase();
+    const matchQ =
+      !q ||
+      (b.title ?? "").toLowerCase().includes(q) ||
+      (b.synopsis ?? "").toLowerCase().includes(q) ||
+      genres.some(g => g.toLowerCase().includes(q));
     return matchGenre && matchQ;
   });
 
