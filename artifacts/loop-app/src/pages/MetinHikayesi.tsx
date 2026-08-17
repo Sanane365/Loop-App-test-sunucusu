@@ -737,39 +737,42 @@ export default function MetinHikayesi() {
 
       {/* Editörde sabit kaydet + format toolbar */}
       {step === 2 && (
-        <div className="fixed bottom-0 inset-x-0 px-4 pb-5 pt-2 border-t border-white/8"
-          style={{ background: "rgba(10,8,20,0.96)", backdropFilter: "blur(12px)" }}>
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-1">
-              {[
-                [Bold,"Kalın"], [Italic,"İtalik"], [Underline,"Altı Çizili"]
-              ].map(([Icon, label]: any) => (
-                <button key={label} type="button"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
-                  <Icon className="h-4 w-4" />
-                </button>
-              ))}
-              <div className="w-px h-5 bg-white/15 mx-1" />
-              {[
-                [ImageIcon,"Görsel","image" as BlockType],
-                [Film,"Video","video" as BlockType],
-                [BarChart2,"Anket","poll" as BlockType],
-              ].map(([Icon, label, type]: any) => (
-                <button key={label} type="button"
-                  onClick={() => {
-                    const ch = chapters[activeChap];
-                    insertBlock(activeChap, ch.blocks.length - 1, type);
-                  }}
-                  className="flex items-center gap-1 h-8 rounded-lg px-2.5 bg-white/8 text-slate-300 text-[11px] font-semibold hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
-                  <Icon className="h-3.5 w-3.5" />{label}
-                </button>
-              ))}
-            </div>
-            <button type="button" onClick={handleSave}
-              className="flex items-center gap-1.5 rounded-xl bg-violet-500 px-4 py-2 text-[12px] font-black text-white">
-              <Save className="h-3.5 w-3.5" /> Kaydet
+        <div className="fixed bottom-0 inset-x-0 border-t border-white/8"
+          style={{ background: "rgba(10,8,20,0.97)", backdropFilter: "blur(14px)" }}>
+          {/* Satır 1 — format + ekle butonları (yatay kaydırma) */}
+          <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-1 overflow-x-auto scrollbar-hide">
+            {/* Format */}
+            {([
+              [Bold,      "Kalın"      ],
+              [Italic,    "İtalik"     ],
+              [Underline, "Altı Çizili"],
+            ] as const).map(([Icon, label]: any) => (
+              <button key={label} type="button"
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-lg bg-white/8 text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
+                <Icon className="h-4 w-4" />
+              </button>
+            ))}
+            <div className="shrink-0 w-px h-5 bg-white/15 mx-0.5" />
+            {/* Ekle */}
+            {([
+              [ImageIcon, "Görsel", "image" as BlockType, "#34d399"],
+              [Film,      "Video",  "video" as BlockType, "#f59e0b"],
+              [BarChart2, "Anket",  "poll"  as BlockType, "#a78bfa"],
+            ] as const).map(([Icon, label, type, color]: any) => (
+              <button key={label} type="button"
+                onClick={() => insertBlock(activeChap, chapters[activeChap].blocks.length - 1, type)}
+                className="shrink-0 flex items-center gap-1.5 h-8 rounded-lg px-2.5 text-[11px] font-bold border transition-colors"
+                style={{ background: `${color}12`, borderColor: `${color}30`, color }}>
+                <Icon className="h-3.5 w-3.5" />{label}
+              </button>
+            ))}
+          </div>
+          {/* Satır 2 — Kaydet butonu */}
+          <div className="px-3 pb-5 pt-1">
+            <button type="button" onClick={() => handleSave("draft")}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-500 py-2.5 text-[13px] font-black text-white active:scale-95 transition-all">
+              <Save className="h-4 w-4" /> Kaydet
             </button>
-            
           </div>
         </div>
       )}
