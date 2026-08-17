@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useSearch, Link } from "wouter";
 import {
-  ArrowLeft, BookOpen, Trash2, Eye, Send,
-  FileText, Clock, Hash, Layers,
-  Search, Plus, PenLine, BookOpen as BookEdit,
+  ArrowLeft, BookOpen, Trash2, Send, FileText,
+  Clock, Hash, Layers,
+  Search, Plus, PenLine, BookOpen as BookEdit, EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  getAllDrafts, deleteDraft, publishDraft,
+  getAllDrafts, deleteDraft, publishDraft, unpublishDraft,
   type Draft,
 } from "@/lib/draftStore";
 
@@ -58,11 +58,12 @@ function Empty({ tab }: { tab: string }) {
 }
 
 /* ── Kart aksiyonları — sabit bottom sheet ───────────────────────────── */
-function CardMenu({ draft, onClose, onDelete, onPublish, onRefresh }: {
+function CardMenu({ draft, onClose, onDelete, onPublish, onUnpublish, onRefresh }: {
   draft: Draft;
   onClose: () => void;
   onDelete: (id: string) => void;
   onPublish: (id: string) => void;
+  onUnpublish: (id: string) => void;
   onRefresh: () => void;
 }) {
   const [, setLocation] = useLocation();
@@ -79,6 +80,13 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onRefresh }: {
   const handlePublish = () => {
     onPublish(draft.id);
     toast.success("Yayınlandı! 🎉");
+    onClose();
+    onRefresh();
+  };
+
+  const handleUnpublish = () => {
+    onUnpublish(draft.id);
+    toast.success("Yayından kaldırıldı", { description: "Taslağa dönüştürüldü" });
     onClose();
     onRefresh();
   };
@@ -151,6 +159,23 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onRefresh }: {
           </button>
         )}
 
+        {/* Yayından Kaldır */}
+        {draft.status === "published" && (
+          <button
+            type="button"
+            onClick={handleUnpublish}
+            className="flex w-full items-center gap-3 px-5 py-4 text-[14px] text-white hover:bg-white/5 transition-colors"
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500/15">
+              <EyeOff className="h-4.5 w-4.5 text-orange-400" />
+            </div>
+            <div className="text-left">
+              <p className="font-bold text-white">Yayından Kaldır</p>
+              <p className="text-[11px] text-slate-500">Taslağa geri döndür</p>
+            </div>
+          </button>
+        )}
+
         {/* Sil */}
         <button
           type="button"
@@ -171,10 +196,11 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onRefresh }: {
 }
 
 /* ── Tek kart ────────────────────────────────────────────────────────── */
-function DraftCard({ draft, onDelete, onPublish, onRefresh }: {
+function DraftCard({ draft, onDelete, onPublish, onUnpublish, onRefresh }: {
   draft: Draft;
   onDelete: (id: string) => void;
   onPublish: (id: string) => void;
+  onUnpublish: (id: string) => void;
   onRefresh: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -268,6 +294,7 @@ function DraftCard({ draft, onDelete, onPublish, onRefresh }: {
           onClose={() => setMenuOpen(false)}
           onDelete={onDelete}
           onPublish={onPublish}
+          onUnpublish={onUnpublish}
           onRefresh={onRefresh}
         />
       )}
@@ -394,6 +421,7 @@ export default function Calismalari() {
               draft={d}
               onDelete={id => { deleteDraft(id); }}
               onPublish={id => { publishDraft(id); }}
+              onUnpublish={id => { unpublishDraft(id); }}
               onRefresh={load}
             />
           ))

@@ -102,6 +102,18 @@ export function publishDraft(id: string): void {
   writeAll(readAll().map(d => d.id === id ? { ...d, status: "published", updatedAt: new Date().toISOString() } : d));
 }
 
+/* Yayından Kaldır */
+export function unpublishDraft(id: string): void {
+  writeAll(readAll().map(d => d.id === id ? { ...d, status: "draft", updatedAt: new Date().toISOString() } : d));
+}
+
+/* Yayında olan kitapları getir */
+export function getPublishedBooks(): Draft[] {
+  return readAll()
+    .filter(d => d.status === "published")
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+}
+
 /* Kelime sayısı hesapla */
 export function calcWordCount(chapters: DraftChapter[]): number {
   return chapters.reduce(

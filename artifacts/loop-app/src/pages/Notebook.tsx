@@ -586,6 +586,12 @@ export default function WriteBook() {
               <h1 className="mt-2 text-3xl sm:text-4xl font-bold text-white">Kişisel Koleksiyon</h1>
               <p className="mt-1 text-sm text-slate-400 max-w-md">Okuduğun, beğendiğin ve koleksiyonuna eklediğin her kitap burada.</p>
 
+              {/* Kitaplar keşif linki */}
+              <Link href="/kitaplar"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-violet-500/20 border border-violet-400/30 px-4 py-2.5 text-[13px] font-bold text-violet-300 transition-all hover:bg-violet-500/30">
+                <BookOpen className="h-4 w-4" /> Yayınlanan Kitaplara Gözat →
+              </Link>
+
               {/* Stat chips */}
               <div className="mt-5 flex flex-wrap gap-2">
                 {[

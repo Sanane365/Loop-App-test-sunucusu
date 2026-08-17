@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/lib/auth";
 import { CallProvider } from "@/lib/callContext";
@@ -24,6 +25,8 @@ import Loops from "@/pages/Loops";
 import IcerikOlustur from "@/pages/IcerikOlustur";
 import MetinHikayesi from "@/pages/MetinHikayesi";
 import Calismalari from "@/pages/Calismalari";
+import Kitaplar from "@/pages/Kitaplar";
+import KitapDetay from "@/pages/KitapDetay";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +54,8 @@ function Router() {
       <Route path="/icerik-olustur" component={IcerikOlustur} />
       <Route path="/yaz/metin" component={MetinHikayesi} />
       <Route path="/notebook/calismalari" component={Calismalari} />
+      <Route path="/kitaplar" component={Kitaplar} />
+      <Route path="/kitap/:id" component={KitapDetay} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -68,6 +73,7 @@ function App() {
           </AuthProvider>
         </WouterRouter>
         <Toaster />
+        <Sonner richColors position="top-center" />
       </TooltipProvider>
     </QueryClientProvider>
   );

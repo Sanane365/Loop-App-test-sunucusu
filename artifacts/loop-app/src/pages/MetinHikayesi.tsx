@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from "react";
-import { useLocation } from "wouter";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import {
   ArrowLeft, Save, ChevronRight, ChevronLeft, Plus, X,
   Bold, Italic, Underline, Image as ImageIcon, Film,
@@ -8,7 +8,7 @@ import {
   CheckCircle2, Circle, Clock, ChevronDown, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
-import { saveDraft, calcWordCount } from "@/lib/draftStore";
+import { saveDraft, calcWordCount, getDraft } from "@/lib/draftStore";
 
 /* ── Sabitler ────────────────────────────────────────────────────────── */
 const GENRES = [
@@ -242,6 +242,7 @@ function BlockEditor({
 /* ── Ana Bileşen ─────────────────────────────────────────────────────── */
 export default function MetinHikayesi() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const [step, setStep] = useState(0);
 
   /* Adım 1 — Kapak & Bilgi */
@@ -268,8 +269,47 @@ export default function MetinHikayesi() {
   const [isPremium,  setIsPremium]  = useState(false);
   const [draftId,    setDraftId]    = useState<string | undefined>(undefined);
 
+  /* Kaydet diyalog */
+  const [saveDialog, setSaveDialog] = useState(false);
+
   const coverRef    = useRef<HTMLInputElement>(null);
   const trailerRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+
+  /* URL'den ?id ve ?step oku → taslağı yükle */
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    const idParam   = params.get("id");
+    const stepParam = params.get("step");
+
+    if (idParam) {
+      const draft = getDraft(idParam);
+      if (draft) {
+        setDraftId(draft.id);
+        setCover(draft.cover);
+        setTrailers(draft.trailers ?? [null, null]);
+        setTitle(draft.title);
+        setSubtitle(draft.subtitle ?? "");
+        setGenres(draft.genres ?? []);
+        setSynopsis(draft.synopsis ?? "");
+        setAgeRating(draft.ageRating ?? "all");
+
+        const f = FONTS.find(x => x.id === draft.fontId) ?? FONTS[0];
+        const t = THEMES.find(x => x.id === draft.themeId) ?? THEMES[0];
+        setFont(f);
+        setTheme(t);
+        setFontSize(draft.fontSize ?? 16);
+        setTextAlign(draft.textAlign ?? "left");
+
+        if (draft.chapters?.length) setChapters(draft.chapters as Chapter[]);
+      }
+    }
+
+    if (stepParam !== null) {
+      const s = parseInt(stepParam, 10);
+      if (!isNaN(s) && s >= 0 && s <= 3) setStep(s);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* Chapter helpers */
   const updateChapter = useCallback((idx: number, ch: Chapter) => {
@@ -293,7 +333,7 @@ export default function MetinHikayesi() {
     }));
   }, []);
 
-  const handleSave = useCallback((status: "draft" | "published" = "draft") => {
+  const handleSave = useCallback((status: "draft" | "published" = "draft", showDialog = false) => {
     const saved = saveDraft({
       id:         draftId,
       type:       "metin",
@@ -313,10 +353,13 @@ export default function MetinHikayesi() {
       wordCount:  calcWordCount(chapters),
     });
     setDraftId(saved.id);
-    toast.success(
-      status === "published" ? "Yayınlandı! 🎉" : "Taslak kaydedildi 💾",
-      { description: title || "Başlıksız", duration: 2500 }
-    );
+    if (status === "published") {
+      toast.success("Yayınlandı! 🎉", { description: title || "Başlıksız", duration: 2500 });
+    } else if (showDialog) {
+      setSaveDialog(true);
+    } else {
+      toast.success("Kaydedildi 💾", { description: title || "Başlıksız", duration: 1800 });
+    }
     return saved;
   }, [draftId, title, subtitle, cover, trailers, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters]);
 
@@ -699,7 +742,7 @@ export default function MetinHikayesi() {
           <p className="text-[15px] font-black text-white tracking-tight">Metin Hikayesi</p>
           <p className="text-[10px] text-slate-500 -mt-0.5">{STEPS[step]}</p>
         </div>
-        <button type="button" onClick={() => handleSave("draft")}
+        <button type="button" onClick={() => handleSave("draft", true)}
           className="flex h-9 items-center gap-1.5 rounded-full bg-violet-500/20 px-3 text-violet-300 text-[12px] font-bold hover:bg-violet-500/30 transition-colors">
           <Save className="h-3.5 w-3.5" /> Kaydet
         </button>
@@ -731,6 +774,67 @@ export default function MetinHikayesi() {
                 İleri <ChevronRight className="inline h-4 w-4 -mt-0.5" />
               </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Kaydet diyaloğu ──────────────────────────────────────────── */}
+      {saveDialog && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-end"
+          style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)" }}
+        >
+          <div
+            className="w-full rounded-t-3xl overflow-hidden pb-10"
+            style={{ background: "#16122a", border: "1px solid rgba(255,255,255,0.1)" }}
+          >
+            {/* tutamak */}
+            <div className="mx-auto mt-3 mb-5 h-1 w-10 rounded-full bg-white/15" />
+
+            {/* İkon + mesaj */}
+            <div className="flex flex-col items-center text-center px-6 mb-6">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl mb-3"
+                style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)" }}>
+                <CheckCircle2 className="h-7 w-7 text-emerald-400" />
+              </div>
+              <p className="text-[18px] font-black text-white">Çalışmanız kaydedildi!</p>
+              {title && (
+                <p className="text-[13px] text-slate-400 mt-1">"{title}"</p>
+              )}
+            </div>
+
+            {/* Seçenekler */}
+            <div className="px-4 space-y-2">
+              <button
+                type="button"
+                onClick={() => { setSaveDialog(false); setLocation("/notebook/calismalari"); }}
+                className="w-full flex items-center gap-3 rounded-2xl px-5 py-4 border transition-all active:scale-[0.98]"
+                style={{ background: "rgba(109,40,217,0.15)", borderColor: "rgba(167,139,250,0.35)" }}
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ background: "rgba(109,40,217,0.25)" }}>
+                  <BookOpen className="h-5 w-5 text-violet-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-black text-white text-[14px]">Çalışmalarıma Git</p>
+                  <p className="text-[11px] text-slate-500">Tüm eserlerini görüntüle</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSaveDialog(false)}
+                className="w-full flex items-center gap-3 rounded-2xl px-5 py-4 border border-white/10 bg-white/4 transition-all active:scale-[0.98]"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15">
+                  <Save className="h-5 w-5 text-amber-400" />
+                </div>
+                <div className="text-left">
+                  <p className="font-black text-white text-[14px]">Yazmaya Devam Et</p>
+                  <p className="text-[11px] text-slate-500">Editöre geri dön</p>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -769,7 +873,7 @@ export default function MetinHikayesi() {
           </div>
           {/* Satır 2 — Kaydet butonu */}
           <div className="px-3 pb-5 pt-1">
-            <button type="button" onClick={() => handleSave("draft")}
+            <button type="button" onClick={() => handleSave("draft", true)}
               className="w-full flex items-center justify-center gap-2 rounded-xl bg-violet-500 py-2.5 text-[13px] font-black text-white active:scale-95 transition-all">
               <Save className="h-4 w-4" /> Kaydet
             </button>
