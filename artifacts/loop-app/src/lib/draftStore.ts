@@ -69,8 +69,16 @@ export function saveDraft(partial: Omit<Draft, "id" | "createdAt" | "updatedAt">
   const now = new Date().toISOString();
   const existing = partial.id ? all.find(d => d.id === partial.id) : undefined;
 
+  // Yayında olan kitap içerik kaydıyla asla taslağa indirilmemeli.
+  // Statüyü yalnızca publishDraft / unpublishDraft fonksiyonları değiştirir.
+  const effectiveStatus: DraftStatus =
+    existing?.status === "published" && partial.status !== "published"
+      ? "published"   // mevcut "published" korunur
+      : partial.status;
+
   const draft: Draft = {
     ...partial,
+    status: effectiveStatus,
     id: existing?.id ?? crypto.randomUUID(),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,

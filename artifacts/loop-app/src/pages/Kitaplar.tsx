@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import {
   ArrowLeft, Search, BookOpen, Clock, Hash,
@@ -89,29 +89,24 @@ function BookCard({ book }: { book: Draft }) {
 }
 
 export default function Kitaplar() {
-  const [books, setBooks] = useState<Draft[]>([]);
   const [genre, setGenre] = useState("Tümü");
   const [query, setQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  const refresh = useCallback(() => setBooks(getPublishedBooks()), []);
+  // localStorage'ı her render'da doğrudan oku — async state gecikmesi yok
+  const allBooks = getPublishedBooks();
 
-  useEffect(() => {
-    refresh();
-    // Kullanıcı başka sekmeden/sayfadan döndüğünde yenile
-    window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
-  }, [refresh]);
-
-  const filtered = books.filter(b => {
+  const filtered = allBooks.filter(b => {
     const genres = Array.isArray(b.genres) ? b.genres : [];
+    // Tür filtresi: büyük/küçük harf insensitive, null-safe
     const matchGenre =
       genre === "Tümü" ||
       genres.some(g => g.trim().toLowerCase() === genre.trim().toLowerCase());
+    // Arama filtresi: başlık, özet veya tür eşleşmesi
     const q = query.trim().toLowerCase();
     const matchQ =
       !q ||
-      (b.title ?? "").toLowerCase().includes(q) ||
+      (b.title ?? "").trim().toLowerCase().includes(q) ||
       (b.synopsis ?? "").toLowerCase().includes(q) ||
       genres.some(g => g.toLowerCase().includes(q));
     return matchGenre && matchQ;
@@ -129,7 +124,7 @@ export default function Kitaplar() {
           </Link>
           <div className="flex-1">
             <h1 className="text-[20px] font-black text-white tracking-tight">Kitaplar</h1>
-            <p className="text-[11px] text-slate-500">{books.length} eser yayında</p>
+            <p className="text-[11px] text-slate-500">{allBooks.length} eser yayında</p>
           </div>
           <button
             type="button"
@@ -185,14 +180,14 @@ export default function Kitaplar() {
               <Sparkles className="h-8 w-8 text-violet-400/50" />
             </div>
             <p className="text-[15px] font-bold text-white mb-1">
-              {books.length === 0 ? "Henüz yayında kitap yok" : "Eşleşen kitap bulunamadı"}
+              {allBooks.length === 0 ? "Henüz yayında kitap yok" : "Eşleşen kitap bulunamadı"}
             </p>
             <p className="text-[12px] text-slate-500 max-w-[220px]">
-              {books.length === 0
+              {allBooks.length === 0
                 ? "Çalışmalarım sayfasından bir kitabı yayınlayın"
                 : "Farklı bir tür veya arama deneyin"}
             </p>
-            {books.length === 0 && (
+            {allBooks.length === 0 && (
               <Link href="/notebook/calismalari">
                 <button className="mt-5 rounded-xl bg-violet-500/20 px-4 py-2.5 text-[13px] font-bold text-violet-300 border border-violet-400/30">
                   Çalışmalarıma Git
