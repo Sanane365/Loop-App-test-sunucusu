@@ -334,10 +334,16 @@ export default function MetinHikayesi() {
   }, []);
 
   const handleSave = useCallback((status: "draft" | "published" = "draft", showDialog = false) => {
+    // Yayında olan kitabı Kaydet düğmesi taslağa indirmemeli —
+    // mevcut "published" statüsü korunur; sadece "Yayınla" butonu "published" set eder.
+    const existingStatus = draftId ? (getDraft(draftId)?.status ?? "draft") : "draft";
+    const effectiveStatus: "draft" | "published" =
+      status === "published" ? "published" : existingStatus;
+
     const saved = saveDraft({
       id:         draftId,
       type:       "metin",
-      status,
+      status:     effectiveStatus,
       title,
       subtitle,
       cover,
