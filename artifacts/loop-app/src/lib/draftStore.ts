@@ -36,6 +36,10 @@ export interface Draft {
   textAlign: "left" | "center" | "right";
   chapters: DraftChapter[];
   wordCount: number;
+  /** Şeffaf bant etiketi (ör. "Breaking Point Serisi") */
+  label?: string;
+  /** Bantın kapak üzerindeki dikey konumu */
+  labelPos?: "top" | "mid" | "bottom";
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
@@ -105,6 +109,22 @@ export function publishDraft(id: string): void {
 /* Yayından Kaldır */
 export function unpublishDraft(id: string): void {
   writeAll(readAll().map(d => d.id === id ? { ...d, status: "draft", updatedAt: new Date().toISOString() } : d));
+}
+
+/* Kapak fotoğrafı ve bant etiketini güncelle */
+export function updateDraftCoverAndLabel(
+  id: string,
+  cover: string | null,
+  label: string,
+  labelPos: "top" | "mid" | "bottom",
+): void {
+  writeAll(
+    readAll().map(d =>
+      d.id === id
+        ? { ...d, cover, label: label || undefined, labelPos: label ? labelPos : undefined, updatedAt: new Date().toISOString() }
+        : d,
+    ),
+  );
 }
 
 /* Yayında olan kitapları getir */
