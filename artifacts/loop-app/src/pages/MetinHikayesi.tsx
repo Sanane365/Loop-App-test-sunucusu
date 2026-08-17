@@ -715,7 +715,7 @@ export default function MetinHikayesi() {
       {/* Yayınla butonu */}
       <button
         type="button"
-        onClick={() => { handleSave("published"); setTimeout(() => setLocation("/notebook/calismalari"), 1200); }}
+        onClick={() => { handleSave("published"); setTimeout(() => setLocation("/kitaplar"), 1200); }}
         className="w-full rounded-2xl py-4 font-black text-[15px] text-white transition-all active:scale-95"
         style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7,#7c3aed)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
       >

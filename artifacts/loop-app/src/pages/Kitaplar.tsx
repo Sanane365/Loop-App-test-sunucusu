@@ -1,14 +1,64 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   ArrowLeft, BookOpen, Clock, Hash, Sparkles, X, Search,
 } from "lucide-react";
-import { getAllDrafts, type Draft } from "@/lib/draftStore";
+
+/* ── Sabitler ──────────────────────────────────────────────────────────── */
+const STORAGE_KEY = "loop_drafts_v1";
 
 const GENRES = [
   "Tümü","Romantizm","Fantastik","Gerilim","Bilim Kurgu",
   "Tarih","Gizem","Macera","Korku","Komedi","Drama","Şiir","Deneme",
 ];
+
+/* ── Tipler (draftStore'dan bağımsız kopyası) ─────────────────────────── */
+interface Book {
+  id: string;
+  type: string;
+  status: string;
+  title: string;
+  subtitle?: string;
+  cover?: string | null;
+  genres?: string[];
+  synopsis?: string;
+  chapters?: unknown[];
+  wordCount?: number;
+  updatedAt: string;
+}
+
+/* ── Yardımcılar ─────────────────────────────────────────────────────── */
+function loadPublished(): Book[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const all: Book[] = JSON.parse(raw);
+    return all
+      .filter(d => d.status === "published")
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  } catch {
+    return [];
+  }
+}
+
+function loadDraftCount(): number {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return 0;
+    const all: Book[] = JSON.parse(raw);
+    return all.filter(d => d.status !== "published").length;
+  } catch {
+    return 0;
+  }
+}
+
+/** Türkçe karakterleri de kapsayan küçük harf normalize */
+function norm(s: string): string {
+  return (s ?? "")
+    .toLocaleLowerCase("tr-TR")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -18,7 +68,8 @@ function timeAgo(iso: string) {
   return `${Math.floor(s / 86400)}g`;
 }
 
-function BookCard({ book }: { book: Draft }) {
+/* ── Kitap kartı ──────────────────────────────────────────────────────── */
+function BookCard({ book }: { book: Book }) {
   const [, setLocation] = useLocation();
   return (
     <button
@@ -52,7 +103,7 @@ function BookCard({ book }: { book: Draft }) {
         )}
         <div className="mt-2 flex items-center gap-3 text-[10px] text-slate-500">
           <span className="flex items-center gap-1">
-            <BookOpen className="h-2.5 w-2.5" />{book.chapters?.length ?? 0} bölüm
+            <BookOpen className="h-2.5 w-2.5" />{(book.chapters as unknown[])?.length ?? 0} bölüm
           </span>
           <span className="flex items-center gap-1">
             <Hash className="h-2.5 w-2.5" />{(book.wordCount ?? 0).toLocaleString("tr")} kelime
@@ -66,34 +117,48 @@ function BookCard({ book }: { book: Draft }) {
   );
 }
 
+/* ── Ana bileşen ──────────────────────────────────────────────────────── */
 export default function Kitaplar() {
-  const [genre, setGenre] = useState("Tümü");
-  const [query, setQuery] = useState("");
+  const [genre, setGenre]   = useState("Tümü");
+  const [query, setQuery]   = useState("");
+  // tick: her mount ve her storage değişiminde bileşeni yeniden render eder
+  const [tick, setTick]     = useState(0);
 
-  /* ── Veri: tüm taslakları oku, yayındakileri filtrele ── */
-  // getAllDrafts() her render'da doğrudan localStorage'ı okur
-  const allDrafts     = getAllDrafts();
-  const publishedBooks = allDrafts.filter(d => d.status === "published");
-  const draftCount    = allDrafts.filter(d => d.status !== "published").length;
+  /* Mount'ta ve "focus" ile "storage" eventlerinde localStorage'ı yenile */
+  useEffect(() => {
+    const refresh = () => setTick(t => t + 1);
+    window.addEventListener("focus",   refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("focus",   refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
 
-  /* ── Filtre ── */
-  const q = query.trim().toLowerCase();
+  /* ── Veri: her render'da localStorage'ı doğrudan oku ── */
+  // tick bağımlılığı olmasa da React, state değişince zaten re-render eder.
+  // loadPublished() saf fonksiyon, localStorage'dan okuyor.
+  void tick; // tick'i "kullandım" sayılsın
+  const published  = loadPublished();
+  const draftCount = loadDraftCount();
 
-  const filtered = publishedBooks.filter(b => {
+  /* ── Arama + Tür filtresi ── */
+  const q = norm(query);
+
+  const filtered = published.filter(b => {
     const genres = Array.isArray(b.genres) ? b.genres : [];
 
-    // Arama sorgusunun aktif olduğu durumda TÜR FİLTRESİNİ ATLA —
-    // kullanıcı kitap adını yazarken aktif genre chip engel çıkarmamalı.
+    // Arama aktifken tür filtresi devre dışı
     const matchGenre = q
       ? true
-      : genre === "Tümü" || genres.some(g => g.toLowerCase() === genre.toLowerCase());
+      : genre === "Tümü" || genres.some(g => norm(g) === norm(genre));
 
     const matchQ =
       !q ||
-      (b.title  ?? "").toLowerCase().includes(q) ||
-      (b.subtitle ?? "").toLowerCase().includes(q) ||
-      (b.synopsis ?? "").toLowerCase().includes(q) ||
-      genres.some(g => g.toLowerCase().includes(q));
+      norm(b.title).includes(q)    ||
+      norm(b.subtitle ?? "").includes(q) ||
+      norm(b.synopsis ?? "").includes(q) ||
+      genres.some(g => norm(g).includes(q));
 
     return matchGenre && matchQ;
   });
@@ -113,7 +178,7 @@ export default function Kitaplar() {
           </Link>
           <div className="flex-1">
             <h1 className="text-[20px] font-black text-white tracking-tight">Kitaplar</h1>
-            <p className="text-[11px] text-slate-500">{publishedBooks.length} eser yayında</p>
+            <p className="text-[11px] text-slate-500">{published.length} eser yayında</p>
           </div>
         </div>
 
@@ -133,15 +198,15 @@ export default function Kitaplar() {
           )}
         </div>
 
-        {/* Tür chip'leri — arama aktifken soluk göster */}
+        {/* Tür chip'leri */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4" style={{ scrollbarWidth: "none" }}>
           {GENRES.map(g => (
             <button
               key={g}
               type="button"
-              onClick={() => setGenre(g)}
+              onClick={() => { setGenre(g); setQuery(""); }}
               className={`shrink-0 rounded-full px-3 py-1.5 text-[12px] font-bold border transition-all ${
-                genre === g && !q
+                genre === g
                   ? "bg-violet-500 border-violet-400 text-white"
                   : "bg-white/5 border-white/10 text-slate-400 hover:border-violet-400/30"
               } ${q ? "opacity-40" : ""}`}
@@ -149,7 +214,6 @@ export default function Kitaplar() {
           ))}
         </div>
 
-        {/* Arama aktifken bilgi etiketi */}
         {q && (
           <p className="text-[11px] text-violet-400/80 px-1">
             Tüm kategorilerde "{query}" aranıyor
@@ -160,11 +224,11 @@ export default function Kitaplar() {
       {/* ── Liste ── */}
       <div className="flex-1 overflow-y-auto px-4 pb-24">
 
-        {/* Hiç yayın yok ama taslak var → yol göster */}
-        {publishedBooks.length === 0 && draftCount > 0 && (
+        {/* Taslak var ama hiçbiri yayında değil */}
+        {published.length === 0 && draftCount > 0 && (
           <div className="mt-4 mb-2 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-4 py-3">
             <p className="text-[12px] font-bold text-amber-300">
-              {draftCount} taslak var, hiçbiri henüz yayında değil
+              {draftCount} taslak var, hiçbiri yayında değil
             </p>
             <p className="mt-0.5 text-[11px] text-amber-400/70">
               Çalışmalarım → ⋯ → Yayınla yaparak kitabını buraya ekle
@@ -179,23 +243,23 @@ export default function Kitaplar() {
               <Sparkles className="h-8 w-8 text-violet-400/50" />
             </div>
             <p className="text-[15px] font-bold text-white mb-1">
-              {publishedBooks.length === 0 ? "Henüz yayında kitap yok" : "Eşleşen kitap bulunamadı"}
+              {published.length === 0 ? "Henüz yayında kitap yok" : "Eşleşen kitap bulunamadı"}
             </p>
             <p className="text-[12px] text-slate-500 max-w-[230px]">
-              {publishedBooks.length === 0
+              {published.length === 0
                 ? "Çalışmalarım sayfasından bir kitabı yayınlayın"
                 : q
                   ? `"${query}" ile eşleşen yayında kitap yok`
                   : "Farklı bir tür deneyin"}
             </p>
-            {publishedBooks.length === 0 && (
+            {published.length === 0 && (
               <Link href="/notebook/calismalari">
                 <button className="mt-5 rounded-xl bg-violet-500/20 px-4 py-2.5 text-[13px] font-bold text-violet-300 border border-violet-400/30">
                   Çalışmalarıma Git
                 </button>
               </Link>
             )}
-            {publishedBooks.length > 0 && q && (
+            {published.length > 0 && q && (
               <button
                 type="button"
                 onClick={() => setQuery("")}

@@ -286,9 +286,11 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onUnpublish, onRefresh,
 
   const handlePublish = () => {
     onPublish(draft.id);
-    toast.success("Yayınlandı! 🎉");
+    toast.success("Yayınlandı! 🎉 Kitaplara eklendi.");
     onClose();
     onRefresh();
+    // Yayınlanan kitabı hemen göster
+    setTimeout(() => go("/kitaplar"), 900);
   };
 
   const handleUnpublish = () => {
