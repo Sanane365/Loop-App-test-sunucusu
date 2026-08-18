@@ -1498,16 +1498,7 @@ export default function WriteBook() {
 
           <section className="writebook-columns grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
-                <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 mb-6 sm:mb-8">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-violet-600 font-semibold">📚 Kitaplık Öne Çıkan</p>
-                  <h2 className="mt-2 text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900">Okuma ve yazma akışın</h2>
-                </div>
-                <button className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 px-5 py-2 text-sm font-semibold text-white transition shadow-lg hover:shadow-xl">
-                  Tüm koleksiyonu gör
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              </div>
+              <div className="mb-6 sm:mb-8">
 
               <div className="writebook-columns grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
                 <article className="writebook-panel rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-[0_25px_90px_rgba(15,23,42,0.3)] border border-white/10 hover:border-white/20 transition">
