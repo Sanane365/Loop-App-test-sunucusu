@@ -973,36 +973,62 @@ export default function WriteBook() {
                   </div>
                 </div>
 
-                {/* ── Trailer strip ────────────────────────────────────────── */}
+                {/* ── Trailer strip (video varsa) / Kapak sinema strip (yoksa) ── */}
                 <div
                   className="mt-3 grid grid-cols-3 gap-2 px-4"
                   style={{ touchAction: "pan-y" }}
                   onPointerDown={e => e.stopPropagation()}
                   onTouchStart={e => e.stopPropagation()}
                 >
-                  {premium.trailers.map((trailer, ti) => {
-                    const isActive = ti === activeTrailerIndex;
-                    return (
-                      <button
-                        key={`${premium.title}-${ti}`}
-                        type="button"
-                        aria-label={`${premium.title} fragman ${ti + 1}`}
-                        onClick={() => setActiveTrailerIndex(ti)}
-                        className={`group/tr relative overflow-hidden rounded-xl border transition-all duration-500 ${isActive ? "col-span-2 border-amber-300/65 shadow-[0_0_22px_rgba(251,191,36,0.18)]" : "border-white/10 opacity-50 hover:opacity-75"}`}
-                        style={{ height: isActive ? 96 : 56 }}
-                      >
-                        {isActive
-                          ? <video key={`${premium.title}-v${ti}`} src={trailer} className="h-full w-full object-cover" muted autoPlay playsInline loop={premium.trailers.length === 1} onEnded={() => premium.trailers.length > 1 && setActiveTrailerIndex((ti + 1) % premium.trailers.length)} />
-                          : <img src={premium.cover} alt="" className="h-full w-full object-cover transition duration-500 group-hover/tr:scale-110" />
-                        }
-                        <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                        {isActive
-                          ? <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[9px] font-bold text-amber-200"><Play className="h-2.5 w-2.5 fill-current" /> Oynuyor</span>
-                          : <span className="absolute bottom-1.5 left-2 text-[9px] font-bold text-white/60 opacity-0 transition group-hover/tr:opacity-100">Fragman {ti + 1}</span>
-                        }
-                      </button>
-                    );
-                  })}
+                  {premium.trailers.length > 0 ? (
+                    premium.trailers.map((trailer, ti) => {
+                      const isActive = ti === activeTrailerIndex;
+                      return (
+                        <button
+                          key={`${premium.title}-${ti}`}
+                          type="button"
+                          aria-label={`${premium.title} fragman ${ti + 1}`}
+                          onClick={() => setActiveTrailerIndex(ti)}
+                          className={`group/tr relative overflow-hidden rounded-xl border transition-all duration-500 ${isActive ? "col-span-2 border-amber-300/65 shadow-[0_0_22px_rgba(251,191,36,0.18)]" : "border-white/10 opacity-50 hover:opacity-75"}`}
+                          style={{ height: isActive ? 96 : 56 }}
+                        >
+                          {isActive
+                            ? <video key={`${premium.title}-v${ti}`} src={trailer} className="h-full w-full object-cover" muted autoPlay playsInline loop={premium.trailers.length === 1} onEnded={() => premium.trailers.length > 1 && setActiveTrailerIndex((ti + 1) % premium.trailers.length)} />
+                            : <img src={premium.cover} alt="" className="h-full w-full object-cover transition duration-500 group-hover/tr:scale-110" />
+                          }
+                          <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                          {isActive
+                            ? <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[9px] font-bold text-amber-200"><Play className="h-2.5 w-2.5 fill-current" /> Oynuyor</span>
+                            : <span className="absolute bottom-1.5 left-2 text-[9px] font-bold text-white/60 opacity-0 transition group-hover/tr:opacity-100">Fragman {ti + 1}</span>
+                          }
+                        </button>
+                      );
+                    })
+                  ) : premium.cover ? (
+                    // Kapak görselini 3 sinematik panele böl
+                    <>
+                      {/* Panel 1 — geniş, aktif görünüm */}
+                      <div className="col-span-2 relative overflow-hidden rounded-xl border border-amber-300/40 shadow-[0_0_18px_rgba(251,191,36,0.12)]" style={{ height: 96 }}>
+                        <img src={premium.cover} alt={premium.title} className="h-full w-full object-cover" style={{ objectPosition: "center 20%" }} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                        <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[9px] font-bold text-amber-200">
+                          <BookOpen className="h-2.5 w-2.5" /> Kapak
+                        </span>
+                      </div>
+                      {/* Panel 2 — dar, farklı pozisyon */}
+                      <div className="relative overflow-hidden rounded-xl border border-white/10 opacity-55" style={{ height: 56 }}>
+                        <img src={premium.cover} alt="" aria-hidden className="h-full w-full object-cover scale-110" style={{ objectPosition: "center 60%" }} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <span className="absolute bottom-1 left-1.5 text-[8px] font-semibold text-white/50">Detay</span>
+                      </div>
+                      {/* Panel 3 — dar, sol kendar */}
+                      <div className="relative overflow-hidden rounded-xl border border-white/10 opacity-40" style={{ height: 56 }}>
+                        <img src={premium.cover} alt="" aria-hidden className="h-full w-full object-cover scale-125" style={{ objectPosition: "left 40%" }} />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <span className="absolute bottom-1 left-1.5 text-[8px] font-semibold text-white/40">Arka</span>
+                      </div>
+                    </>
+                  ) : null}
                 </div>
 
                 {/* ── Book thumbnail nav (kapak görselleriyle) ─────────────── */}
