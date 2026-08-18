@@ -12,6 +12,7 @@ import {
   updateDraftCoverAndLabel,
   type Draft,
 } from "@/lib/draftStore";
+import { useAuth } from "@/lib/auth";
 
 /* ── Yardımcılar ─────────────────────────────────────────────────────── */
 function timeAgo(iso: string) {
@@ -562,6 +563,8 @@ export default function Calismalari() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery]   = useState("");
   const [showSearch, setShowSearch] = useState(false);
+  const { user } = useAuth();
+  const isPremiumUser = user?.role === "admin";
 
   const load = useCallback(() => setDrafts(getAllDrafts()), []);
   useEffect(() => { load(); }, [load]);
@@ -660,7 +663,7 @@ export default function Calismalari() {
               key={d.id}
               draft={d}
               onDelete={id => { deleteDraft(id); }}
-              onPublish={id => { publishDraft(id); }}
+              onPublish={id => { publishDraft(id, isPremiumUser); }}
               onUnpublish={id => { unpublishDraft(id); }}
               onRefresh={load}
             />

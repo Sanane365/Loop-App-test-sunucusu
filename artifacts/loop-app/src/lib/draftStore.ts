@@ -40,6 +40,8 @@ export interface Draft {
   label?: string;
   /** Bantın kapak üzerindeki dikey konumu */
   labelPos?: "top" | "mid" | "bottom";
+  /** Yazar admin/premium rolüne sahipse true — "Premium Yazarlardan" bölümünde gösterilir */
+  isPremiumAuthor?: boolean;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
@@ -109,9 +111,13 @@ export function deleteDraft(id: string): void {
   writeAll(readAll().filter(d => d.id !== id));
 }
 
-/* Yayınla */
-export function publishDraft(id: string): void {
-  writeAll(readAll().map(d => d.id === id ? { ...d, status: "published", updatedAt: new Date().toISOString() } : d));
+/* Yayınla — isPremiumAuthor: yazar admin/premium ise true */
+export function publishDraft(id: string, isPremiumAuthor?: boolean): void {
+  writeAll(readAll().map(d =>
+    d.id === id
+      ? { ...d, status: "published", isPremiumAuthor: isPremiumAuthor ?? d.isPremiumAuthor ?? false, updatedAt: new Date().toISOString() }
+      : d
+  ));
 }
 
 /* Yayından Kaldır */

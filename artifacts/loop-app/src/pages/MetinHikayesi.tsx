@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { saveDraft, calcWordCount, getDraft } from "@/lib/draftStore";
+import { useAuth } from "@/lib/auth";
 
 /* ── Sabitler ────────────────────────────────────────────────────────── */
 const GENRES = [
@@ -244,6 +245,8 @@ export default function MetinHikayesi() {
   const [, setLocation] = useLocation();
   const search = useSearch();
   const [step, setStep] = useState(0);
+  const { user } = useAuth();
+  const isPremiumUser = user?.role === "admin";
 
   /* Adım 1 — Kapak & Bilgi */
   const [cover,      setCover]      = useState<string | null>(null);
@@ -357,6 +360,8 @@ export default function MetinHikayesi() {
       textAlign,
       chapters,
       wordCount:  calcWordCount(chapters),
+      // Admin kullanıcılar premium yazar sayılır — kitap premium yazarlar bölümünde gösterilir
+      ...(effectiveStatus === "published" && { isPremiumAuthor: isPremiumUser }),
     });
     setDraftId(saved.id);
     if (status === "published") {
@@ -367,7 +372,7 @@ export default function MetinHikayesi() {
       toast.success("Kaydedildi 💾", { description: title || "Başlıksız", duration: 1800 });
     }
     return saved;
-  }, [draftId, title, subtitle, cover, trailers, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters]);
+  }, [draftId, title, subtitle, cover, trailers, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters, isPremiumUser]);
 
   /* ── ADIM 1: Kapak & Bilgi ─────────────────────────────────────────── */
   const renderStep0 = () => (
