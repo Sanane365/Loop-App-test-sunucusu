@@ -1579,115 +1579,11 @@ export default function WriteBook() {
                     </div>
                   </div>
 
-                  <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
-                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-sky-600 font-semibold">🏷️ Kategoriler</p>
-                    <h3 className="mt-2 text-base sm:text-lg lg:text-xl font-bold text-slate-900">Türlere göre</h3>
-                    <div className="mt-4 sm:mt-6 grid gap-2 sm:gap-3">
-                      {Object.entries(_genreCount).length === 0 ? (
-                        <p className="text-sm text-slate-400 text-center py-4">Henüz yayınlanan kitap yok</p>
-                      ) : (
-                        Object.entries(_genreCount)
-                          .sort(([, a], [, b]) => b - a)
-                          .slice(0, 4)
-                          .map(([genre, count]) => (
-                            <Link key={genre} href={`/kitaplar`}>
-                              <button className="w-full rounded-[1.25rem] sm:rounded-[1.5rem] border border-sky-200/50 bg-gradient-to-r from-sky-50/80 to-slate-50/80 hover:from-sky-100/80 hover:to-slate-50/80 px-3 sm:px-5 py-3 sm:py-4 transition duration-300 hover:shadow-md hover:border-sky-300 text-left group">
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-bold text-slate-900 group-hover:text-sky-700 truncate">{genre}</p>
-                                    <p className="mt-0.5 sm:mt-1 text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">📚 {count} kitap</p>
-                                  </div>
-                                  <div className="text-lg sm:text-xl flex-shrink-0 group-hover:translate-x-1 transition">→</div>
-                                </div>
-                              </button>
-                            </Link>
-                          ))
-                      )}
-                    </div>
-                  </div>
                 </div>
               </div>
             </section>
 
             <aside className="writebook-panel space-y-6">
-              <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
-                <div className="flex items-center justify-between gap-2 sm:gap-4">
-                  <div>
-                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-violet-600 font-semibold">🔍 Arama</p>
-                    <h3 className="mt-2 text-base sm:text-lg font-bold text-slate-900">Kitap veya bölüm ara</h3>
-                  </div>
-                </div>
-                <div className="mt-4 sm:mt-6 flex items-center gap-2 sm:gap-3 rounded-[1.25rem] sm:rounded-[1.5rem] border-2 border-violet-200 bg-gradient-to-r from-violet-50 to-slate-50 px-3 sm:px-4 py-2.5 sm:py-3 focus-within:border-violet-400 transition">
-                  <Search className="h-4 sm:h-5 w-4 sm:w-5 text-violet-500 flex-shrink-0" />
-                  <input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="w-full bg-transparent text-xs sm:text-sm text-slate-900 outline-none placeholder:text-slate-400 font-medium"
-                    placeholder="Kitap, yazar veya anahtar kelime..."
-                  />
-                </div>
-                <div className="mt-4 sm:mt-5 flex flex-wrap gap-1.5 sm:gap-2">
-                  {['Roman', 'Polisiye', 'Fantastik', 'Kişisel Gelişim'].map((tag) => (
-                    <button key={tag} type="button" onClick={() => setSearchQuery(tag)} aria-pressed={searchQuery === tag} className="rounded-full border-2 border-violet-200 bg-gradient-to-r from-violet-50 to-slate-50 hover:from-violet-100 hover:to-slate-50 px-3 sm:px-4 py-1.5 sm:py-2 text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] sm:tracking-[0.3em] text-violet-700 transition hover:shadow-md hover:border-violet-300 whitespace-nowrap">
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-slate-500 font-semibold">Arama modu</p>
-                      <p className="mt-1 text-sm text-slate-700">Bu bölüm sadece Kitaplar sayfasına özel arama sunar.</p>
-                    </div>
-                    <div className="inline-flex rounded-full border border-slate-200 bg-slate-100 p-1">
-                      <button type="button" onClick={() => setSearchMode("books")} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${searchMode === "books" ? "bg-violet-700 text-white shadow" : "text-slate-700 hover:bg-slate-200"}`}>Kitap</button>
-                      <button type="button" onClick={() => setSearchMode("users")} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${searchMode === "users" ? "bg-violet-700 text-white shadow" : "text-slate-700 hover:bg-slate-200"}`}>Yazar</button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-[1.5rem] bg-slate-50 p-3 sm:p-4">
-                    {searchQuery ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-semibold text-slate-900">{searchMode === "books" ? "Kitap sonuçları" : "Yazar sonuçları"}</p>
-                          <span className="text-xs uppercase tracking-[0.25em] text-slate-500">{searchMode === "books" ? `${filteredCollection.length} adet` : `${filteredUsers.length} adet`}</span>
-                        </div>
-
-                        {searchMode === "books" ? (
-                          filteredCollection.slice(0, 4).map((book) => (
-                            <div key={book.title} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-                              <img src={book.cover} alt={book.title} className="h-14 w-12 rounded-lg object-cover" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 truncate">{book.title}</p>
-                                <p className="text-xs text-slate-500">{book.author} · {book.genre}</p>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          filteredUsers.slice(0, 4).map((user) => (
-                            <div key={user.name} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-                              <img src={user.avatar} alt={user.name} className="h-14 w-14 rounded-full object-cover" />
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-900 truncate">{user.name}</p>
-                                <p className="text-xs text-slate-500">{user.role} · {user.genre}</p>
-                                <p className="mt-1 text-[11px] text-slate-500">{user.followers} takipçi · {user.city}</p>
-                              </div>
-                            </div>
-                          ))
-                        )}
-
-                        {(searchMode === "books" ? filteredCollection : filteredUsers).length === 0 && (
-                          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-100 p-4 text-center text-sm text-slate-600">Aradığınız kriterlere uygun sonuç bulunamadı.</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-600">Kitap ya da yazar adı girerek burada özel arama sonuçlarını görebilirsin.</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
               <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-violet-700 to-sky-600 p-4 sm:p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
                 <div className="flex items-center justify-between gap-2 sm:gap-4">
                   <div>
@@ -1736,50 +1632,6 @@ export default function WriteBook() {
             </aside>
           </main>
 
-          <section className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-white p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-slate-500 font-semibold">📖 Kitap Koleksiyonu</p>
-                <h2 className="mt-2 text-lg sm:text-2xl font-bold text-slate-900">Loop Kitaplık vitrini</h2>
-              </div>
-              <button className="inline-flex items-center gap-2 rounded-full bg-slate-900 hover:bg-slate-800 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-white transition shadow-md hover:shadow-lg">
-                Düzenle
-                <ArrowRight className="h-3.5 sm:h-4 w-3.5 sm:w-4" />
-              </button>
-            </div>
-            <div className="mt-4 sm:mt-6 flex flex-wrap gap-3 sm:gap-4 justify-start items-end overflow-x-auto pb-2">
-              {filteredCollection.map((book) => (
-                <article key={book.title} className="relative group h-56 w-36 sm:h-64 sm:w-40 lg:h-72 lg:w-48 cursor-pointer perspective transition-transform duration-300 hover:scale-105 flex-shrink-0">
-                  <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(15,23,42,0.16)] transition-shadow duration-300 group-hover:shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
-                    <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                    <div className="absolute inset-y-0 -right-2 w-6 bg-gradient-to-r from-slate-900/30 to-slate-950/50 rounded-r-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 sm:p-4 flex flex-col justify-between">
-                      <div>
-                        <span className="inline-flex rounded-full bg-violet-500/80 px-2 sm:px-3 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.2em] sm:tracking-[0.35em] text-white backdrop-blur-sm">{book.genre}</span>
-                      </div>
-                      <div className="space-y-2 sm:space-y-3">
-                        <div>
-                          <h4 className="text-sm sm:text-lg font-bold text-white line-clamp-2">{book.title}</h4>
-                          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-200">{book.author}</p>
-                        </div>
-                        <button className="w-full rounded-lg bg-violet-600 hover:bg-violet-700 px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-semibold text-white transition">İncele</button>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="mt-2 sm:mt-3 text-center px-1">
-                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 group-hover:text-violet-700 transition">{book.title}</h5>
-                    <p className="text-xs text-slate-500 mt-0.5 sm:mt-1 line-clamp-1">{book.author}</p>
-                  </div>
-                </article>
-              ))}
-              {filteredCollection.length === 0 && (
-                <div className="w-full rounded-[1.5rem] border border-dashed border-violet-200 bg-violet-50/50 px-6 py-10 text-center">
-                  <p className="font-semibold text-slate-900">Eşleşen kitap bulunamadı.</p>
-                  <button type="button" onClick={() => setSearchQuery("")} className="mt-3 text-sm font-semibold text-violet-700 hover:text-violet-900">Aramayı temizle</button>
-                </div>
-              )}
-            </div>
-          </section>
         </div>
         </div>
       )}
