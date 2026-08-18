@@ -1,8 +1,9 @@
 import { AppLayout } from "@/components/layout/AppLayout";
-import { ArrowRight, BookOpen, Bookmark, ChevronDown, ChevronUp, Eye, Globe2, Heart, Home, MapPin, MoreVertical, Pen, Search, Sparkles, Star, UserPlus, Users, X } from "lucide-react";
+import { ArrowRight, BookOpen, Bookmark, ChevronDown, ChevronUp, Eye, Globe2, Heart, Home, Images, MapPin, MoreVertical, Pen, Play, Search, Sparkles, Star, UserPlus, Users, X } from "lucide-react";
 import { useState } from "react";
 import { useEffect, useRef } from "react";
 import { useSearch, Link } from "wouter";
+import { useListPosts, getListPostsQueryKey } from "@workspace/api-client-react";
 import { PostCard } from "@/components/shared/PostCard";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -38,6 +39,29 @@ const launchPipeline: LaunchPipelineItem[] = [
   { title: "OK okunma listesi", description: "Okuyucu notlarını toparla ve yeni öneriler ekle.", status: "Hazır" },
 ];
 
+const featuredBooks = [
+  {
+    title: "Derin Mesafe",
+    author: "Uygar Y.",
+    category: "Genç Yetişkin",
+    progress: 78,
+    cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Sessiz Sayfalar",
+    author: "Maya T.",
+    category: "Polisiye",
+    progress: 45,
+    cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Yıldızların Altında",
+    author: "Ege A.",
+    category: "Fantastik",
+    progress: 92,
+    cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
 const rankings = [
   { rank: 1, title: "Beklenen Kaos", reads: "4.8K" },
@@ -52,10 +76,58 @@ const libraryCategories = [
   { name: "Kişisel Gelişim", count: 9 },
 ];
 
+const formaliteBooks = [
+  {
+    title: "Formalite: Ritmik Akış",
+    author: "Loop Koleksiyonu",
+    progress: 54,
+    cover: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Formalite: Gece Defteri",
+    author: "Loop Koleksiyonu",
+    progress: 37,
+    cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
+const inspirationBooks = [
+  { title: "Klasik Kurallar", cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=900&q=80" },
+  { title: "Mektup ve Mühür", cover: "https://images.unsplash.com/photo-1528209396504-5f31f70ca3b2?auto=format&fit=crop&w=900&q=80" },
+  { title: "Sessiz Sayfalar", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80" },
+];
 
+const featuredStories = [
+  { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80", description: "Eylül Çetiner kanser olduğunu öğrendiği gün ilk aşkı ile karşılaşır. Çağan Demirsoy kim olduğunu Eylül'den gizlemiş yıllar sonra birden ortaya çıkar...", reads: "12.8K", likes: "161", rating: "5.0" },
+  { title: "Derin Mesafe", author: "Uygar Y.", genre: "Genç Yetişkin", cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=700&q=80", description: "Hayata tutunduğu sıkı ipleri bir bir elinden kaçırmaya başlayan Uygar'ın, Peri ile karşılaşmasıyla başlar her şey...", reads: "26.4K", likes: "228", rating: "5.0" },
+  { title: "Son Perde", author: "Lina K.", genre: "Dram", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80", description: "Bir sahnenin son ışığı sönerken geçmişin sakladığı hikâye yeniden ortaya çıkar.", reads: "18.2K", likes: "184", rating: "4.8" },
+  { title: "Kayıp Harita", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=700&q=80", description: "Eski bir harita, hiç bilmediği bir şehre ve unutulmuş bir sırrın merkezine götürür.", reads: "14.7K", likes: "163", rating: "4.9" },
+  { title: "Ay Işığı Notları", author: "Mina E.", genre: "Romantik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80", description: "Her gece yazılan kısa notlar, iki yabancının birbirine yaklaşan sesine dönüşür.", reads: "12.8K", likes: "149", rating: "4.7" },
+  { title: "Sessiz Oda", author: "Can D.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80", description: "Kapısı yıllardır açılmayan bir oda, evin tüm sessizliğini üzerine toplamıştır.", reads: "10.6K", likes: "121", rating: "4.6" },
+  { title: "Gökyüzü Çizgisi", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", description: "Gökyüzünde beliren ince çizgi, yeni bir dünyanın kapısını aralar.", reads: "9.8K", likes: "108", rating: "4.8" },
+];
 
+const premiumBooks = [
+  { title: "Karma", author: "Nairobi", authorAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80", label: "Premium Yazar", description: "İki dünyanın arasında sıkışmış hayatlar... Farklı acılar, farklı seçimler, farklı kaderler.", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=70", genre: "Dram · Gizem", rank: "#01", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4"], media: ["https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=900&q=85"] },
+  { title: "Mekanik Kalp", author: "Arman Berra", authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80", label: "Loop Black Label", description: "İnsan olmakla programlanmış olmak arasındaki son çizgiye yaklaşırken.", cover: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=70", genre: "Bilim Kurgu", rank: "#02", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4"], media: ["https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=85"] },
+  { title: "Beyaz Yıldız Dağı", author: "Yume", authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80", label: "Altın Seçki", description: "Karın altında saklanan eski bir kehanet, dört yolcuyu aynı zirvede buluşturur.", cover: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=70", genre: "Fantastik · Macera", rank: "#03", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4"], media: ["https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=900&q=85"] },
+];
 
+const recommendedBooks = [
+  { title: "Sessiz Sayfalar", author: "Maya T.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", progress: "92%" },
+  { title: "Yıldızların Altında", author: "Ege A.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80", progress: "78%" },
+  { title: "Kayıp Şehirler", author: "Derya N.", genre: "Macera", cover: "https://images.unsplash.com/photo-1470115636492-6d2b56f1d284?auto=format&fit=crop&w=700&q=80", progress: "64%" },
+  { title: "Sırra Davet", author: "Deniz K.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=700&q=80", progress: "51%" },
+  { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", progress: "43%" },
+];
+
+const trendingBooks = [
+  { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80", reads: "12.8K" },
+  { title: "Derin Mesafe", author: "Uygar Y.", genre: "Genç Yetişkin", cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=700&q=80", reads: "26.4K" },
+  { title: "Gökyüzü Çizgisi", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", reads: "9.8K" },
+  { title: "Kayıp Harita", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=700&q=80", reads: "14.7K" },
+  { title: "Sessiz Oda", author: "Can D.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80", reads: "10.6K" },
+];
 
 const featuredAuthors = [
   { name: "Hülya_Aslıkc", role: "Yerel yazar", bio: "Gözle görülmeyeni kalemle çiziyorum. Yarım kalan kitapların ve yeni başlangıçların yazarı.", genre: "Romantizm", stories: "10", followers: "9.1K", city: "İstanbul", accent: "from-fuchsia-950 via-slate-900 to-cyan-950", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80" },
@@ -72,10 +144,112 @@ const loopUniverses = [
   { title: "Başka Bir Gökyüzü", description: "Kuralların değiştiği, yıldızların yol gösterdiği ve hayal gücünün sınır tanımadığı dünya.", mood: "Fantastik · Sonsuz", stories: "76 öykü", color: "from-violet-950 via-slate-900 to-fuchsia-950", author: "Ece Y.", authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80", cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=900&q=85", gallery: ["https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=700&q=80", "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=700&q=80"] },
 ];
 
+const shelfRows = [
+  {
+    title: "Yeni Çıkanlar",
+    subtitle: "Daha yeni keşfedilmeye başlayan hikâyeler",
+    books: [
+      { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80" },
+      { title: "Geceye Kalanlar", author: "Hülya_Aslıkc", genre: "Gizem", cover: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kayıp Haritalar", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=700&q=80" },
+      { title: "Son Perde", author: "Lina K.", genre: "Dram", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Aksiyon",
+    subtitle: "Temposu yüksek, sınırları zorlayan dünyalar",
+    books: [
+      { title: "Çelik Yemin", author: "Mert A.", genre: "Aksiyon", cover: "https://images.unsplash.com/photo-1533130061792-64b345e4a833?auto=format&fit=crop&w=700&q=80" },
+      { title: "Son Siper", author: "Kerem D.", genre: "Macera", cover: "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=700&q=80" },
+      { title: "Karanlık Rota", author: "Bora K.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kuzey Hattı", author: "Selin E.", genre: "Aksiyon", cover: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Korku",
+    subtitle: "Gece okumayı sevenler için karanlık hikâyeler",
+    books: [
+      { title: "Sessiz Oda", author: "Can D.", genre: "Korku", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80" },
+      { title: "Fısıltı", author: "Nehir T.", genre: "Korku", cover: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?auto=format&fit=crop&w=700&q=80" },
+      { title: "Uyumayan Ev", author: "Duru P.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1505843513577-22bb7d21e455?auto=format&fit=crop&w=700&q=80" },
+      { title: "Karanlıkta Üç Ses", author: "Ali V.", genre: "Korku", cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Romantizm",
+    subtitle: "Kalbe dokunan karşılaşmalar ve ikinci şanslar",
+    books: [
+      { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kalbin Kıyısı", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=700&q=80" },
+      { title: "Ay Işığı Notları", author: "Mina E.", genre: "Romantik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
+      { title: "Eski Bir Mektup", author: "Lina K.", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Fantastik",
+    subtitle: "Başka dünyalara açılan büyülü kapılar",
+    books: [
+      { title: "Başka Bir Gökyüzü", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=700&q=80" },
+      { title: "Yıldızların Altında", author: "Ege A.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
+      { title: "Gölgeler Ülkesi", author: "Sena R.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Polisiye",
+    subtitle: "İpuçlarını takip et, gerçeği herkesten önce bul",
+    books: [
+      { title: "Sessiz Sayfalar", author: "Maya T.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
+      { title: "Sırra Davet", author: "Deniz K.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kayıp Dosya", author: "Bora K.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&w=700&q=80" },
+      { title: "Son Tanık", author: "Duru P.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+  {
+    title: "Bilim Kurgu",
+    subtitle: "Geleceğin şehirleri ve bilinmeyen olasılıklar",
+    books: [
+      { title: "Mekanik Kalp", author: "Arman B.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=700&q=80" },
+      { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
+      { title: "Yörünge", author: "Mert A.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?auto=format&fit=crop&w=700&q=80" },
+      { title: "Dünya 2.0", author: "Selin E.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=700&q=80" },
+    ],
+  },
+];
 
+const continuingBooks = [
+  { title: "Bir Kamp Gecesi +18", description: "Biz, dokuz kişilik bir arkadaş grubuyduk. Dokuz masum can, dokuz günahsız kul... Biz bu sonu hak etmemiştik.", chapters: "36 Bölümler", status: "TAMAMLANDI", rank: "#11 içinde Macera", covers: ["https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=500&q=80"] },
+  { title: "Derin Mesafe", description: "Bazı mesafeler kilometreyle değil, söylenmemiş cümlelerle ölçülür.", chapters: "8 Bölüm", status: "DEVAM EDİYOR", rank: "#14 içinde Genç Yetişkin", covers: ["https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=500&q=80"] },
+];
 
 const loopUniversesFull = loopUniverses;
 
+const libraryCollection = [
+  {
+    title: "Kayıp Şehirler",
+    author: "Derya N.",
+    genre: "Macera",
+    cover: "https://images.unsplash.com/photo-1470115636492-6d2b56f1d284?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Sırra Davet",
+    author: "Deniz K.",
+    genre: "Gerilim",
+    cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Kırık Zaman",
+    author: "Elif M.",
+    genre: "Bilim Kurgu",
+    cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Çığlık Sokağı",
+    author: "Burak A.",
+    genre: "Polisiye",
+    cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
 export default function WriteBook() {
   const search = useSearch();
@@ -88,6 +262,8 @@ export default function WriteBook() {
   const [showStudio, setShowStudio] = useState(true);
   const [selectedStoryIndex, setSelectedStoryIndex] = useState(0);
   const [premiumIndex, setPremiumIndex] = useState(0);
+  const [activeTrailerIndex, setActiveTrailerIndex] = useState(0);
+  const [showPremiumMedia, setShowPremiumMedia] = useState(false);
   const [currentTab, setCurrentTab] = useState("books");
   // Auto-advance and touch/swipe controls for premium area
   const premiumAreaRef = useRef<HTMLElement | null>(null);
@@ -176,16 +352,18 @@ export default function WriteBook() {
 
   const selectPremium = (index: number) => {
     setPremiumIndex(index);
+    setActiveTrailerIndex(0);
+    setShowPremiumMedia(false);
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
   };
 
   const prevPremium = () => {
-    setPremiumIndex((prev) => (prev - 1 + Math.max(_published.length, 1)) % Math.max(_published.length, 1));
+    setPremiumIndex((prev) => (prev - 1 + premiumBooks.length) % premiumBooks.length);
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_BACK_SWIPE_MS;
   };
 
   const nextPremium = () => {
-    setPremiumIndex((prev) => (prev + 1) % Math.max(_published.length, 1));
+    setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
   };
 
@@ -194,7 +372,7 @@ export default function WriteBook() {
       if (autoAdvanceTimerRef.current) window.clearInterval(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = window.setInterval(() => {
         if (Date.now() < pausedUntilRef.current) return;
-        setPremiumIndex((prev) => (prev + 1) % Math.max(_published.length, 1));
+        setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
       }, 300000);
     };
 
@@ -215,7 +393,7 @@ export default function WriteBook() {
         setPremiumIndex((prev) => Math.max(0, prev - 1));
         pausedUntilRef.current = Date.now() + PAUSE_AFTER_BACK_SWIPE_MS;
       } else if (dx < -THRESHOLD) {
-        setPremiumIndex((prev) => (prev + 1) % Math.max(_published.length, 1));
+        setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
         pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
       }
       touchStartXRef.current = null;
@@ -231,36 +409,14 @@ export default function WriteBook() {
     };
   }, []);
 
-
-  // Taslaklar (yayınlanmamış çalışmalar)
-  const _drafts: typeof _published = (() => {
-    try {
-      const raw = localStorage.getItem("loop_drafts_v1");
-      if (!raw) return [];
-      return (JSON.parse(raw) as any[])
-        .filter((d: any) => d.status !== "published")
-        .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-    } catch { return []; }
-  })();
-
-  // _published kitaplarını türe göre grupla
-  const _publishedByGenre: Record<string, typeof _published> = {};
-  for (const book of _published) {
-    for (const g of (book.genres ?? [])) {
-      if (!_publishedByGenre[g]) _publishedByGenre[g] = [];
-      _publishedByGenre[g].push(book);
-    }
-  }
-  const _publishedShelfRows = Object.entries(_publishedByGenre).map(([genre, books]) => ({
-    title: genre,
-    subtitle: `${genre} türündeki yayınlarınız`,
-    books,
-  }));
+  useEffect(() => {
+    setActiveTrailerIndex(0);
+  }, [premiumIndex]);
 
   const query = searchQuery.trim().toLocaleLowerCase("tr-TR");
-  const filteredCollection = _published.filter((book) => {
+  const filteredCollection = libraryCollection.filter((book) => {
     if (!query || searchMode === "users") return true;
-    return [book.title, ...(book.genres ?? []), book.synopsis ?? ""].some((value) =>
+    return [book.title, book.author, book.genre].some((value) =>
       value.toLocaleLowerCase("tr-TR").includes(query),
     );
   });
@@ -272,11 +428,11 @@ export default function WriteBook() {
     );
   });
 
-  // Categories tab — independent search (gerçek yayınlanan kitaplar üzerinden)
+  // Categories tab — independent search
   const catQuery = catSearchQuery.trim().toLocaleLowerCase("tr-TR");
-  const catFilteredBooks = _published.filter((book) => {
+  const catFilteredBooks = libraryCollection.filter((book) => {
     if (!catQuery) return true;
-    return [book.title, ...(book.genres ?? []), book.synopsis ?? ""].some((v) =>
+    return [book.title, book.author, book.genre].some((v) =>
       v.toLocaleLowerCase("tr-TR").includes(catQuery),
     );
   });
@@ -287,9 +443,22 @@ export default function WriteBook() {
     );
   });
 
+  const libraryShelves = Object.entries(
+    libraryCollection.reduce((acc, book) => {
+      if (!acc[book.genre]) acc[book.genre] = [];
+      acc[book.genre].push(book);
+      return acc;
+    }, {} as Record<string, typeof libraryCollection>),
+  );
+
+  const { data: bookPosts, isLoading: bookLoading } = useListPosts(
+    { postType: "book" },
+    { query: { queryKey: getListPostsQueryKey({ postType: "book" }), enabled: libraryView === "flow" } }
+  );
+
   const visibleShelfRows = shelfCategory === "Tümü"
-    ? _publishedShelfRows
-    : _publishedShelfRows.filter((row) => row.title === shelfCategory);
+    ? shelfRows
+    : shelfRows.filter((row) => row.title === shelfCategory);
 
   return (
     <AppLayout>
@@ -348,21 +517,16 @@ export default function WriteBook() {
                   {catSearchMode === "books" ? (
                     <div className="grid gap-2">
                       {catFilteredBooks.slice(0, 8).map((book) => (
-                        <Link key={book.id} href={`/kitap/${book.id}`}>
-                          <div className="flex items-center gap-4 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-3 hover:border-violet-200 hover:bg-violet-50/50 transition cursor-pointer">
-                            <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg shadow-sm bg-slate-200">
-                              {book.cover
-                                ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
-                                : <div className="flex h-full w-full items-center justify-center text-xl">📖</div>
-                              }
-                            </div>
-                            <div className="min-w-0">
-                              <p className="font-semibold text-sm text-slate-900 truncate">{book.title}</p>
-                              <p className="text-xs text-slate-500 truncate">{(book.genres ?? [])[0] ?? "—"} · {(book.wordCount ?? 0).toLocaleString("tr")} kelime</p>
-                            </div>
-                            <span className="ml-auto flex-shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-semibold text-violet-700">{(book.genres ?? [])[0] ?? "—"}</span>
+                        <div key={book.title} className="flex items-center gap-4 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-3 hover:border-violet-200 hover:bg-violet-50/50 transition">
+                          <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg shadow-sm">
+                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
                           </div>
-                        </Link>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-900 truncate">{book.title}</p>
+                            <p className="text-xs text-slate-500 truncate">{book.author} · {book.genre}</p>
+                          </div>
+                          <span className="ml-auto flex-shrink-0 rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-semibold text-violet-700">{book.genre}</span>
+                        </div>
                       ))}
                       {catFilteredBooks.length === 0 && (
                         <p className="py-6 text-center text-sm text-slate-500">"{catSearchQuery}" için kitap bulunamadı.</p>
@@ -481,121 +645,87 @@ export default function WriteBook() {
             {/* RAFLAR */}
             {libraryView === "shelves" && (
               <div className="space-y-10 pt-4">
-                {_publishedShelfRows.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <p className="text-slate-400 text-sm font-medium">Henüz yayınlanan kitap yok</p>
-                    <Link href="/notebook/calismalari" className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/15 px-4 py-2 text-xs font-bold text-violet-300 transition hover:bg-violet-500/25">
-                      Çalışmalarım <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                ) : (
-                  _publishedShelfRows.map((row) => (
-                    <section key={row.title}>
-                      <div className="mb-4 flex items-end justify-between">
-                        <div>
-                          <h2 className="text-base font-bold text-white">{row.title}</h2>
-                          <p className="text-xs text-slate-500 mt-0.5">{row.subtitle}</p>
+                {shelfRows.map((row) => (
+                  <section key={row.title}>
+                    <div className="mb-4 flex items-end justify-between">
+                      <div>
+                        <h2 className="text-base font-bold text-white">{row.title}</h2>
+                        <p className="text-xs text-slate-500 mt-0.5">{row.subtitle}</p>
+                      </div>
+                      <button className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition">Tümü →</button>
+                    </div>
+                    <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory" style={{scrollbarWidth:"none"}}>
+                      {row.books.map((book, idx) => (
+                        <div key={idx} className="group flex-shrink-0 snap-start w-32 sm:w-36 cursor-pointer">
+                          <div className="relative h-48 sm:h-52 w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-[1.03]">
+                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+                            <span className="absolute bottom-2 left-2 rounded-full bg-white/15 backdrop-blur-sm px-2 py-0.5 text-[9px] font-semibold text-white/90 uppercase tracking-wide">{book.genre}</span>
+                          </div>
+                          <p className="mt-2 text-xs font-semibold text-slate-200 line-clamp-2 leading-tight">{book.title}</p>
+                          <p className="mt-0.5 text-[10px] text-slate-500">{book.author}</p>
                         </div>
-                        <button className="text-xs font-semibold text-violet-400 hover:text-violet-300 transition">Tümü →</button>
-                      </div>
-                      <div className="flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory" style={{scrollbarWidth:"none"}}>
-                        {row.books.map((book) => (
-                          <Link key={book.id} href={`/kitap/${book.id}`}>
-                            <div className="group flex-shrink-0 snap-start w-32 sm:w-36 cursor-pointer">
-                              <div className="relative h-48 sm:h-52 w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-[1.03]">
-                                {book.cover
-                                  ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
-                                  : <div className="flex h-full w-full items-center justify-center bg-violet-900/50 text-4xl">📖</div>
-                                }
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-                                <span className="absolute bottom-2 left-2 rounded-full bg-white/15 backdrop-blur-sm px-2 py-0.5 text-[9px] font-semibold text-white/90 uppercase tracking-wide">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                              </div>
-                              <p className="mt-2 text-xs font-semibold text-slate-200 line-clamp-2 leading-tight">{book.title || "Başlıksız"}</p>
-                            </div>
-                          </Link>
-                        ))}
-                      </div>
-                    </section>
-                  ))
-                )}
+                      ))}
+                    </div>
+                  </section>
+                ))}
               </div>
             )}
 
             {/* YENİ EKLEDİKLERİM */}
             {libraryView === "new" && (
               <div className="pt-4">
-                {_published.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <p className="text-slate-400 text-sm font-medium">Henüz yayınlanan kitap yok</p>
-                    <Link href="/notebook/calismalari" className="mt-3 inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-violet-500/15 px-4 py-2 text-xs font-bold text-violet-300 transition hover:bg-violet-500/25">
-                      Çalışmalarım <ArrowRight className="h-3.5 w-3.5" />
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                    {_published.map((book, idx) => (
-                      <Link key={book.id} href={`/kitap/${book.id}`}>
-                        <div className="group cursor-pointer">
-                          <div className="relative overflow-hidden rounded-2xl shadow-[0_6px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-[1.03]">
-                            {book.cover
-                              ? <img src={book.cover} alt={book.title} className="h-44 sm:h-52 w-full object-cover" />
-                              : <div className="flex h-44 sm:h-52 w-full items-center justify-center bg-violet-900/50 text-4xl">📖</div>
-                            }
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                            <div className="absolute bottom-0 left-0 right-0 p-3">
-                              <p className="text-xs font-bold text-white line-clamp-2 leading-tight">{book.title || "Başlıksız"}</p>
-                            </div>
-                            <div className="absolute top-2 right-2">
-                              <span className="rounded-full bg-violet-500/80 backdrop-blur-sm px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                            </div>
-                          </div>
-                          <div className="mt-1.5 flex items-center justify-between px-0.5">
-                            <p className="text-[10px] text-slate-500">
-                              {idx === 0 ? "Bugün" : idx < 3 ? "Dün" : idx < 6 ? "3 gün önce" : "Bu hafta"}
-                            </p>
-                            <Bookmark className="h-3.5 w-3.5 text-slate-600" />
-                          </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {[...libraryCollection, ...shelfRows[0].books].map((book, idx) => (
+                    <div key={idx} className="group cursor-pointer">
+                      <div className="relative overflow-hidden rounded-2xl shadow-[0_6px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-[1.03]">
+                        <img src={book.cover} alt={book.title} className="h-44 sm:h-52 w-full object-cover" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute bottom-0 left-0 right-0 p-3">
+                          <p className="text-xs font-bold text-white line-clamp-2 leading-tight">{book.title}</p>
+                          <p className="mt-0.5 text-[10px] text-slate-300">{book.author}</p>
                         </div>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                        <div className="absolute top-2 right-2">
+                          <span className="rounded-full bg-violet-500/80 backdrop-blur-sm px-2 py-0.5 text-[9px] font-bold text-white uppercase tracking-wide">{book.genre}</span>
+                        </div>
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between px-0.5">
+                        <p className="text-[10px] text-slate-500">
+                          {idx === 0 ? "Bugün" : idx < 3 ? "Dün" : idx < 6 ? "3 gün önce" : "Bu hafta"}
+                        </p>
+                        <button className="text-slate-600 hover:text-red-400 transition">
+                          <Bookmark className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 
             {/* BEĞENDİKLERİM */}
             {libraryView === "liked" && (
               <div className="pt-4 space-y-3">
-                {_published.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Heart className="mx-auto h-8 w-8 text-slate-600 mb-3" />
-                    <p className="text-slate-400 text-sm font-medium">Henüz yayınlanan kitap yok</p>
+                {[...featuredStories, ...recommendedBooks.map(b => ({ ...b, likes: "—", reads: "—", rating: "5.0", description: "" }))].map((book, idx) => (
+                  <div key={idx} className="group flex items-center gap-4 rounded-2xl bg-white/5 border border-white/8 px-4 py-3 hover:bg-white/8 transition-all duration-200 cursor-pointer">
+                    <div className="relative flex-shrink-0 h-16 w-12 overflow-hidden rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.3)]">
+                      <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-white line-clamp-1">{book.title}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{book.author} · <span className="text-violet-400">{book.genre}</span></p>
+                      {"description" in book && book.description ? (
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{book.description}</p>
+                      ) : null}
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                      <Heart className="h-4 w-4 text-rose-400 fill-rose-400" />
+                      {"reads" in book && book.reads ? (
+                        <span className="text-[10px] text-slate-500">{book.reads} okuma</span>
+                      ) : null}
+                    </div>
                   </div>
-                ) : (
-                  _published.map((book) => (
-                    <Link key={book.id} href={`/kitap/${book.id}`}>
-                      <div className="group flex items-center gap-4 rounded-2xl bg-white/5 border border-white/8 px-4 py-3 hover:bg-white/8 transition-all duration-200 cursor-pointer">
-                        <div className="relative flex-shrink-0 h-16 w-12 overflow-hidden rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.3)] bg-violet-900/50">
-                          {book.cover
-                            ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
-                            : <div className="flex h-full w-full items-center justify-center text-xl">📖</div>
-                          }
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-sm text-white line-clamp-1">{book.title || "Başlıksız"}</p>
-                          <p className="text-xs text-slate-400 mt-0.5"><span className="text-violet-400">{(book.genres ?? [])[0] ?? "Kitap"}</span></p>
-                          {book.synopsis ? (
-                            <p className="text-[11px] text-slate-500 mt-1 line-clamp-1">{book.synopsis}</p>
-                          ) : null}
-                        </div>
-                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                          <Heart className="h-4 w-4 text-rose-400 fill-rose-400" />
-                          <span className="text-[10px] text-slate-500">{(book.wordCount ?? 0).toLocaleString("tr")} kelime</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                )}
+                ))}
               </div>
             )}
           </div>
@@ -707,11 +837,10 @@ export default function WriteBook() {
           </button>}
 
           {/* ── Öne Çıkan Hikayeler ── */}
-          {_published.length > 0 && (
           <section className="relative overflow-hidden rounded-[2rem] shadow-[0_32px_100px_rgba(0,0,0,0.35)]">
-            {/* Blurred backdrop */}
+            {/* Blurred backdrop — all images pre-rendered; only opacity changes, no src swap */}
             <div className="absolute inset-0 -z-0 overflow-hidden">
-              {_published.map((story, index) => story.cover ? (
+              {featuredStories.map((story, index) => (
                 <img
                   key={index}
                   src={story.cover}
@@ -725,7 +854,7 @@ export default function WriteBook() {
                     willChange: "opacity",
                   }}
                 />
-              ) : null)}
+              ))}
               <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d12]/80 via-[#0d0d12]/70 to-[#0d0d12]/95" />
             </div>
 
@@ -736,31 +865,28 @@ export default function WriteBook() {
                   <Sparkles className="h-3.5 w-3.5 text-amber-300" />
                 </span>
                 <div>
-                  <p className="text-[9px] uppercase tracking-[0.35em] text-amber-300/80 font-semibold">Yayınlanan Kitaplar</p>
+                  <p className="text-[9px] uppercase tracking-[0.35em] text-amber-300/80 font-semibold">Loop Seçkisi</p>
                   <h2 className="text-sm font-bold text-white leading-tight">Öne Çıkan Hikayeler</h2>
                 </div>
               </div>
-              <Link href="/notebook/calismalari" className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-sm transition hover:bg-white/15 hover:text-white">
+              <button type="button" className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/8 px-3 py-1.5 text-[11px] font-semibold text-white/80 backdrop-blur-sm transition hover:bg-white/15 hover:text-white">
                 Tümü <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              </button>
             </div>
 
             {/* Active story — hero */}
             <div className="relative z-10 px-5 pt-5 sm:px-7">
               {(() => {
-                const story = _published[selectedStoryIndex] ?? _published[0];
-                if (!story) return null;
+                const story = featuredStories[selectedStoryIndex];
                 return (
                   <div className="flex gap-4 sm:gap-6">
                     {/* Cover */}
                     <div className="relative flex-shrink-0 w-28 sm:w-36">
-                      <div className="relative h-40 sm:h-52 w-full overflow-hidden rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)] bg-violet-900/50">
-                        {story.cover
-                          ? <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition-all duration-500" />
-                          : <div className="flex h-full w-full items-center justify-center text-5xl">📖</div>
-                        }
+                      <div className="relative h-40 sm:h-52 w-full overflow-hidden rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
+                        <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition-all duration-500" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       </div>
+                      {/* Rank badge */}
                       <div className="absolute -top-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full bg-amber-400 text-[10px] font-black text-black shadow-lg">
                         #{selectedStoryIndex + 1}
                       </div>
@@ -770,17 +896,30 @@ export default function WriteBook() {
                     <div className="flex flex-1 min-w-0 flex-col justify-between py-1">
                       <div className="space-y-2">
                         <span className="inline-flex items-center rounded-full bg-violet-500/20 border border-violet-400/30 px-2.5 py-0.5 text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
-                          {(story.genres ?? [])[0] ?? "Kitap"}
+                          {story.genre}
                         </span>
-                        <h3 className="text-xl sm:text-2xl font-black text-white leading-tight line-clamp-2">{story.title || "Başlıksız"}</h3>
-                        {story.synopsis && <p className="text-[11px] sm:text-xs text-slate-400 leading-5 line-clamp-3">{story.synopsis}</p>}
+                        <h3 className="text-xl sm:text-2xl font-black text-white leading-tight line-clamp-2">{story.title}</h3>
+                        <p className="text-[11px] sm:text-xs text-slate-400 leading-5 line-clamp-3">{story.description}</p>
                       </div>
+
+                      {/* Author row */}
+                      <div className="mt-3 flex items-center gap-2">
+                        <div className="h-6 w-6 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-[9px] font-bold text-white flex-shrink-0">
+                          {story.author[0]}
+                        </div>
+                        <span className="text-xs text-slate-400 truncate">{story.author}</span>
+                      </div>
+
+                      {/* Stats */}
                       <div className="mt-3 flex items-center gap-2 flex-wrap">
                         <span className="inline-flex items-center gap-1 rounded-full bg-white/8 border border-white/10 px-2.5 py-1 text-[10px] text-slate-300">
-                          <BookOpen className="h-3 w-3" /> {(story.chapters as unknown[])?.length ?? 0} bölüm
+                          <Eye className="h-3 w-3" /> {story.reads}
                         </span>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/10 border border-violet-400/20 px-2.5 py-1 text-[10px] text-violet-300">
-                          ✍️ {(story.wordCount ?? 0).toLocaleString("tr")} kelime
+                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 border border-rose-400/20 px-2.5 py-1 text-[10px] text-rose-300">
+                          <Heart className="h-3 w-3 fill-rose-400 text-rose-400" /> {story.likes}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/10 border border-amber-400/20 px-2.5 py-1 text-[10px] font-semibold text-amber-300">
+                          <Star className="h-3 w-3 fill-amber-400 text-amber-400" /> {story.rating}
                         </span>
                       </div>
                     </div>
@@ -795,7 +934,7 @@ export default function WriteBook() {
               className="relative z-10 mt-5 flex gap-2.5 overflow-x-auto px-5 pb-5 sm:px-7 sm:pb-6"
               style={{ scrollbarWidth: "none" }}
             >
-              {_published.map((story, index) => (
+              {featuredStories.map((story, index) => (
                 <button
                   key={`thumb-${index}`}
                   type="button"
@@ -806,16 +945,11 @@ export default function WriteBook() {
                       : "w-16 sm:w-20 opacity-50 hover:opacity-80 ring-1 ring-white/10"
                   }`}
                 >
-                  <div className="h-20 sm:h-24 w-full bg-violet-900/60 flex items-center justify-center">
-                    {story.cover
-                      ? <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                      : <span className="text-2xl">📖</span>
-                    }
-                  </div>
+                  <img src={story.cover} alt={story.title} className="h-20 sm:h-24 w-full object-cover transition duration-500 group-hover:scale-105" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   {selectedStoryIndex === index && (
                     <div className="absolute bottom-1.5 left-0 right-0 px-1.5">
-                      <p className="text-[8px] font-bold text-white/90 line-clamp-1 text-center">{story.title || "Başlıksız"}</p>
+                      <p className="text-[8px] font-bold text-white/90 line-clamp-1 text-center">{story.title}</p>
                     </div>
                   )}
                 </button>
@@ -824,7 +958,7 @@ export default function WriteBook() {
 
             {/* Progress dots */}
             <div className="relative z-10 flex items-center justify-center gap-1.5 pb-4">
-              {_published.map((_, index) => (
+              {featuredStories.map((_, index) => (
                 <button
                   key={`dot-${index}`}
                   type="button"
@@ -838,146 +972,211 @@ export default function WriteBook() {
               ))}
             </div>
           </section>
-          )}
 
-          {_published.length > 0 && (() => {
-            const safeIndex = premiumIndex % _published.length;
-            const premium = _published[safeIndex];
+          {(() => {
+            const premium = premiumBooks[premiumIndex];
             return (
               <section
                 ref={premiumAreaRef}
                 className="relative isolate overflow-hidden rounded-[2rem] text-white"
                 style={{ boxShadow: "0 32px 110px rgba(120,53,15,0.28)" }}
               >
-                {/* Backdrop — kapak görseli */}
-                {_published.map((pb, i) => pb.cover ? (
+                {/* ── Stacked cinematic backdrops (opacity only, no src swap) ── */}
+                {premiumBooks.map((pb, i) => (
                   <img
-                    key={pb.id} src={pb.cover} alt="" aria-hidden
+                    key={pb.backdrop} src={pb.backdrop} alt="" aria-hidden
                     className="absolute inset-0 h-full w-full object-cover"
                     style={{
                       zIndex: -20,
                       transform: "scale(1.18)",
                       filter: "blur(24px)",
-                      opacity: i === safeIndex ? 1 : 0,
+                      opacity: i === premiumIndex ? 1 : 0,
                       transition: "opacity 0.85s ease",
                       willChange: "opacity",
                     }}
                   />
-                ) : null)}
+                ))}
                 <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/80 via-black/65 to-[#180d00]/90" />
 
-                {/* Header */}
+                {/* ── Header ───────────────────────────────────────────────── */}
                 <div className="flex items-center justify-between px-4 pt-4">
                   <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.38em] text-amber-400/75">Yayınlanan Kitaplar</p>
-                    <h2 className="mt-0.5 text-[17px] font-black tracking-tight leading-tight">Kitap Vitrini</h2>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.38em] text-amber-400/75">Loop Seçkisi · Özel Salon</p>
+                    <h2 className="mt-0.5 text-[17px] font-black tracking-tight leading-tight">Premium Yazarlardan Kitaplar</h2>
                   </div>
-                  <span className="shrink-0 rounded-full border border-amber-300/55 bg-amber-950/55 px-3 py-1.5 text-[11px] font-black text-amber-200 backdrop-blur">✦ Yayında</span>
+                  <span className="shrink-0 rounded-full border border-amber-300/55 bg-amber-950/55 px-3 py-1.5 text-[11px] font-black text-amber-200 backdrop-blur">✦ Pro</span>
                 </div>
 
-                {/* Cover + Info */}
+                {/* ── Cover + Info row ─────────────────────────────────────── */}
                 <div className="mt-3 flex gap-3 px-4">
+                  {/* Left: stacked covers */}
                   <div
-                    className="relative shrink-0 overflow-hidden rounded-2xl bg-violet-900/60"
+                    className="relative shrink-0 overflow-hidden rounded-2xl"
                     style={{ width: 108, aspectRatio: "2/3", boxShadow: "0 14px 48px rgba(0,0,0,0.65)" }}
                   >
-                    {_published.map((pb, i) => (
-                      pb.cover
-                        ? <img key={pb.id} src={pb.cover} alt={pb.title} className="absolute inset-0 h-full w-full object-cover" style={{ opacity: i === safeIndex ? 1 : 0, transition: "opacity 0.65s ease" }} />
-                        : null
+                    {premiumBooks.map((pb, i) => (
+                      <img
+                        key={pb.cover} src={pb.cover} alt={pb.title}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        style={{ opacity: i === premiumIndex ? 1 : 0, transition: "opacity 0.65s ease" }}
+                      />
                     ))}
-                    {!premium.cover && <div className="flex h-full w-full items-center justify-center text-4xl">📖</div>}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
                     <span className="absolute left-2 top-2 rounded-full border border-amber-300/65 bg-black/55 px-2 py-0.5 text-[10px] font-black text-amber-200 backdrop-blur">
-                      #{safeIndex + 1}
+                      {premium.rank}
                     </span>
+                    <div
+                      className="absolute bottom-2 left-1/2 flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-1 ring-1 ring-white/20 backdrop-blur"
+                      style={{ transform: "translateX(-50%)", whiteSpace: "nowrap" }}
+                    >
+                      <img src={premium.authorAvatar} alt={premium.author} className="h-5 w-5 shrink-0 rounded-full object-cover ring-1 ring-amber-300/70" />
+                      <span className="max-w-[58px] truncate text-[9px] font-bold text-white/90">{premium.author}</span>
+                    </div>
                   </div>
 
+                  {/* Right: info */}
                   <div className="flex min-w-0 flex-1 flex-col justify-between">
                     <div>
                       <span className="inline-flex items-center rounded-full border border-amber-400/40 bg-amber-900/35 px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
-                        {(premium.genres ?? [])[0] ?? "Kitap"}
+                        Premium Yazar
                       </span>
-                      <h3 className="mt-2 font-serif text-[22px] font-black leading-[1.15] text-white line-clamp-2">{premium.title || "Başlıksız"}</h3>
-                      {premium.synopsis && <p className="mt-2 line-clamp-4 text-[11px] leading-[1.65] text-slate-300/90">{premium.synopsis}</p>}
-                      <p className="mt-1.5 text-[10px] text-slate-400">{(premium.wordCount ?? 0).toLocaleString("tr")} kelime · {(premium.chapters as unknown[])?.length ?? 0} bölüm</p>
+                      <h3 className="mt-2 font-serif text-[22px] font-black leading-[1.15] text-white line-clamp-2">{premium.title}</h3>
+                      <p className="mt-1 text-[10px] font-semibold tracking-wide text-amber-200/65">{premium.genre}</p>
+                      <p className="mt-2 line-clamp-4 text-[11px] leading-[1.65] text-slate-300/90">{premium.description}</p>
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                      <Link
-                        href={`/kitap/${premium.id}`}
+                      <button
+                        type="button"
                         className="rounded-full px-4 py-2 text-[11px] font-black text-black transition active:scale-95"
                         style={{ background: "linear-gradient(135deg,#fcd34d,#f59e0b)" }}
                       >
                         Kitaba Git <ArrowRight className="ml-0.5 inline h-3 w-3" />
-                      </Link>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPremiumMedia(true)}
+                        className="flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-3 py-2 text-[11px] font-bold text-amber-100 backdrop-blur transition hover:bg-white/18 active:scale-95"
+                        aria-label="Kitap görsellerini aç"
+                      >
+                        <span className="flex -space-x-1.5">
+                          <span className="h-3.5 w-3.5 rounded bg-white/30 ring-1 ring-white/50" />
+                          <span className="h-3.5 w-3.5 -rotate-6 rounded bg-amber-200/70 ring-1 ring-white/60" />
+                        </span>
+                        Görseller
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Thumbnail nav */}
-                {_published.length > 1 && (
-                  <div className="mt-3 flex gap-2 px-4 pb-4">
-                    {_published.map((pb, i) => (
+                {/* ── Trailer strip ────────────────────────────────────────── */}
+                <div
+                  className="mt-3 grid grid-cols-3 gap-2 px-4"
+                  style={{ touchAction: "pan-y" }}
+                  onPointerDown={e => e.stopPropagation()}
+                  onTouchStart={e => e.stopPropagation()}
+                >
+                  {premium.trailers.map((trailer, ti) => {
+                    const isActive = ti === activeTrailerIndex;
+                    return (
                       <button
-                        key={pb.id}
+                        key={`${premium.title}-${ti}`}
                         type="button"
-                        aria-label={`${pb.title || "Kitap"} kitabını göster`}
-                        aria-current={i === safeIndex ? "true" : undefined}
-                        onClick={() => selectPremium(i)}
-                        className="relative flex-1 overflow-hidden rounded-xl transition-all duration-300 bg-violet-900/60"
-                        style={{
-                          height: 52,
-                          border: i === safeIndex ? "2px solid #fcd34d" : "2px solid rgba(255,255,255,0.1)",
-                          opacity: i === safeIndex ? 1 : 0.42,
-                          boxShadow: i === safeIndex ? "0 0 14px rgba(252,211,77,0.35)" : "none",
-                        }}
+                        aria-label={`${premium.title} fragman ${ti + 1}`}
+                        onClick={() => setActiveTrailerIndex(ti)}
+                        className={`group/tr relative overflow-hidden rounded-xl border transition-all duration-500 ${isActive ? "col-span-2 border-amber-300/65 shadow-[0_0_22px_rgba(251,191,36,0.18)]" : "border-white/10 opacity-50 hover:opacity-75"}`}
+                        style={{ height: isActive ? 96 : 56 }}
                       >
-                        {pb.cover
-                          ? <img src={pb.cover} alt={pb.title || "Kitap"} className="h-full w-full object-cover" />
-                          : <div className="flex h-full w-full items-center justify-center text-lg">📖</div>
+                        {isActive
+                          ? <video key={`${premium.title}-v${ti}`} src={trailer} className="h-full w-full object-cover" muted autoPlay playsInline loop={premium.trailers.length === 1} onEnded={() => premium.trailers.length > 1 && setActiveTrailerIndex((ti + 1) % premium.trailers.length)} />
+                          : <img src={premium.cover} alt="" className="h-full w-full object-cover transition duration-500 group-hover/tr:scale-110" />
                         }
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                        <span className="absolute bottom-1 right-1.5 max-w-[52px] truncate text-[7px] font-semibold text-white/65">{pb.title || "Başlıksız"}</span>
+                        <span className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        {isActive
+                          ? <span className="absolute bottom-1.5 left-2 flex items-center gap-1 text-[9px] font-bold text-amber-200"><Play className="h-2.5 w-2.5 fill-current" /> Oynuyor</span>
+                          : <span className="absolute bottom-1.5 left-2 text-[9px] font-bold text-white/60 opacity-0 transition group-hover/tr:opacity-100">Fragman {ti + 1}</span>
+                        }
                       </button>
-                    ))}
+                    );
+                  })}
+                </div>
+
+                {/* ── Book thumbnail nav (kapak görselleriyle) ─────────────── */}
+                <div className="mt-3 flex gap-2 px-4 pb-4">
+                  {premiumBooks.map((pb, i) => (
+                    <button
+                      key={pb.title}
+                      type="button"
+                      aria-label={`${pb.title} kitabını göster`}
+                      aria-current={i === premiumIndex ? "true" : undefined}
+                      onClick={() => selectPremium(i)}
+                      className="relative flex-1 overflow-hidden rounded-xl transition-all duration-300"
+                      style={{
+                        height: 52,
+                        border: i === premiumIndex ? "2px solid #fcd34d" : "2px solid rgba(255,255,255,0.1)",
+                        opacity: i === premiumIndex ? 1 : 0.42,
+                        boxShadow: i === premiumIndex ? "0 0 14px rgba(252,211,77,0.35)" : "none",
+                      }}
+                    >
+                      <img src={pb.cover} alt={pb.title} className="h-full w-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <span className="absolute bottom-1 left-1.5 text-[8px] font-black text-amber-300">{pb.rank}</span>
+                      <span className="absolute bottom-1 right-1.5 max-w-[52px] truncate text-[7px] font-semibold text-white/65">{pb.title}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* ── Media modal ──────────────────────────────────────────── */}
+                {showPremiumMedia && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-label={`${premium.title} görselleri`}>
+                    <div className="w-full max-w-2xl rounded-[1.5rem] border border-amber-200/30 bg-[#15100b] p-4 text-white shadow-2xl">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.25em] text-amber-300">{premium.author}</p>
+                          <h3 className="mt-1 text-xl font-bold">{premium.title} görselleri</h3>
+                        </div>
+                        <button type="button" onClick={() => setShowPremiumMedia(false)} aria-label="Kapat" className="rounded-full bg-white/10 p-2 hover:bg-white/20">
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {premium.media.map(img => <img key={img} src={img} alt={`${premium.title} görseli`} className="h-32 w-full rounded-xl object-cover sm:h-44" />)}
+                      </div>
+                    </div>
                   </div>
                 )}
               </section>
             );
           })()}
 
-          {_published.length > 0 && (
           <section className="overflow-hidden rounded-[1.5rem] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] ring-1 ring-slate-100 sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[10px] uppercase tracking-[0.25em] text-violet-600">Yayınlanan kitapların</p>
+                <p className="text-[10px] uppercase tracking-[0.25em] text-violet-600">Okuma rotan</p>
                 <h2 className="mt-1 text-xl font-bold text-slate-950">Sizin İçin Önerdiğimiz</h2>
               </div>
-              <Link href="/notebook/calismalari" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
+              <button type="button" className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 transition hover:border-violet-300 hover:text-violet-700">
                 Tümünü gör <ArrowRight className="h-4 w-4" />
-              </Link>
+              </button>
             </div>
             <div className="scrollbar-hide mt-5 flex gap-4 overflow-x-auto pb-2">
-              {_published.map((book) => (
-                <Link key={book.id} href={`/kitap/${book.id}`}>
-                  <article className="group w-32 flex-none sm:w-40 cursor-pointer">
-                    <div className="relative h-48 overflow-hidden rounded-xl bg-slate-200 shadow-md sm:h-60">
-                      {book.cover
-                        ? <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                        : <div className="flex h-full w-full items-center justify-center text-4xl bg-violet-100">📖</div>
-                      }
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-3 pt-10">
-                        <span className="rounded-full bg-white/15 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                      </div>
+              {recommendedBooks.map((book) => (
+                <article key={book.title} className="group w-32 flex-none sm:w-40">
+                  <div className="relative h-48 overflow-hidden rounded-xl bg-slate-200 shadow-md sm:h-60">
+                    <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-3 pt-10">
+                      <span className="rounded-full bg-white/15 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{book.genre}</span>
                     </div>
-                    <h3 className="mt-2 truncate text-sm font-bold text-slate-900 group-hover:text-violet-700">{book.title || "Başlıksız"}</h3>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{(book.chapters as unknown[])?.length ?? 0} bölüm</p>
-                  </article>
-                </Link>
+                  </div>
+                  <h3 className="mt-2 truncate text-sm font-bold text-slate-900 group-hover:text-violet-700">{book.title}</h3>
+                  <p className="mt-0.5 truncate text-xs text-slate-500">{book.author}</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-violet-500" style={{ width: book.progress }} /></div>
+                    <span className="text-[10px] font-semibold text-violet-700">{book.progress}</span>
+                  </div>
+                </article>
               ))}
             </div>
           </section>
-          )}
 
           <section className="overflow-hidden rounded-[2rem] text-white" style={{ background: "linear-gradient(145deg,#0f0c1a 0%,#12102a 55%,#1a0f2e 100%)", boxShadow: "0 24px 80px rgba(109,40,217,0.18)" }}>
             {/* Header */}
@@ -993,29 +1192,27 @@ export default function WriteBook() {
             </div>
 
             {/* #1 hero card */}
-            {_published.length > 0 && (() => {
-              const top = _published[0];
+            {(() => {
+              const top = trendingBooks[0];
               return (
                 <div className="mt-3 mx-4 relative overflow-hidden rounded-2xl" style={{ height: 130 }}>
-                  {top.cover && <img src={top.cover} alt={top.title} className="absolute inset-0 h-full w-full object-cover scale-110" style={{ filter: "blur(2px)" }} />}
-                  {!top.cover && <div className="absolute inset-0 bg-violet-950" />}
+                  <img src={top.cover} alt={top.title} className="absolute inset-0 h-full w-full object-cover scale-110" style={{ filter: "blur(2px)" }} />
                   <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.2) 100%)" }} />
+                  {/* rank watermark */}
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[72px] font-black leading-none select-none" style={{ color: "rgba(255,255,255,0.06)" }}>1</span>
                   <div className="relative flex h-full items-center gap-3 px-3">
-                    <div className="h-20 w-14 shrink-0 rounded-xl overflow-hidden shadow-lg ring-2 ring-amber-400/60 bg-violet-900/50 flex items-center justify-center">
-                      {top.cover
-                        ? <img src={top.cover} alt={top.title} className="h-full w-full object-cover" />
-                        : <span className="text-2xl">📖</span>
-                      }
-                    </div>
+                    <img src={top.cover} alt={top.title} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-lg ring-2 ring-amber-400/60" />
                     <div className="min-w-0">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-black">#1 Bu Hafta</span>
-                      <h3 className="mt-1.5 text-[17px] font-black leading-tight text-white line-clamp-1">{top.title || "Başlıksız"}</h3>
-                      <p className="mt-0.5 text-[11px] text-slate-300/80"><span className="text-violet-300">{(top.genres ?? [])[0] ?? "Kitap"}</span></p>
+                      <h3 className="mt-1.5 text-[17px] font-black leading-tight text-white line-clamp-1">{top.title}</h3>
+                      <p className="mt-0.5 text-[11px] text-slate-300/80">{top.author} · <span className="text-violet-300">{top.genre}</span></p>
                       <div className="mt-2 flex items-center gap-3">
-                        <Link href={`/kitap/${top.id}`} className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/20 transition-colors">
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300">
+                          <Eye className="h-3 w-3" />{top.reads}
+                        </span>
+                        <button type="button" className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-bold text-white hover:bg-white/20 transition-colors">
                           Oku
-                        </Link>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1023,31 +1220,29 @@ export default function WriteBook() {
               );
             })()}
 
-            {/* #2–N horizontal scroll */}
-            {_published.length > 1 && (
-              <div className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto px-4 pb-4">
-                {_published.slice(1).map((book, i) => (
-                  <Link key={book.id} href={`/kitap/${book.id}`}>
-                    <article className="group w-28 flex-none cursor-pointer">
-                      <div className="relative h-40 overflow-hidden rounded-xl bg-violet-900/50 shadow-lg">
-                        {book.cover
-                          ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                          : <div className="flex h-full w-full items-center justify-center text-3xl">📖</div>
-                        }
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                        <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black shadow-lg" style={{ background: "rgba(109,40,217,0.85)", color: "#e9d5ff" }}>
-                          {i + 2}
-                        </span>
-                        <div className="absolute bottom-2 left-2 right-2">
-                          <span className="block text-[8px] font-semibold text-violet-300 uppercase tracking-wide truncate">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                        </div>
-                      </div>
-                      <h3 className="mt-1.5 truncate text-[12px] font-bold text-white/90 group-hover:text-violet-300 transition-colors">{book.title || "Başlıksız"}</h3>
-                    </article>
-                  </Link>
-                ))}
-              </div>
-            )}
+            {/* #2–5 horizontal scroll */}
+            <div className="scrollbar-hide mt-3 flex gap-3 overflow-x-auto px-4 pb-4">
+              {trendingBooks.slice(1).map((book, i) => (
+                <article key={book.title} className="group w-28 flex-none">
+                  <div className="relative h-40 overflow-hidden rounded-xl bg-slate-800 shadow-lg">
+                    <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-106" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                    {/* rank */}
+                    <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black shadow-lg" style={{ background: "rgba(109,40,217,0.85)", color: "#e9d5ff" }}>
+                      {i + 2}
+                    </span>
+                    <div className="absolute bottom-2 left-2 right-2">
+                      <span className="block text-[8px] font-semibold text-violet-300 uppercase tracking-wide truncate">{book.genre}</span>
+                      <span className="mt-0.5 flex items-center gap-1 text-[9px] text-amber-300 font-bold">
+                        <Eye className="h-2.5 w-2.5" />{book.reads}
+                      </span>
+                    </div>
+                  </div>
+                  <h3 className="mt-1.5 truncate text-[12px] font-bold text-white/90 group-hover:text-violet-300 transition-colors">{book.title}</h3>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">{book.author}</p>
+                </article>
+              ))}
+            </div>
           </section>
 
           <section className="overflow-hidden rounded-[1.5rem] bg-white p-4 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:p-6">
@@ -1135,7 +1330,7 @@ export default function WriteBook() {
               <div className="flex items-center gap-2">
                 <select value={shelfCategory} onChange={(event) => setShelfCategory(event.target.value)} className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition hover:border-violet-300">
                   <option value="Tümü">Kategori seç</option>
-                  {_publishedShelfRows.map((row) => <option key={row.title} value={row.title}>{row.title}</option>)}
+                  {shelfRows.map((row) => <option key={row.title} value={row.title}>{row.title}</option>)}
                 </select>
                 <button type="button" className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-3 py-2 text-xs font-bold text-white transition hover:bg-slate-800">Tüm rafı gör <ArrowRight className="h-4 w-4" /></button>
               </div>
@@ -1152,18 +1347,14 @@ export default function WriteBook() {
                   </div>
                   <div className="scrollbar-hide flex gap-4 overflow-x-auto border-b-[10px] border-amber-950/80 pb-3">
                     {row.books.map((book) => (
-                      <Link key={book.id} href={`/kitap/${book.id}`}>
-                        <article className="group w-28 flex-none sm:w-36 cursor-pointer">
-                          <div className="relative h-40 overflow-hidden rounded-md bg-slate-300 shadow-[5px_6px_0_rgba(71,45,24,0.25)] sm:h-52">
-                            {book.cover
-                              ? <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                              : <div className="flex h-full w-full items-center justify-center text-4xl bg-violet-100">📖</div>
-                            }
-                            <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                          </div>
-                          <h4 className="mt-2 truncate text-xs font-bold text-slate-900 sm:text-sm">{book.title || "Başlıksız"}</h4>
-                        </article>
-                      </Link>
+                      <article key={book.title} className="group w-28 flex-none sm:w-36">
+                        <div className="relative h-40 overflow-hidden rounded-md bg-slate-300 shadow-[5px_6px_0_rgba(71,45,24,0.25)] sm:h-52">
+                          <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                          <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{book.genre}</span>
+                        </div>
+                        <h4 className="mt-2 truncate text-xs font-bold text-slate-900 sm:text-sm">{book.title}</h4>
+                        <p className="truncate text-[10px] text-slate-500 sm:text-xs">{book.author}</p>
+                      </article>
                     ))}
                   </div>
                 </div>
@@ -1279,39 +1470,28 @@ export default function WriteBook() {
               <button type="button" className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/15">Tümünü gör</button>
             </div>
             <div className="scrollbar-hide mt-5 flex snap-x gap-5 overflow-x-auto pb-2">
-              {_drafts.length === 0 ? (
-                <div className="flex w-full flex-col items-center justify-center py-10 text-center">
-                  <p className="text-slate-400 text-sm font-medium">Devam eden taslak yok</p>
-                  <Link href="/notebook/calismalari" className="mt-3 inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-cyan-500/15 px-4 py-2 text-xs font-bold text-cyan-300 transition hover:bg-cyan-500/25">
-                    Yeni kitap başlat <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </div>
-              ) : _drafts.map((book) => (
-                <Link key={book.id} href={`/kitap/${book.id}/duzenle`}>
-                  <article className="group min-w-[calc(100%-1rem)] snap-start overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4 shadow-xl backdrop-blur sm:min-w-[34rem] sm:p-5 cursor-pointer">
-                    <div className="flex gap-3 sm:gap-5">
-                      <div className="relative flex h-40 w-28 shrink-0 items-center justify-center sm:h-52 sm:w-36">
-                        <div className="relative h-full w-full overflow-hidden rounded-lg bg-violet-900/50 shadow-xl ring-1 ring-white/20">
-                          {book.cover
-                            ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-105" />
-                            : <div className="flex h-full w-full items-center justify-center text-5xl">📖</div>
-                          }
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1 self-end pb-1">
-                        <span className="inline-flex rounded-full bg-cyan-300/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-200">Taslak · Devam ediyor</span>
-                        <h3 className="mt-3 text-xl font-black text-white sm:text-2xl">{book.title || "Başlıksız"}</h3>
-                        {book.synopsis && <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-300">{book.synopsis}</p>}
-                        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                          <span className="rounded-full border border-violet-400/60 px-3 py-1 font-bold text-violet-300">{(book.genres ?? [])[0] ?? "Kitap"}</span>
-                          <span className="text-sm italic text-slate-400">{(book.chapters as unknown[])?.length ?? 0} bölüm · {(book.wordCount ?? 0).toLocaleString("tr")} kelime</span>
-                        </div>
-                        <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[40%] rounded-full bg-gradient-to-r from-cyan-300 to-violet-400" /></div>
-                        <button type="button" className="mt-4 text-base font-bold text-cyan-300 transition hover:text-white">Düzenlemeye devam et <ArrowRight className="ml-1 inline h-4 w-4" /></button>
-                      </div>
+              {continuingBooks.map((book) => (
+                <article key={book.title} className="group min-w-[calc(100%-1rem)] snap-start overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.07] p-4 shadow-xl backdrop-blur sm:min-w-[34rem] sm:p-5">
+                  <div className="flex gap-3 sm:gap-5">
+                    <div className="relative flex h-40 w-28 shrink-0 items-end justify-center sm:h-52 sm:w-36">
+                      {book.covers.map((cover, index) => (
+                        <img key={cover} src={cover} alt={`${book.title} ${index + 1}. kapak`} className={`absolute w-20 rounded-lg object-cover shadow-xl ring-1 ring-white/20 transition duration-300 group-hover:scale-105 sm:w-28 ${index === 0 ? "left-0 h-32 -rotate-6 sm:h-44" : index === 1 ? "left-4 z-10 h-40 sm:left-5 sm:h-52" : "right-0 h-32 rotate-6 sm:h-44"}`} />
+                      ))}
                     </div>
-                  </article>
-                </Link>
+                    <div className="min-w-0 flex-1 self-end pb-1">
+                      <span className="inline-flex rounded-full bg-cyan-300/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-cyan-200">Şu anda okuyorsun</span>
+                      <h3 className="mt-3 text-xl font-black text-white sm:text-2xl">{book.title}</h3>
+                      <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-300">{book.description}</p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                        <span className="text-sm italic text-slate-400">{book.chapters}</span>
+                        <span className="rounded-full border border-emerald-400/60 px-3 py-1 font-bold text-emerald-300">{book.status}</span>
+                        <span className="rounded-full border border-amber-400/60 px-3 py-1 font-bold text-amber-300">{book.rank}</span>
+                      </div>
+                      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/10"><div className="h-full w-[68%] rounded-full bg-gradient-to-r from-cyan-300 to-violet-400" /></div>
+                      <button type="button" className="mt-4 text-base font-bold text-cyan-300 transition hover:text-white">Devamını oku <ArrowRight className="ml-1 inline h-4 w-4" /></button>
+                    </div>
+                  </div>
+                </article>
               ))}
             </div>
           </section>
