@@ -3,7 +3,6 @@ import { ArrowRight, BookOpen, Bookmark, ChevronDown, ChevronUp, Eye, Globe2, He
 import { useState } from "react";
 import { useEffect, useRef } from "react";
 import { useSearch, Link } from "wouter";
-import { useListPosts, getListPostsQueryKey } from "@workspace/api-client-react";
 import { PostCard } from "@/components/shared/PostCard";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
@@ -39,96 +38,6 @@ const launchPipeline: LaunchPipelineItem[] = [
   { title: "OK okunma listesi", description: "Okuyucu notlarını toparla ve yeni öneriler ekle.", status: "Hazır" },
 ];
 
-const featuredBooks = [
-  {
-    title: "Derin Mesafe",
-    author: "Uygar Y.",
-    category: "Genç Yetişkin",
-    progress: 78,
-    cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Sessiz Sayfalar",
-    author: "Maya T.",
-    category: "Polisiye",
-    progress: 45,
-    cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Yıldızların Altında",
-    author: "Ege A.",
-    category: "Fantastik",
-    progress: 92,
-    cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=900&q=80",
-  },
-];
-
-const rankings = [
-  { rank: 1, title: "Beklenen Kaos", reads: "4.8K" },
-  { rank: 2, title: "Ölüm İksiri", reads: "3.2K" },
-  { rank: 3, title: "Yıldızların Altında", reads: "5.7K" },
-];
-
-const libraryCategories = [
-  { name: "Roman", count: 24 },
-  { name: "Polisiye", count: 18 },
-  { name: "Fantastik", count: 12 },
-  { name: "Kişisel Gelişim", count: 9 },
-];
-
-const formaliteBooks = [
-  {
-    title: "Formalite: Ritmik Akış",
-    author: "Loop Koleksiyonu",
-    progress: 54,
-    cover: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Formalite: Gece Defteri",
-    author: "Loop Koleksiyonu",
-    progress: 37,
-    cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=900&q=80",
-  },
-];
-
-const inspirationBooks = [
-  { title: "Klasik Kurallar", cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=900&q=80" },
-  { title: "Mektup ve Mühür", cover: "https://images.unsplash.com/photo-1528209396504-5f31f70ca3b2?auto=format&fit=crop&w=900&q=80" },
-  { title: "Sessiz Sayfalar", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80" },
-];
-
-const featuredStories = [
-  { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80", description: "Eylül Çetiner kanser olduğunu öğrendiği gün ilk aşkı ile karşılaşır. Çağan Demirsoy kim olduğunu Eylül'den gizlemiş yıllar sonra birden ortaya çıkar...", reads: "12.8K", likes: "161", rating: "5.0" },
-  { title: "Derin Mesafe", author: "Uygar Y.", genre: "Genç Yetişkin", cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=700&q=80", description: "Hayata tutunduğu sıkı ipleri bir bir elinden kaçırmaya başlayan Uygar'ın, Peri ile karşılaşmasıyla başlar her şey...", reads: "26.4K", likes: "228", rating: "5.0" },
-  { title: "Son Perde", author: "Lina K.", genre: "Dram", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80", description: "Bir sahnenin son ışığı sönerken geçmişin sakladığı hikâye yeniden ortaya çıkar.", reads: "18.2K", likes: "184", rating: "4.8" },
-  { title: "Kayıp Harita", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=700&q=80", description: "Eski bir harita, hiç bilmediği bir şehre ve unutulmuş bir sırrın merkezine götürür.", reads: "14.7K", likes: "163", rating: "4.9" },
-  { title: "Ay Işığı Notları", author: "Mina E.", genre: "Romantik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80", description: "Her gece yazılan kısa notlar, iki yabancının birbirine yaklaşan sesine dönüşür.", reads: "12.8K", likes: "149", rating: "4.7" },
-  { title: "Sessiz Oda", author: "Can D.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80", description: "Kapısı yıllardır açılmayan bir oda, evin tüm sessizliğini üzerine toplamıştır.", reads: "10.6K", likes: "121", rating: "4.6" },
-  { title: "Gökyüzü Çizgisi", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", description: "Gökyüzünde beliren ince çizgi, yeni bir dünyanın kapısını aralar.", reads: "9.8K", likes: "108", rating: "4.8" },
-];
-
-const premiumBooks = [
-  { title: "Karma", author: "Nairobi", authorAvatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&q=80", label: "Premium Yazar", description: "İki dünyanın arasında sıkışmış hayatlar... Farklı acılar, farklı seçimler, farklı kaderler.", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1400&q=70", genre: "Dram · Gizem", rank: "#01", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4"], media: ["https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=900&q=85"] },
-  { title: "Mekanik Kalp", author: "Arman Berra", authorAvatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&q=80", label: "Loop Black Label", description: "İnsan olmakla programlanmış olmak arasındaki son çizgiye yaklaşırken.", cover: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=70", genre: "Bilim Kurgu", rank: "#02", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4"], media: ["https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=900&q=85"] },
-  { title: "Beyaz Yıldız Dağı", author: "Yume", authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80", label: "Altın Seçki", description: "Karın altında saklanan eski bir kehanet, dört yolcuyu aynı zirvede buluşturur.", cover: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=700&q=85", backdrop: "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=70", genre: "Fantastik · Macera", rank: "#03", trailers: ["https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4", "https://storage.googleapis.com/coverr-main/mp4/Footboys.mp4", "https://storage.googleapis.com/coverr-main/mp4/Mt_Baker.mp4"], media: ["https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=900&q=85", "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=900&q=85"] },
-];
-
-const recommendedBooks = [
-  { title: "Sessiz Sayfalar", author: "Maya T.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", progress: "92%" },
-  { title: "Yıldızların Altında", author: "Ege A.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80", progress: "78%" },
-  { title: "Kayıp Şehirler", author: "Derya N.", genre: "Macera", cover: "https://images.unsplash.com/photo-1470115636492-6d2b56f1d284?auto=format&fit=crop&w=700&q=80", progress: "64%" },
-  { title: "Sırra Davet", author: "Deniz K.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=700&q=80", progress: "51%" },
-  { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", progress: "43%" },
-];
-
-const trendingBooks = [
-  { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80", reads: "12.8K" },
-  { title: "Derin Mesafe", author: "Uygar Y.", genre: "Genç Yetişkin", cover: "https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=700&q=80", reads: "26.4K" },
-  { title: "Gökyüzü Çizgisi", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80", reads: "9.8K" },
-  { title: "Kayıp Harita", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1543002588-bfa74002ed7e?auto=format&fit=crop&w=700&q=80", reads: "14.7K" },
-  { title: "Sessiz Oda", author: "Can D.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80", reads: "10.6K" },
-];
-
 const featuredAuthors = [
   { name: "Hülya_Aslıkc", role: "Yerel yazar", bio: "Gözle görülmeyeni kalemle çiziyorum. Yarım kalan kitapların ve yeni başlangıçların yazarı.", genre: "Romantizm", stories: "10", followers: "9.1K", city: "İstanbul", accent: "from-fuchsia-950 via-slate-900 to-cyan-950", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80" },
   { name: "İrem Uslu", role: "Yerel yazar", bio: "Duygusal karşılaşmaları ve ikinci şansları sade, güçlü karakterlerle anlatıyor.", genre: "Romantizm", stories: "8", followers: "7.4K", city: "İzmir", accent: "from-amber-950 via-slate-900 to-rose-950", avatar: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=crop&w=240&q=80" },
@@ -144,112 +53,7 @@ const loopUniverses = [
   { title: "Başka Bir Gökyüzü", description: "Kuralların değiştiği, yıldızların yol gösterdiği ve hayal gücünün sınır tanımadığı dünya.", mood: "Fantastik · Sonsuz", stories: "76 öykü", color: "from-violet-950 via-slate-900 to-fuchsia-950", author: "Ece Y.", authorAvatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80", cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=900&q=85", gallery: ["https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=700&q=80", "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=700&q=80"] },
 ];
 
-const shelfRows = [
-  {
-    title: "Yeni Çıkanlar",
-    subtitle: "Daha yeni keşfedilmeye başlayan hikâyeler",
-    books: [
-      { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80" },
-      { title: "Geceye Kalanlar", author: "Hülya_Aslıkc", genre: "Gizem", cover: "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kayıp Haritalar", author: "Arda S.", genre: "Macera", cover: "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=700&q=80" },
-      { title: "Son Perde", author: "Lina K.", genre: "Dram", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Aksiyon",
-    subtitle: "Temposu yüksek, sınırları zorlayan dünyalar",
-    books: [
-      { title: "Çelik Yemin", author: "Mert A.", genre: "Aksiyon", cover: "https://images.unsplash.com/photo-1533130061792-64b345e4a833?auto=format&fit=crop&w=700&q=80" },
-      { title: "Son Siper", author: "Kerem D.", genre: "Macera", cover: "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=700&q=80" },
-      { title: "Karanlık Rota", author: "Bora K.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kuzey Hattı", author: "Selin E.", genre: "Aksiyon", cover: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Korku",
-    subtitle: "Gece okumayı sevenler için karanlık hikâyeler",
-    books: [
-      { title: "Sessiz Oda", author: "Can D.", genre: "Korku", cover: "https://images.unsplash.com/photo-1511108690759-009324a90311?auto=format&fit=crop&w=700&q=80" },
-      { title: "Fısıltı", author: "Nehir T.", genre: "Korku", cover: "https://images.unsplash.com/photo-1509248961158-e54f6934749c?auto=format&fit=crop&w=700&q=80" },
-      { title: "Uyumayan Ev", author: "Duru P.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1505843513577-22bb7d21e455?auto=format&fit=crop&w=700&q=80" },
-      { title: "Karanlıkta Üç Ses", author: "Ali V.", genre: "Korku", cover: "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Romantizm",
-    subtitle: "Kalbe dokunan karşılaşmalar ve ikinci şanslar",
-    books: [
-      { title: "Bir Adın Bedeli", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1522673607200-164d1b6ce486?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kalbin Kıyısı", author: "İrem Uslu", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=700&q=80" },
-      { title: "Ay Işığı Notları", author: "Mina E.", genre: "Romantik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
-      { title: "Eski Bir Mektup", author: "Lina K.", genre: "Romantizm", cover: "https://images.unsplash.com/photo-1516979187457-637abb4f9353?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Fantastik",
-    subtitle: "Başka dünyalara açılan büyülü kapılar",
-    books: [
-      { title: "Başka Bir Gökyüzü", author: "Ece Y.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=700&q=80" },
-      { title: "Yıldızların Altında", author: "Ege A.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
-      { title: "Gölgeler Ülkesi", author: "Sena R.", genre: "Fantastik", cover: "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Polisiye",
-    subtitle: "İpuçlarını takip et, gerçeği herkesten önce bul",
-    books: [
-      { title: "Sessiz Sayfalar", author: "Maya T.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
-      { title: "Sırra Davet", author: "Deniz K.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kayıp Dosya", author: "Bora K.", genre: "Polisiye", cover: "https://images.unsplash.com/photo-1505664194779-8beaceb93744?auto=format&fit=crop&w=700&q=80" },
-      { title: "Son Tanık", author: "Duru P.", genre: "Gerilim", cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-  {
-    title: "Bilim Kurgu",
-    subtitle: "Geleceğin şehirleri ve bilinmeyen olasılıklar",
-    books: [
-      { title: "Mekanik Kalp", author: "Arman B.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=700&q=80" },
-      { title: "Kırık Zaman", author: "Elif M.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=700&q=80" },
-      { title: "Yörünge", author: "Mert A.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1446776877081-d282a0f896e2?auto=format&fit=crop&w=700&q=80" },
-      { title: "Dünya 2.0", author: "Selin E.", genre: "Bilim Kurgu", cover: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=700&q=80" },
-    ],
-  },
-];
-
-const continuingBooks = [
-  { title: "Bir Kamp Gecesi +18", description: "Biz, dokuz kişilik bir arkadaş grubuyduk. Dokuz masum can, dokuz günahsız kul... Biz bu sonu hak etmemiştik.", chapters: "36 Bölümler", status: "TAMAMLANDI", rank: "#11 içinde Macera", covers: ["https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=500&q=80"] },
-  { title: "Derin Mesafe", description: "Bazı mesafeler kilometreyle değil, söylenmemiş cümlelerle ölçülür.", chapters: "8 Bölüm", status: "DEVAM EDİYOR", rank: "#14 içinde Genç Yetişkin", covers: ["https://images.unsplash.com/photo-1496104679561-38d5f6b8446c?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=500&q=80", "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=500&q=80"] },
-];
-
 const loopUniversesFull = loopUniverses;
-
-const libraryCollection = [
-  {
-    title: "Kayıp Şehirler",
-    author: "Derya N.",
-    genre: "Macera",
-    cover: "https://images.unsplash.com/photo-1470115636492-6d2b56f1d284?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Sırra Davet",
-    author: "Deniz K.",
-    genre: "Gerilim",
-    cover: "https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Kırık Zaman",
-    author: "Elif M.",
-    genre: "Bilim Kurgu",
-    cover: "https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=900&q=80",
-  },
-  {
-    title: "Çığlık Sokağı",
-    author: "Burak A.",
-    genre: "Polisiye",
-    cover: "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=900&q=80",
-  },
-];
 
 export default function WriteBook() {
   const search = useSearch();
@@ -320,6 +124,96 @@ export default function WriteBook() {
     { name: "Deneme",       count: _genreCount["Deneme"]       ?? 0, icon: "✍️" },
   ];
 
+  // ── Gerçek veriden türetilmiş kitap koleksiyonları ─────────────────────────
+  // genre + author alanları eklenerek JSX uyumu sağlanıyor
+  const _mapped = _published.map((book) => ({
+    ...book,
+    genre: (book.genres ?? [])[0] ?? "—",
+    author: "Ben",
+  }));
+
+  // Yayınlanmamış taslaklar — "Devam Edenler" bölümü için
+  const _drafts = (() => {
+    try {
+      const raw = localStorage.getItem("loop_drafts_v1");
+      if (!raw) return [] as typeof _mapped;
+      return (JSON.parse(raw) as any[])
+        .filter((d: any) => d.status !== "published")
+        .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        .map((b: any) => ({ ...b, genre: (b.genres ?? [])[0] ?? "—", author: "Ben" }));
+    } catch { return [] as typeof _mapped; }
+  })();
+
+  // Türe göre gruplandırılmış raflar
+  const _publishedShelfRows = Object.entries(
+    _mapped.reduce((acc, book) => {
+      const g = book.genre === "—" ? "Diğer" : book.genre;
+      if (!acc[g]) acc[g] = [];
+      acc[g].push(book);
+      return acc;
+    }, {} as Record<string, typeof _mapped>),
+  ).map(([title, books]) => ({
+    title,
+    subtitle: `${title} türünde ${books.length} kitap`,
+    books,
+  }));
+
+  // Eski sahte sabitlerin yerini alan gerçek veri koleksiyonları
+  const featuredStories = _mapped.map((book) => ({
+    title: book.title || "Başlıksız",
+    author: book.author,
+    genre: book.genre,
+    cover: book.cover ?? "",
+    description: book.synopsis ?? "",
+    reads: "—",
+    likes: "—",
+    rating: "5.0",
+  }));
+
+  const premiumBooks = _mapped.map((book, i) => ({
+    title: book.title || "Başlıksız",
+    author: book.author,
+    authorAvatar: "" as string,
+    label: "Yayında",
+    description: book.synopsis ?? "",
+    cover: book.cover ?? "",
+    backdrop: book.cover ?? "",
+    genre: book.genre,
+    rank: `#${String(i + 1).padStart(2, "0")}`,
+    trailers: [] as string[],
+    media: book.cover ? [book.cover] : [] as string[],
+  }));
+
+  const recommendedBooks = _mapped.map((book) => ({
+    title: book.title || "Başlıksız",
+    author: book.author,
+    genre: book.genre,
+    cover: book.cover ?? "",
+    progress: "100%",
+  }));
+
+  const trendingBooks = _mapped.map((book) => ({
+    title: book.title || "Başlıksız",
+    author: book.author,
+    genre: book.genre,
+    cover: book.cover ?? "",
+    reads: "—",
+  }));
+
+  const shelfRows = _publishedShelfRows;
+
+  const continuingBooks = _drafts.map((book) => ({
+    title: book.title || "Başlıksız",
+    description: (book as any).synopsis ?? "",
+    chapters: `${((book as any).chapters as unknown[])?.length ?? 0} Bölüm`,
+    status: "DEVAM EDİYOR",
+    rank: "",
+    covers: (book as any).cover ? [(book as any).cover as string] : [] as string[],
+  }));
+
+  const libraryCollection = _mapped;
+  // ───────────────────────────────────────────────────────────────────────────
+
   const startUniversePress = (universe: (typeof loopUniverses)[number]) => {
     universePressTimer.current = setTimeout(() => setSelectedUniverse(universe), 550);
   };
@@ -357,13 +251,15 @@ export default function WriteBook() {
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
   };
 
+  const _pLen = Math.max(1, premiumBooks.length);
+
   const prevPremium = () => {
-    setPremiumIndex((prev) => (prev - 1 + premiumBooks.length) % premiumBooks.length);
+    setPremiumIndex((prev) => (prev - 1 + _pLen) % _pLen);
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_BACK_SWIPE_MS;
   };
 
   const nextPremium = () => {
-    setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
+    setPremiumIndex((prev) => (prev + 1) % _pLen);
     pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
   };
 
@@ -372,7 +268,7 @@ export default function WriteBook() {
       if (autoAdvanceTimerRef.current) window.clearInterval(autoAdvanceTimerRef.current);
       autoAdvanceTimerRef.current = window.setInterval(() => {
         if (Date.now() < pausedUntilRef.current) return;
-        setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
+        setPremiumIndex((prev) => (prev + 1) % _pLen);
       }, 300000);
     };
 
@@ -393,7 +289,7 @@ export default function WriteBook() {
         setPremiumIndex((prev) => Math.max(0, prev - 1));
         pausedUntilRef.current = Date.now() + PAUSE_AFTER_BACK_SWIPE_MS;
       } else if (dx < -THRESHOLD) {
-        setPremiumIndex((prev) => (prev + 1) % premiumBooks.length);
+        setPremiumIndex((prev) => (prev + 1) % _pLen);
         pausedUntilRef.current = Date.now() + PAUSE_AFTER_MANUAL_MS;
       }
       touchStartXRef.current = null;
@@ -443,18 +339,7 @@ export default function WriteBook() {
     );
   });
 
-  const libraryShelves = Object.entries(
-    libraryCollection.reduce((acc, book) => {
-      if (!acc[book.genre]) acc[book.genre] = [];
-      acc[book.genre].push(book);
-      return acc;
-    }, {} as Record<string, typeof libraryCollection>),
-  );
-
-  const { data: bookPosts, isLoading: bookLoading } = useListPosts(
-    { postType: "book" },
-    { query: { queryKey: getListPostsQueryKey({ postType: "book" }), enabled: libraryView === "flow" } }
-  );
+  // libraryShelves artık _publishedShelfRows ile aynı; ayrı hesaplamaya gerek yok
 
   const visibleShelfRows = shelfCategory === "Tümü"
     ? shelfRows
@@ -519,7 +404,7 @@ export default function WriteBook() {
                       {catFilteredBooks.slice(0, 8).map((book) => (
                         <div key={book.title} className="flex items-center gap-4 rounded-[1.25rem] border border-slate-100 bg-slate-50 p-3 hover:border-violet-200 hover:bg-violet-50/50 transition">
                           <div className="h-14 w-10 flex-shrink-0 overflow-hidden rounded-lg shadow-sm">
-                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
+                            {book.cover ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-violet-100 flex items-center justify-center text-2xl">📖</div>}
                           </div>
                           <div className="min-w-0">
                             <p className="font-semibold text-sm text-slate-900 truncate">{book.title}</p>
@@ -658,7 +543,7 @@ export default function WriteBook() {
                       {row.books.map((book, idx) => (
                         <div key={idx} className="group flex-shrink-0 snap-start w-32 sm:w-36 cursor-pointer">
                           <div className="relative h-48 sm:h-52 w-full overflow-hidden rounded-2xl shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-transform duration-300 group-hover:scale-[1.03]">
-                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
+                            {book.cover ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover" /> : <div className="h-full w-full bg-violet-900/40 flex items-center justify-center text-3xl">📖</div>}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                             <span className="absolute bottom-2 left-2 rounded-full bg-white/15 backdrop-blur-sm px-2 py-0.5 text-[9px] font-semibold text-white/90 uppercase tracking-wide">{book.genre}</span>
                           </div>
@@ -676,10 +561,10 @@ export default function WriteBook() {
             {libraryView === "new" && (
               <div className="pt-4">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {[...libraryCollection, ...shelfRows[0].books].map((book, idx) => (
+                  {libraryCollection.map((book, idx) => (
                     <div key={idx} className="group cursor-pointer">
                       <div className="relative overflow-hidden rounded-2xl shadow-[0_6px_24px_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:scale-[1.03]">
-                        <img src={book.cover} alt={book.title} className="h-44 sm:h-52 w-full object-cover" />
+                        {book.cover ? <img src={book.cover} alt={book.title} className="h-44 sm:h-52 w-full object-cover" /> : <div className="h-44 sm:h-52 w-full bg-violet-900/40 flex items-center justify-center text-3xl">📖</div>}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                         <div className="absolute bottom-0 left-0 right-0 p-3">
                           <p className="text-xs font-bold text-white line-clamp-2 leading-tight">{book.title}</p>
@@ -706,7 +591,7 @@ export default function WriteBook() {
             {/* BEĞENDİKLERİM */}
             {libraryView === "liked" && (
               <div className="pt-4 space-y-3">
-                {[...featuredStories, ...recommendedBooks.map(b => ({ ...b, likes: "—", reads: "—", rating: "5.0", description: "" }))].map((book, idx) => (
+                {featuredStories.map((book, idx) => (
                   <div key={idx} className="group flex items-center gap-4 rounded-2xl bg-white/5 border border-white/8 px-4 py-3 hover:bg-white/8 transition-all duration-200 cursor-pointer">
                     <div className="relative flex-shrink-0 h-16 w-12 overflow-hidden rounded-xl shadow-[0_4px_16px_rgba(0,0,0,0.3)]">
                       <img src={book.cover} alt={book.title} className="h-full w-full object-cover" />
@@ -837,10 +722,17 @@ export default function WriteBook() {
           </button>}
 
           {/* ── Öne Çıkan Hikayeler ── */}
+          {featuredStories.length === 0 ? (
+            <section className="relative overflow-hidden rounded-[2rem] bg-[#0d0d12] px-6 py-10 text-center shadow-[0_32px_100px_rgba(0,0,0,0.35)]">
+              <Sparkles className="mx-auto h-8 w-8 text-amber-400/40 mb-3" />
+              <p className="text-sm font-semibold text-slate-400">Henüz yayınlanan kitap yok</p>
+              <p className="text-xs text-slate-600 mt-1">Bir kitabı yayınladıktan sonra burada öne çıkan hikayeler bölümünde görünecek.</p>
+            </section>
+          ) : (
           <section className="relative overflow-hidden rounded-[2rem] shadow-[0_32px_100px_rgba(0,0,0,0.35)]">
             {/* Blurred backdrop — all images pre-rendered; only opacity changes, no src swap */}
             <div className="absolute inset-0 -z-0 overflow-hidden">
-              {featuredStories.map((story, index) => (
+              {featuredStories.map((story, index) => story.cover ? (
                 <img
                   key={index}
                   src={story.cover}
@@ -854,7 +746,7 @@ export default function WriteBook() {
                     willChange: "opacity",
                   }}
                 />
-              ))}
+              ) : null)}
               <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d12]/80 via-[#0d0d12]/70 to-[#0d0d12]/95" />
             </div>
 
@@ -877,13 +769,17 @@ export default function WriteBook() {
             {/* Active story — hero */}
             <div className="relative z-10 px-5 pt-5 sm:px-7">
               {(() => {
-                const story = featuredStories[selectedStoryIndex];
+                const story = featuredStories[Math.min(selectedStoryIndex, featuredStories.length - 1)];
+                if (!story) return null;
                 return (
                   <div className="flex gap-4 sm:gap-6">
                     {/* Cover */}
                     <div className="relative flex-shrink-0 w-28 sm:w-36">
                       <div className="relative h-40 sm:h-52 w-full overflow-hidden rounded-xl shadow-[0_16px_48px_rgba(0,0,0,0.6)]">
-                        <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition-all duration-500" />
+                        {story.cover
+                          ? <img src={story.cover} alt={story.title} className="h-full w-full object-cover transition-all duration-500" />
+                          : <div className="h-full w-full bg-violet-900/40 flex items-center justify-center text-4xl">📖</div>
+                        }
                         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                       </div>
                       {/* Rank badge */}
@@ -899,7 +795,7 @@ export default function WriteBook() {
                           {story.genre}
                         </span>
                         <h3 className="text-xl sm:text-2xl font-black text-white leading-tight line-clamp-2">{story.title}</h3>
-                        <p className="text-[11px] sm:text-xs text-slate-400 leading-5 line-clamp-3">{story.description}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-400 leading-5 line-clamp-3">{story.description || "—"}</p>
                       </div>
 
                       {/* Author row */}
@@ -945,7 +841,10 @@ export default function WriteBook() {
                       : "w-16 sm:w-20 opacity-50 hover:opacity-80 ring-1 ring-white/10"
                   }`}
                 >
-                  <img src={story.cover} alt={story.title} className="h-20 sm:h-24 w-full object-cover transition duration-500 group-hover:scale-105" />
+                  {story.cover
+                    ? <img src={story.cover} alt={story.title} className="h-20 sm:h-24 w-full object-cover transition duration-500 group-hover:scale-105" />
+                    : <div className="h-20 sm:h-24 w-full bg-violet-900/40 flex items-center justify-center text-xl">📖</div>
+                  }
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                   {selectedStoryIndex === index && (
                     <div className="absolute bottom-1.5 left-0 right-0 px-1.5">
@@ -972,9 +871,15 @@ export default function WriteBook() {
               ))}
             </div>
           </section>
+          )}
 
-          {(() => {
-            const premium = premiumBooks[premiumIndex];
+          {premiumBooks.length === 0 ? (
+            <section className="relative isolate overflow-hidden rounded-[2rem] bg-[#180d00] px-6 py-10 text-center text-white">
+              <p className="text-sm font-semibold text-amber-300/60">Henüz yayınlanan kitap yok</p>
+              <p className="text-xs text-slate-600 mt-1">Bir kitap yayınladıktan sonra burada vitrin alanında görünecek.</p>
+            </section>
+          ) : (() => {
+            const premium = premiumBooks[Math.min(premiumIndex, premiumBooks.length - 1)];
             return (
               <section
                 ref={premiumAreaRef}
@@ -982,9 +887,9 @@ export default function WriteBook() {
                 style={{ boxShadow: "0 32px 110px rgba(120,53,15,0.28)" }}
               >
                 {/* ── Stacked cinematic backdrops (opacity only, no src swap) ── */}
-                {premiumBooks.map((pb, i) => (
+                {premiumBooks.map((pb, i) => pb.backdrop ? (
                   <img
-                    key={pb.backdrop} src={pb.backdrop} alt="" aria-hidden
+                    key={`backdrop-${i}`} src={pb.backdrop} alt="" aria-hidden
                     className="absolute inset-0 h-full w-full object-cover"
                     style={{
                       zIndex: -20,
@@ -995,7 +900,7 @@ export default function WriteBook() {
                       willChange: "opacity",
                     }}
                   />
-                ))}
+                ) : null)}
                 <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/80 via-black/65 to-[#180d00]/90" />
 
                 {/* ── Header ───────────────────────────────────────────────── */}
@@ -1159,10 +1064,16 @@ export default function WriteBook() {
               </button>
             </div>
             <div className="scrollbar-hide mt-5 flex gap-4 overflow-x-auto pb-2">
+              {recommendedBooks.length === 0 && (
+                <p className="text-sm text-slate-400 py-4">Henüz yayınlanan kitap yok.</p>
+              )}
               {recommendedBooks.map((book) => (
                 <article key={book.title} className="group w-32 flex-none sm:w-40">
                   <div className="relative h-48 overflow-hidden rounded-xl bg-slate-200 shadow-md sm:h-60">
-                    <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                    {book.cover
+                      ? <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                      : <div className="h-full w-full bg-violet-100 flex items-center justify-center text-3xl">📖</div>
+                    }
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent p-3 pt-10">
                       <span className="rounded-full bg-white/15 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{book.genre}</span>
                     </div>
@@ -1192,16 +1103,25 @@ export default function WriteBook() {
             </div>
 
             {/* #1 hero card */}
-            {(() => {
+            {trendingBooks.length === 0 ? (
+              <div className="mt-3 mx-4 rounded-2xl bg-white/5 py-8 text-center">
+                <p className="text-sm text-slate-400">Henüz yayınlanan kitap yok</p>
+              </div>
+            ) : (() => {
               const top = trendingBooks[0];
               return (
                 <div className="mt-3 mx-4 relative overflow-hidden rounded-2xl" style={{ height: 130 }}>
-                  <img src={top.cover} alt={top.title} className="absolute inset-0 h-full w-full object-cover scale-110" style={{ filter: "blur(2px)" }} />
+                  {top.cover
+                    ? <img src={top.cover} alt={top.title} className="absolute inset-0 h-full w-full object-cover scale-110" style={{ filter: "blur(2px)" }} />
+                    : <div className="absolute inset-0 bg-violet-900/60" />
+                  }
                   <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.2) 100%)" }} />
-                  {/* rank watermark */}
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[72px] font-black leading-none select-none" style={{ color: "rgba(255,255,255,0.06)" }}>1</span>
                   <div className="relative flex h-full items-center gap-3 px-3">
-                    <img src={top.cover} alt={top.title} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-lg ring-2 ring-amber-400/60" />
+                    {top.cover
+                      ? <img src={top.cover} alt={top.title} className="h-20 w-14 shrink-0 rounded-xl object-cover shadow-lg ring-2 ring-amber-400/60" />
+                      : <div className="h-20 w-14 shrink-0 rounded-xl bg-violet-800/60 flex items-center justify-center text-2xl ring-2 ring-amber-400/60">📖</div>
+                    }
                     <div className="min-w-0">
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-black">#1 Bu Hafta</span>
                       <h3 className="mt-1.5 text-[17px] font-black leading-tight text-white line-clamp-1">{top.title}</h3>
@@ -1225,9 +1145,11 @@ export default function WriteBook() {
               {trendingBooks.slice(1).map((book, i) => (
                 <article key={book.title} className="group w-28 flex-none">
                   <div className="relative h-40 overflow-hidden rounded-xl bg-slate-800 shadow-lg">
-                    <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-106" />
+                    {book.cover
+                      ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-106" />
+                      : <div className="h-full w-full bg-violet-900/40 flex items-center justify-center text-2xl">📖</div>
+                    }
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
-                    {/* rank */}
                     <span className="absolute left-2 top-2 flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black shadow-lg" style={{ background: "rgba(109,40,217,0.85)", color: "#e9d5ff" }}>
                       {i + 2}
                     </span>
@@ -1349,7 +1271,7 @@ export default function WriteBook() {
                     {row.books.map((book) => (
                       <article key={book.title} className="group w-28 flex-none sm:w-36">
                         <div className="relative h-40 overflow-hidden rounded-md bg-slate-300 shadow-[5px_6px_0_rgba(71,45,24,0.25)] sm:h-52">
-                          <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                          {book.cover ? <img src={book.cover} alt={`${book.title} kitap kapağı`} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="h-full w-full bg-violet-900/30 flex items-center justify-center text-3xl">📖</div>}
                           <span className="absolute bottom-2 left-2 rounded-full bg-black/60 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur">{book.genre}</span>
                         </div>
                         <h4 className="mt-2 truncate text-xs font-bold text-slate-900 sm:text-sm">{book.title}</h4>
