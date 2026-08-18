@@ -1498,8 +1498,6 @@ export default function WriteBook() {
 
           <section className="writebook-columns grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="overflow-hidden rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
-              <div className="mb-6 sm:mb-8">
-
               <div className="writebook-columns grid gap-6 xl:grid-cols-[1.45fr_0.95fr]">
                 <article className="writebook-panel rounded-[2rem] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white shadow-[0_25px_90px_rgba(15,23,42,0.3)] border border-white/10 hover:border-white/20 transition">
                   <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr] p-8 lg:p-8">
