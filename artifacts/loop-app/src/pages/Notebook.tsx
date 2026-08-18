@@ -1496,6 +1496,55 @@ export default function WriteBook() {
             </div>
           </section>
 
+          <section className="overflow-hidden rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Yayınlanan Kitaplar</p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-900">Son yayınlananlar</h3>
+              </div>
+              <Link href="/kitaplar" className="inline-flex items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800">
+                Tümü
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="mt-6">
+              {_published.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <p className="text-slate-400 text-sm font-medium">Henüz yayınlanan kitap yok</p>
+                  <p className="text-slate-400/60 text-xs mt-1">Çalışmalarım → ⋯ → Yayınla</p>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-6 justify-start items-end">
+                  {_published.slice(0, 4).map((book) => (
+                    <Link key={book.id} href={`/kitap/${book.id}`}>
+                      <article className="relative group h-64 w-40 cursor-pointer transition-transform duration-300 hover:scale-105">
+                        <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(15,23,42,0.16)] transition-shadow duration-300 group-hover:shadow-[0_30px_80px_rgba(15,23,42,0.25)]"
+                          style={{ background: "rgba(109,40,217,0.15)" }}>
+                          {book.cover
+                            ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                            : <div className="flex h-full w-full items-center justify-center text-4xl opacity-30">📖</div>
+                          }
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-end">
+                            <div className="space-y-1">
+                              <span className="inline-flex rounded-full bg-violet-500/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+                                {(book.genres ?? [])[0] ?? "—"}
+                              </span>
+                              <h4 className="text-sm font-bold text-white line-clamp-2">{book.title || "Başlıksız"}</h4>
+                              <p className="text-[10px] text-slate-300">{(book.chapters as unknown[])?.length ?? 0} bölüm · {(book.wordCount ?? 0).toLocaleString("tr")} kelime</p>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-2 text-center">
+                          <h5 className="text-xs font-bold text-slate-900 line-clamp-2 group-hover:text-violet-700 transition">{book.title || "Başlıksız"}</h5>
+                          <p className="text-xs text-slate-500 mt-0.5">{(book.genres ?? [])[0] ?? "—"}</p>
+                        </div>
+                      </article>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
 
         </div>
         </div>
