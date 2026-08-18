@@ -281,28 +281,43 @@ export default function WriteBook() {
   const universePressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const storyCarouselRef = useRef<HTMLDivElement>(null);
 
+  // ── Gerçek yayınlanan kitaplar — localStorage'dan doğrudan oku ──────
+  const _published: Array<{
+    id: string; title: string; cover?: string | null;
+    genres?: string[]; wordCount?: number; chapters?: unknown[];
+    synopsis?: string; updatedAt: string;
+  }> = (() => {
+    try {
+      const raw = localStorage.getItem("loop_drafts_v1");
+      if (!raw) return [];
+      return (JSON.parse(raw) as any[])
+        .filter((d: any) => d.status === "published")
+        .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    } catch { return []; }
+  })();
+
+  // Tür → yayınlanan kitap sayısı (gerçek sayaç)
+  const _genreCount: Record<string, number> = {};
+  for (const book of _published) {
+    for (const g of (book.genres ?? [])) {
+      _genreCount[g] = (_genreCount[g] ?? 0) + 1;
+    }
+  }
+
+  // Kategori listesi — sayılar gerçek veriden geliyor
   const allCategories = [
-    { name: "Roman", count: 24, icon: "📖" },
-    { name: "Polisiye", count: 18, icon: "🔍" },
-    { name: "Fantastik", count: 12, icon: "✨" },
-    { name: "Kişisel Gelişim", count: 9, icon: "🎯" },
-    { name: "Aksiyon", count: 16, icon: "⚡" },
-    { name: "Korku", count: 14, icon: "👻" },
-    { name: "Romantizm", count: 21, icon: "💕" },
-    { name: "Bilim Kurgu", count: 11, icon: "🚀" },
-    { name: "Dram", count: 13, icon: "🎭" },
-    { name: "Macera", count: 15, icon: "🗺️" },
-    { name: "Gerilim", count: 10, icon: "😰" },
-    { name: "Genç Yetişkin", count: 19, icon: "📚" },
-    { name: "Askeri Kurgu", count: 8, icon: "🎖️" },
-    { name: "Çocuk Edebiyatı", count: 22, icon: "👶" },
-    { name: "Edebi Kurgu", count: 11, icon: "✍️" },
-    { name: "Mizah", count: 7, icon: "😂" },
-    { name: "Öykü", count: 17, icon: "📕" },
-    { name: "Mitolojik", count: 10, icon: "🏛️" },
-    { name: "Şiir", count: 14, icon: "🖋️" },
-    { name: "Psikolojik", count: 9, icon: "🧠" },
-    { name: "Ütopya-Distopya", count: 12, icon: "🔮" },
+    { name: "Romantizm",    count: _genreCount["Romantizm"]    ?? 0, icon: "💕" },
+    { name: "Fantastik",    count: _genreCount["Fantastik"]    ?? 0, icon: "✨" },
+    { name: "Gerilim",      count: _genreCount["Gerilim"]      ?? 0, icon: "😰" },
+    { name: "Bilim Kurgu",  count: _genreCount["Bilim Kurgu"]  ?? 0, icon: "🚀" },
+    { name: "Tarih",        count: _genreCount["Tarih"]        ?? 0, icon: "🏛️" },
+    { name: "Gizem",        count: _genreCount["Gizem"]        ?? 0, icon: "🔍" },
+    { name: "Macera",       count: _genreCount["Macera"]       ?? 0, icon: "🗺️" },
+    { name: "Korku",        count: _genreCount["Korku"]        ?? 0, icon: "👻" },
+    { name: "Komedi",       count: _genreCount["Komedi"]       ?? 0, icon: "😂" },
+    { name: "Drama",        count: _genreCount["Drama"]        ?? 0, icon: "🎭" },
+    { name: "Şiir",         count: _genreCount["Şiir"]         ?? 0, icon: "🖋️" },
+    { name: "Deneme",       count: _genreCount["Deneme"]       ?? 0, icon: "✍️" },
   ];
 
   const startUniversePress = (universe: (typeof loopUniverses)[number]) => {
@@ -595,9 +610,9 @@ export default function WriteBook() {
               {/* Stat chips */}
               <div className="mt-5 flex flex-wrap gap-2">
                 {[
-                  { label: "Toplam kitap", value: `${libraryCollection.length + shelfRows.reduce((a,r)=>a+r.books.length,0)}` },
-                  { label: "Tür", value: `${allCategories.length}` },
-                  { label: "Bu ay eklenen", value: "4" },
+                  { label: "Yayında kitap", value: `${_published.length}` },
+                  { label: "Tür", value: `${Object.keys(_genreCount).length}` },
+                  { label: "Toplam kelime", value: _published.reduce((s,b)=>s+(b.wordCount??0),0) > 999 ? `${(_published.reduce((s,b)=>s+(b.wordCount??0),0)/1000).toFixed(1)}B` : `${_published.reduce((s,b)=>s+(b.wordCount??0),0)}` },
                 ].map(s => (
                   <div key={s.label} className="flex items-center gap-2 rounded-full bg-white/8 border border-white/10 px-4 py-2 backdrop-blur-sm">
                     <span className="text-base font-bold text-white">{s.value}</span>
@@ -1726,89 +1741,107 @@ export default function WriteBook() {
                 <div className="overflow-hidden rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)]">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Kütüphane</p>
-                      <h3 className="mt-2 text-xl font-semibold text-slate-900">Sözlükteki favoriler</h3>
+                      <p className="text-xs uppercase tracking-[0.35em] text-slate-500">Yayınlanan Kitaplar</p>
+                      <h3 className="mt-2 text-xl font-semibold text-slate-900">Son yayınlananlar</h3>
                     </div>
-                    <button className="inline-flex items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800">
-                      Daha fazla
+                    <Link href="/kitaplar" className="inline-flex items-center gap-2 rounded-full bg-violet-700 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-800">
+                      Tümü
                       <ArrowRight className="h-4 w-4" />
-                    </button>
+                    </Link>
                   </div>
                   <div className="mt-6">
-                    <div className="flex flex-wrap gap-6 justify-start items-end">
-                      {featuredBooks.map((book) => (
-                        <article key={book.title} className="relative group h-64 w-40 cursor-pointer transition-transform duration-300 hover:scale-105">
-                          <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(15,23,42,0.16)] transition-shadow duration-300 group-hover:shadow-[0_30px_80px_rgba(15,23,42,0.25)]">
-                            <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                            <div className="absolute inset-y-0 -right-2 w-5 bg-gradient-to-r from-slate-900/30 to-slate-950/50 rounded-r-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-between">
-                              <div>
-                                <span className="inline-flex rounded-full bg-violet-500/80 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.35em] text-white backdrop-blur-sm">{book.category}</span>
-                                <span className="ml-2 inline-flex rounded-full bg-white/20 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">{book.progress}%</span>
-                              </div>
-                              <div className="space-y-3">
-                                <div>
-                                  <h4 className="text-base font-bold text-white line-clamp-2">{book.title}</h4>
-                                  <p className="mt-1 text-xs text-slate-200">{book.author}</p>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="h-1.5 overflow-hidden rounded-full bg-white/20">
-                                    <div className="h-full rounded-full bg-gradient-to-r from-violet-400 to-sky-400" style={{ width: `${book.progress}%` }} />
+                    {_published.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-12 text-center">
+                        <p className="text-slate-400 text-sm font-medium">Henüz yayınlanan kitap yok</p>
+                        <p className="text-slate-400/60 text-xs mt-1">Çalışmalarım → ⋯ → Yayınla</p>
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-6 justify-start items-end">
+                        {_published.slice(0, 4).map((book) => (
+                          <Link key={book.id} href={`/kitap/${book.id}`}>
+                            <article className="relative group h-64 w-40 cursor-pointer transition-transform duration-300 hover:scale-105">
+                              <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_20px_60px_rgba(15,23,42,0.16)] transition-shadow duration-300 group-hover:shadow-[0_30px_80px_rgba(15,23,42,0.25)]"
+                                style={{ background: "rgba(109,40,217,0.15)" }}>
+                                {book.cover
+                                  ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                                  : <div className="flex h-full w-full items-center justify-center text-4xl opacity-30">📖</div>
+                                }
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex flex-col justify-end">
+                                  <div className="space-y-1">
+                                    <span className="inline-flex rounded-full bg-violet-500/80 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+                                      {(book.genres ?? [])[0] ?? "—"}
+                                    </span>
+                                    <h4 className="text-sm font-bold text-white line-clamp-2">{book.title || "Başlıksız"}</h4>
+                                    <p className="text-[10px] text-slate-300">{(book.chapters as unknown[])?.length ?? 0} bölüm · {(book.wordCount ?? 0).toLocaleString("tr")} kelime</p>
                                   </div>
-                                  <button className="w-full rounded-lg bg-violet-600 hover:bg-violet-700 px-3 py-2 text-xs font-semibold text-white transition">Okumaya devam et</button>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                          <div className="mt-2 text-center">
-                            <h5 className="text-xs font-bold text-slate-900 line-clamp-2 group-hover:text-violet-700 transition">{book.title}</h5>
-                            <p className="text-xs text-slate-500 mt-1">{book.author}</p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
+                              <div className="mt-2 text-center">
+                                <h5 className="text-xs font-bold text-slate-900 line-clamp-2 group-hover:text-violet-700 transition">{book.title || "Başlıksız"}</h5>
+                                <p className="text-xs text-slate-500 mt-0.5">{(book.genres ?? [])[0] ?? "—"}</p>
+                              </div>
+                            </article>
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="writebook-panel space-y-6">
                   <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
-                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-amber-600 font-semibold">⭐ Sıralama</p>
-                    <h3 className="mt-2 text-base sm:text-lg lg:text-xl font-bold text-slate-900">Haftanın en iyileri</h3>
+                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-amber-600 font-semibold">⭐ Son Yayınlar</p>
+                    <h3 className="mt-2 text-base sm:text-lg lg:text-xl font-bold text-slate-900">En güncel kitaplar</h3>
                     <div className="mt-4 sm:mt-6 space-y-2 sm:space-y-3">
-                      {rankings.map((item) => (
-                        <div key={item.rank} className="flex items-center justify-between rounded-[1.25rem] sm:rounded-[1.5rem] bg-gradient-to-r from-amber-50 to-slate-50 border border-amber-100/50 hover:border-amber-200 p-3 sm:p-4 transition hover:shadow-md gap-2">
-                          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                            <div className="flex-shrink-0 w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg">
-                              {item.rank}
+                      {_published.length === 0 ? (
+                        <p className="text-sm text-slate-400 text-center py-4">Henüz yayınlanan kitap yok</p>
+                      ) : (
+                        _published.slice(0, 3).map((book, idx) => (
+                          <Link key={book.id} href={`/kitap/${book.id}`}>
+                            <div className="flex items-center justify-between rounded-[1.25rem] sm:rounded-[1.5rem] bg-gradient-to-r from-amber-50 to-slate-50 border border-amber-100/50 hover:border-amber-200 p-3 sm:p-4 transition hover:shadow-md gap-2 cursor-pointer">
+                              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                                <div className="flex-shrink-0 w-8 sm:w-10 h-8 sm:h-10 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white font-bold text-base sm:text-lg shadow-lg">
+                                  {idx + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="font-bold text-sm sm:text-base text-slate-900 truncate">{book.title || "Başlıksız"}</p>
+                                  <p className="text-xs text-slate-500">📖 {(book.wordCount ?? 0).toLocaleString("tr")} kelime · {(book.chapters as unknown[])?.length ?? 0} bölüm</p>
+                                </div>
+                              </div>
+                              <div className="flex-shrink-0">
+                                <Star className="h-5 sm:h-6 w-5 sm:w-6 text-amber-400 drop-shadow-lg" />
+                              </div>
                             </div>
-                            <div className="min-w-0">
-                              <p className="font-bold text-sm sm:text-base text-slate-900 truncate">{item.title}</p>
-                              <p className="text-xs text-slate-500">📖 {item.reads} okunma</p>
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0">
-                            <Star className="h-5 sm:h-6 w-5 sm:w-6 text-amber-400 drop-shadow-lg" />
-                          </div>
-                        </div>
-                      ))}
+                          </Link>
+                        ))
+                      )}
                     </div>
                   </div>
 
                   <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-white to-slate-50 p-4 sm:p-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] border border-slate-100">
                     <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-sky-600 font-semibold">🏷️ Kategoriler</p>
-                    <h3 className="mt-2 text-base sm:text-lg lg:text-xl font-bold text-slate-900">Hızlı filtreler</h3>
+                    <h3 className="mt-2 text-base sm:text-lg lg:text-xl font-bold text-slate-900">Türlere göre</h3>
                     <div className="mt-4 sm:mt-6 grid gap-2 sm:gap-3">
-                      {libraryCategories.map((category) => (
-                        <button key={category.name} className="rounded-[1.25rem] sm:rounded-[1.5rem] border border-sky-200/50 bg-gradient-to-r from-sky-50/80 to-slate-50/80 hover:from-sky-100/80 hover:to-slate-50/80 px-3 sm:px-5 py-3 sm:py-4 transition duration-300 hover:shadow-md hover:border-sky-300 text-left group">
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-900 group-hover:text-sky-700 truncate">{category.name}</p>
-                              <p className="mt-0.5 sm:mt-1 text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">📚 {category.count} kitap</p>
-                            </div>
-                            <div className="text-lg sm:text-xl flex-shrink-0 group-hover:translate-x-1 transition">→</div>
-                          </div>
-                        </button>
-                      ))}
+                      {Object.entries(_genreCount).length === 0 ? (
+                        <p className="text-sm text-slate-400 text-center py-4">Henüz yayınlanan kitap yok</p>
+                      ) : (
+                        Object.entries(_genreCount)
+                          .sort(([, a], [, b]) => b - a)
+                          .slice(0, 4)
+                          .map(([genre, count]) => (
+                            <Link key={genre} href={`/kitaplar`}>
+                              <button className="w-full rounded-[1.25rem] sm:rounded-[1.5rem] border border-sky-200/50 bg-gradient-to-r from-sky-50/80 to-slate-50/80 hover:from-sky-100/80 hover:to-slate-50/80 px-3 sm:px-5 py-3 sm:py-4 transition duration-300 hover:shadow-md hover:border-sky-300 text-left group">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-bold text-slate-900 group-hover:text-sky-700 truncate">{genre}</p>
+                                    <p className="mt-0.5 sm:mt-1 text-xs uppercase tracking-[0.15em] sm:tracking-[0.2em] text-slate-500">📚 {count} kitap</p>
+                                  </div>
+                                  <div className="text-lg sm:text-xl flex-shrink-0 group-hover:translate-x-1 transition">→</div>
+                                </div>
+                              </button>
+                            </Link>
+                          ))
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1897,35 +1930,46 @@ export default function WriteBook() {
               <div className="overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] bg-gradient-to-br from-violet-700 to-sky-600 p-4 sm:p-6 text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
                 <div className="flex items-center justify-between gap-2 sm:gap-4">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-slate-200/75 font-semibold">✨ İlham</p>
+                    <p className="text-xs uppercase tracking-[0.2em] sm:tracking-[0.35em] text-slate-200/75 font-semibold">✨ Yayınlananlar</p>
                     <h3 className="mt-2 text-lg sm:text-2xl font-semibold">Öne çıkan kitaplar</h3>
                   </div>
                   <Sparkles className="h-5 sm:h-6 w-5 sm:w-6 text-white/90 flex-shrink-0" />
                 </div>
                 <div className="mt-4 sm:mt-6 flex flex-wrap gap-2 sm:gap-3 justify-start items-end overflow-x-auto pb-2">
-                  {inspirationBooks.map((book) => (
-                    <article key={book.title} className="relative group h-48 w-32 sm:h-56 sm:w-36 cursor-pointer transition-transform duration-300 hover:scale-105 flex-shrink-0">
-                      <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.3)] transition-shadow duration-300 group-hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]">
-                        <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
-                        <div className="absolute inset-y-0 -right-2 w-4 bg-gradient-to-r from-sky-900/40 to-sky-950/60 rounded-r-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 flex flex-col justify-between">
-                          <div>
-                            <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.3em] text-white backdrop-blur-sm">İlham</span>
-                          </div>
-                          <div className="space-y-2">
-                            <div>
-                              <h4 className="text-sm font-bold text-white line-clamp-2">{book.title}</h4>
-                              <p className="mt-0.5 text-xs text-slate-200">Okuma için seçilen modern kapak</p>
+                  {_published.length === 0 ? (
+                    <div className="w-full py-8 text-center">
+                      <p className="text-white/70 text-sm">Henüz yayınlanan kitap yok</p>
+                      <Link href="/notebook/calismalari" className="mt-2 inline-block text-xs text-white/50 underline">Çalışmalarım'dan yayınla</Link>
+                    </div>
+                  ) : (
+                    _published.slice(0, 4).map((book) => (
+                      <Link key={book.id} href={`/kitap/${book.id}`}>
+                        <article className="relative group h-48 w-32 sm:h-56 sm:w-36 cursor-pointer transition-transform duration-300 hover:scale-105 flex-shrink-0">
+                          <div className="relative h-full w-full rounded-lg overflow-hidden shadow-[0_15px_50px_rgba(0,0,0,0.3)] transition-shadow duration-300 group-hover:shadow-[0_25px_70px_rgba(0,0,0,0.4)]"
+                            style={{ background: "rgba(109,40,217,0.4)" }}>
+                            {book.cover
+                              ? <img src={book.cover} alt={book.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" />
+                              : <div className="flex h-full w-full items-center justify-center text-4xl opacity-40">📖</div>
+                            }
+                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-3 flex flex-col justify-between">
+                              <span className="inline-flex rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+                                {(book.genres ?? [])[0] ?? "Kitap"}
+                              </span>
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-bold text-white line-clamp-2">{book.title || "Başlıksız"}</h4>
+                                <Link href={`/kitap/${book.id}`}>
+                                  <button className="w-full rounded-lg bg-white/20 hover:bg-white/30 px-2 py-1.5 text-[11px] font-semibold text-white transition backdrop-blur-sm">Oku</button>
+                                </Link>
+                              </div>
                             </div>
-                            <button className="w-full rounded-lg bg-white/20 hover:bg-white/30 px-2 py-1.5 text-[11px] font-semibold text-white transition backdrop-blur-sm">Keşfet</button>
                           </div>
-                        </div>
-                      </div>
-                      <div className="mt-2 text-center">
-                        <h5 className="text-xs font-bold text-white line-clamp-2 group-hover:text-sky-200 transition">{book.title}</h5>
-                      </div>
-                    </article>
-                  ))}
+                          <div className="mt-2 text-center">
+                            <h5 className="text-xs font-bold text-white line-clamp-2 group-hover:text-sky-200 transition">{book.title || "Başlıksız"}</h5>
+                          </div>
+                        </article>
+                      </Link>
+                    ))
+                  )}
                 </div>
               </div>
             </aside>
