@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { applySystemColor, getSystemColorId } from "./use-system-color";
 
 export function useDarkMode() {
   const [dark, setDark] = useState(() => {
@@ -16,9 +17,11 @@ export function useDarkMode() {
     } else {
       root.classList.remove("dark");
     }
+    applySystemColor(getSystemColorId());
     try {
       localStorage.setItem("loop-dark", String(dark));
     } catch {}
+    window.dispatchEvent(new Event("loop-dark-mode-change"));
   }, [dark]);
 
   return { dark, toggle: () => setDark((d) => !d) };

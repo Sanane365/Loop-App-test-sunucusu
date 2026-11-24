@@ -5,6 +5,7 @@
 ─────────────────────────────────────────────────────────────────── */
 
 export type DraftStatus = "draft" | "published";
+export type ProgressStatus = "ongoing" | "completed";
 
 export interface DraftChapter {
   id: string;
@@ -27,6 +28,8 @@ export interface Draft {
   subtitle: string;
   cover: string | null;
   trailers: (string | null)[];
+  trailerOrientations?: ("horizontal" | "vertical")[];
+  favoriteImages?: (string | null)[];
   genres: string[];
   synopsis: string;
   ageRating: "all" | "13+" | "18+";
@@ -42,6 +45,7 @@ export interface Draft {
   labelPos?: "top" | "mid" | "bottom";
   /** Yazar admin/premium rolüne sahipse true — "Premium Yazarlardan" bölümünde gösterilir */
   isPremiumAuthor?: boolean;
+  progressStatus?: ProgressStatus;
   createdAt: string; // ISO
   updatedAt: string; // ISO
 }
@@ -58,11 +62,69 @@ function readAll(): Draft[] {
 }
 
 function writeAll(drafts: Draft[]): void {
+  const serialized = JSON.stringify(drafts);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(drafts));
-  } catch {
-    /* storage dolu olabilir */
+    localStorage.setItem(STORAGE_KEY, serialized);
+    return;
+  } catch (error) {
+    if (!(error instanceof DOMException) || error.name !== "QuotaExceededError") throw error;
   }
+
+  const compact = drafts.map((draft) => ({
+    ...draft,
+    cover: draft.cover?.startsWith("data:") ? null : draft.cover,
+    trailers: draft.trailers.map(trailer => trailer?.startsWith("data:") ? null : trailer),
+    favoriteImages: draft.favoriteImages?.map(image => image?.startsWith("data:") ? null : image),
+    chapters: draft.chapters.map(chapter => ({
+      ...chapter,
+      blocks: chapter.blocks.map(block =>
+        (block.type === "image" || block.type === "video") && block.content.startsWith("data:")
+          ? { ...block, content: "" }
+          : block,
+      ),
+    })),
+  }));
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(compact));
+    return;
+  } catch (compactError) {
+    if (!(compactError instanceof DOMException) || compactError.name !== "QuotaExceededError") throw compactError;
+  }
+
+  // Replace the old oversized value before retrying with fewer drafts.
+  localStorage.removeItem(STORAGE_KEY);
+  for (let count = compact.length; count >= 1; count -= 1) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compact.slice(0, count)));
+      return;
+    } catch (error) {
+      if (!(error instanceof DOMException) || error.name !== "QuotaExceededError") throw error;
+    }
+  }
+
+  const current = compact[0];
+  if (!current) return;
+  const minimal = {
+    ...current,
+    cover: null,
+    trailers: [],
+    favoriteImages: [],
+    chapters: current.chapters.map(chapter => ({
+      ...chapter,
+      blocks: chapter.blocks.map(block =>
+        block.type === "image" || block.type === "video" ? { ...block, content: "" } : block,
+      ),
+    })),
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([minimal]));
+}
+
+function createDraftId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 /* Kaydet (oluştur ya da güncelle) — güncellenmiş draft'ı döner */
@@ -81,7 +143,7 @@ export function saveDraft(partial: Omit<Draft, "id" | "createdAt" | "updatedAt">
   const draft: Draft = {
     ...partial,
     status: effectiveStatus,
-    id: existing?.id ?? crypto.randomUUID(),
+    id: existing?.id ?? createDraftId(),
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -131,11 +193,12 @@ export function updateDraftCoverAndLabel(
   cover: string | null,
   label: string,
   labelPos: "top" | "mid" | "bottom",
+  progressStatus?: ProgressStatus,
 ): void {
   writeAll(
     readAll().map(d =>
       d.id === id
-        ? { ...d, cover, label: label || undefined, labelPos: label ? labelPos : undefined, updatedAt: new Date().toISOString() }
+        ? { ...d, cover, label: label || undefined, labelPos: label ? labelPos : undefined, ...(progressStatus ? { progressStatus } : {}), updatedAt: new Date().toISOString() }
         : d,
     ),
   );

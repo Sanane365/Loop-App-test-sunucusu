@@ -185,6 +185,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
 
+  /users/me/avatar-frame-transform:
+    patch:
+      operationId: updateAvatarFrameTransform
+      tags: [users]
+      summary: Save current user's profile frame placement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AvatarFrameTransform"
+      responses:
+        "200":
+          description: Saved frame placement
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [avatarFrameTransform]
+                properties:
+                  avatarFrameTransform:
+                    $ref: "#/components/schemas/AvatarFrameTransform"
+        "400":
+          description: Invalid frame placement
+        "401":
+          description: Unauthorized
+
   /users/me/avatar:
     post:
       operationId: uploadAvatar
@@ -197,6 +224,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/UploadResult"
+
+  /users/me/story-cover:
+    post:
+      operationId: uploadStoryPreviewCover
+      tags: [users]
+      summary: Upload a gallery image as the current user's story preview cover
+      responses:
+        "200":
+          description: Saved story preview cover
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [storyPreviewUrl]
+                properties:
+                  storyPreviewUrl:
+                    type: string
+        "400":
+          description: Invalid image
+        "401":
+          description: Unauthorized
+    delete:
+      operationId: removeStoryPreviewCover
+      tags: [users]
+      summary: Remove the current user's story preview cover
+      responses:
+        "200":
+          description: Removed story preview cover
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success:
+                    type: boolean
+        "401":
+          description: Unauthorized
 
   /posts:
     get:
@@ -212,6 +277,10 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: following
+          in: query
+          schema:
+            type: boolean
         - name: postType
           in: query
           schema:
@@ -482,6 +551,12 @@ paths:
           in: query
           schema:
             type: ["integer", "null"]
+        - name: roomId
+          in: query
+          description: Custom general-chat room ID; omit for the default general chat.
+          schema:
+            type: integer
+            minimum: 1
       responses:
         "200":
           description: Messages
@@ -508,6 +583,38 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ChatMessage"
+
+  /chat/rooms:
+    get:
+      operationId: listChatRooms
+      tags: [chat]
+      summary: List simple public rooms in the general chat
+      responses:
+        "200":
+          description: General chat rooms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatRoom"
+    post:
+      operationId: createChatRoom
+      tags: [chat]
+      summary: Create a simple general chat room
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRoomInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatRoom"
 
   /chat/voice:
     post:
@@ -702,6 +809,10 @@ components:
           type: ["string", "null"]
         avatarUrl:
           type: ["string", "null"]
+        storyPreviewUrl:
+          type: ["string", "null"]
+        avatarFrameTransform:
+          $ref: "#/components/schemas/NullableAvatarFrameTransform"
         bannerUrl:
           type: ["string", "null"]
         role:
@@ -733,6 +844,8 @@ components:
           type: ["string", "null"]
         avatarUrl:
           type: ["string", "null"]
+        avatarFrameTransform:
+          $ref: "#/components/schemas/NullableAvatarFrameTransform"
         followerCount:
           type: integer
         followingCount:
@@ -755,6 +868,28 @@ components:
           type: string
         bio:
           type: string
+
+    AvatarFrameTransform:
+      type: object
+      required: [x, y, scale]
+      properties:
+        x:
+          type: number
+          minimum: -42
+          maximum: 42
+        y:
+          type: number
+          minimum: -42
+          maximum: 42
+        scale:
+          type: number
+          minimum: 0.8
+          maximum: 1.3
+
+    NullableAvatarFrameTransform:
+      anyOf:
+        - $ref: "#/components/schemas/AvatarFrameTransform"
+        - type: "null"
 
     UploadResult:
       type: object
@@ -902,8 +1037,32 @@ components:
           type: ["string", "null"]
         voiceDuration:
           type: ["integer", "null"]
+        roomId:
+          type: ["integer", "null"]
         createdAt:
           type: string
+
+    ChatRoom:
+      type: object
+      required: [id, name, createdBy, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+
+    ChatRoomInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 40
 
     ChatMessageInput:
       type: object
@@ -916,6 +1075,8 @@ components:
           type: ["string", "null"]
         gifUrl:
           type: ["string", "null"]
+        roomId:
+          type: ["integer", "null"]
 
     VoiceRoom:
       type: object
@@ -926,6 +1087,8 @@ components:
         name:
           type: string
         description:
+          type: ["string", "null"]
+        roomCode:
           type: ["string", "null"]
         createdBy:
           type: integer

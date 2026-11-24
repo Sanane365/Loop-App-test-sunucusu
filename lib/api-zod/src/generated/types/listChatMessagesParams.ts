@@ -11,4 +11,9 @@ export type ListChatMessagesParams = {
  * @nullable
  */
 before?: number | null;
+/**
+ * Custom general-chat room ID; omit for the default general chat.
+ * @minimum 1
+ */
+roomId?: number;
 };

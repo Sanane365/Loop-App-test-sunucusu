@@ -21,5 +21,7 @@ export interface ChatMessage {
   voiceUrl?: string | null;
   /** @nullable */
   voiceDuration?: number | null;
+  /** @nullable */
+  roomId?: number | null;
   createdAt: string;
 }

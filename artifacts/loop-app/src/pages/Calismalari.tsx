@@ -4,13 +4,14 @@ import {
   ArrowLeft, BookOpen, Trash2, Send, FileText,
   Clock, Hash, Layers,
   Search, Plus, PenLine, BookOpen as BookEdit, EyeOff,
-  ImagePlus, Tag,
+  ImagePlus, Tag, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getAllDrafts, deleteDraft, publishDraft, unpublishDraft,
   updateDraftCoverAndLabel,
   type Draft,
+  type ProgressStatus,
 } from "@/lib/draftStore";
 import { useAuth } from "@/lib/auth";
 
@@ -85,14 +86,16 @@ function Empty({ tab }: { tab: string }) {
 }
 
 /* ── Kapak & Etiket düzenleyici bottom sheet ─────────────────────────── */
-function CoverEditSheet({ draft, onClose, onRefresh }: {
+function CoverEditSheet({ draft, onClose, onRefresh, canEditLabel }: {
   draft: Draft;
   onClose: () => void;
   onRefresh: () => void;
+  canEditLabel: boolean;
 }) {
   const [cover, setCover]       = useState<string | null>(draft.cover);
   const [label, setLabel]       = useState(draft.label ?? "");
   const [labelPos, setLabelPos] = useState<"top" | "mid" | "bottom">(draft.labelPos ?? "mid");
+  const [progressStatus, setProgressStatus] = useState<ProgressStatus>(draft.progressStatus ?? "ongoing");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,7 +107,7 @@ function CoverEditSheet({ draft, onClose, onRefresh }: {
   };
 
   const handleSave = () => {
-    updateDraftCoverAndLabel(draft.id, cover, label.trim(), labelPos);
+    updateDraftCoverAndLabel(draft.id, cover, canEditLabel ? label.trim() : draft.label ?? "", labelPos, progressStatus);
     onRefresh();
     onClose();
     toast.success("Kapak güncellendi ✓");
@@ -214,12 +217,12 @@ function CoverEditSheet({ draft, onClose, onRefresh }: {
           {/* Bant etiketi */}
           <div>
             <p className="mb-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Şeffaf Bant Etiketi</p>
-            <input
-              value={label}
-              onChange={e => setLabel(e.target.value.slice(0, 40))}
-              placeholder='ör. "Breaking Point Serisi"'
-              className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3.5 text-[13px] text-white placeholder:text-slate-600 outline-none focus:border-violet-500/50 focus:bg-white/8 transition-colors"
-            />
+            {canEditLabel ? <input
+                value={label}
+                onChange={e => setLabel(e.target.value.slice(0, 40))}
+                placeholder='ör. "Breaking Point Serisi"'
+                className="w-full rounded-2xl bg-white/5 border border-white/10 px-4 py-3.5 text-[13px] text-white placeholder:text-slate-600 outline-none focus:border-violet-500/50 focus:bg-white/8 transition-colors"
+              /> : <p className="rounded-2xl border border-amber-400/20 bg-amber-400/8 px-4 py-3.5 text-[11px] text-amber-300">Test aşamasında: Etiket alanı yalnızca adminler için açık.</p>}
             <div className="flex justify-between mt-1.5">
               <span className="text-[10px] text-slate-600">Boş bırakırsan bant görünmez</span>
               <span className="text-[10px] text-slate-600">{label.length}/40</span>
@@ -249,6 +252,15 @@ function CoverEditSheet({ draft, onClose, onRefresh }: {
             </div>
           )}
 
+          <div>
+            <p className="mb-2 text-[10px] font-black text-slate-500 uppercase tracking-[0.18em]">Kitap Durumu</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([ ["ongoing", "Devam ediyor"], ["completed", "Bitti"] ] as const).map(([value, text]) => (
+                <button key={value} type="button" onClick={() => setProgressStatus(value)} className={`rounded-2xl py-3 text-[12px] font-bold ${progressStatus === value ? "bg-violet-600 text-white" : "bg-white/5 text-slate-400"}`}>{text}</button>
+              ))}
+            </div>
+          </div>
+
           {/* Kaydet */}
           <button
             type="button"
@@ -275,6 +287,8 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onUnpublish, onRefresh,
   onOpenCoverEdit: () => void;
 }) {
   const [, setLocation] = useLocation();
+  const { user } = useAuth();
+  const canEditLabel = user?.role === "admin";
 
   const go = (path: string) => { onClose(); setLocation(path); };
 
@@ -356,7 +370,7 @@ function CardMenu({ draft, onClose, onDelete, onPublish, onUnpublish, onRefresh,
           icon={<Tag className="h-4.5 w-4.5 text-sky-400" />}
           iconBg="rgba(56,189,248,0.15)"
           label="Kapak & Etiket"
-          sub="Kapak fotoğrafı ve şeffaf bant"
+          sub={canEditLabel ? "Kapak fotoğrafı ve şeffaf bant" : "Kapak fotoğrafı · Etiket test aşamasında"}
           onClick={() => { onClose(); onOpenCoverEdit(); }}
         />
 
@@ -416,6 +430,8 @@ function DraftCard({ draft, onDelete, onPublish, onUnpublish, onRefresh }: {
   const wordCount = draft.wordCount;
   const chCount   = draft.chapters?.length ?? 0;
   const typeColor = TYPE_COLORS[draft.type] ?? "#a78bfa";
+  const { user } = useAuth();
+  const canEditLabel = user?.role === "admin";
 
   return (
     <>
@@ -492,6 +508,9 @@ function DraftCard({ draft, onDelete, onPublish, onUnpublish, onRefresh }: {
                   >
                     {draft.status === "draft" ? "Taslak" : "Yayında"}
                   </span>
+                  <span className="inline-block rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[9px] font-black text-slate-400">
+                    {draft.progressStatus === "completed" ? "Bitti" : "Devam ediyor"}
+                  </span>
                 </div>
               </div>
               {/* ⋯ Menü tetikleyici */}
@@ -547,6 +566,7 @@ function DraftCard({ draft, onDelete, onPublish, onUnpublish, onRefresh }: {
           draft={draft}
           onClose={() => setCoverEditOpen(false)}
           onRefresh={onRefresh}
+          canEditLabel={canEditLabel}
         />
       )}
     </>
@@ -556,17 +576,138 @@ function DraftCard({ draft, onDelete, onPublish, onUnpublish, onRefresh }: {
 /* ── Ana sayfa ───────────────────────────────────────────────────────── */
 type Tab = "all" | "draft" | "published";
 
+type Universe = {
+  id?: string;
+  title: string;
+  description: string;
+  color: string;
+  gallery: string[];
+};
+
+const UNIVERSES_KEY = "loop_my_universes_v1";
+
+const DEFAULT_UNIVERSES: Universe[] = [
+  { title: "Geceye Kalanlar", description: "Sessiz şehirlerde saklanan sırların ve cesur başlangıçların evreni.", color: "from-indigo-950 via-slate-900 to-cyan-950", gallery: ["https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=700&q=80"] },
+  { title: "Kayıp Haritalar", description: "Her yolculuğun yeni bir kapı açtığı keşif evreni.", color: "from-emerald-950 via-slate-900 to-teal-950", gallery: ["https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=700&q=80"] },
+];
+
+function readUniverses(): Universe[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(UNIVERSES_KEY) || "null");
+    return Array.isArray(saved) ? saved.filter((item: Universe) => !DEFAULT_UNIVERSES.some(defaultUniverse => defaultUniverse.title === item.title)) : [];
+  } catch { return []; }
+}
+
+function UniverseCreateSheet({ onClose, onCreate }: { onClose: () => void; onCreate: (universe: Universe) => void }) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [gallery, setGallery] = useState<string[]>([]);
+
+  const addImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || gallery.length >= 3) return;
+    const reader = new FileReader();
+    reader.onload = () => setGallery(items => [...items, String(reader.result)].slice(0, 3));
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  const create = () => {
+    if (!title.trim()) return;
+    onCreate({ title: title.trim(), description: description.trim(), color: "from-violet-950 via-slate-900 to-cyan-950", gallery });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:justify-center" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-[1.5rem] border border-white/10 bg-[#16122a] p-5 text-white shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Kendi evrenin</p><h2 className="mt-1 text-xl font-black">Evren kartı oluştur</h2></div><button type="button" onClick={onClose} aria-label="Kapat" className="rounded-full bg-white/10 p-2"><X className="h-4 w-4" /></button></div>
+        <div className="mt-5 space-y-3">
+          <input value={title} onChange={event => setTitle(event.target.value)} placeholder="Evren adı" maxLength={80} className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/50" />
+          <textarea value={description} onChange={event => setDescription(event.target.value)} placeholder="Evrenini anlat..." maxLength={240} rows={3} className="w-full resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white outline-none focus:border-cyan-300/50" />
+        </div>
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {gallery.map((image, index) => <div key={`${image}-${index}`} className="relative aspect-square overflow-hidden rounded-xl"><img src={image} alt={`Yeni evren görseli ${index + 1}`} className="h-full w-full object-cover" /><button type="button" onClick={() => setGallery(items => items.filter((_, itemIndex) => itemIndex !== index))} aria-label="Görseli sil" className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1 text-rose-300"><X className="h-3 w-3" /></button></div>)}
+          {gallery.length < 3 && <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-cyan-300/40 bg-cyan-400/5 text-cyan-200"><ImagePlus className="h-6 w-6" /><span className="mt-1 text-[10px] font-bold">Görsel ekle</span><input type="file" accept="image/*" className="hidden" onChange={addImage} /></label>}
+        </div>
+        <button type="button" disabled={!title.trim()} onClick={create} className="mt-5 w-full rounded-xl bg-cyan-400 py-3 text-sm font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40">Kartı oluştur</button>
+      </div>
+    </div>
+  );
+}
+
+function UniverseEditSheet({ universe, onClose, onSave }: { universe: Universe; onClose: () => void; onSave: (universe: Universe) => void }) {
+  const [gallery, setGallery] = useState(universe.gallery.slice(0, 3));
+
+  const addImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || gallery.length >= 3) return;
+    const reader = new FileReader();
+    reader.onload = () => setGallery(items => [...items, String(reader.result)].slice(0, 3));
+    reader.readAsDataURL(file);
+    event.target.value = "";
+  };
+
+  return (
+    <div className="fixed inset-0 z-[999] flex items-end bg-black/70 p-3 backdrop-blur-sm sm:items-center sm:justify-center" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-[1.5rem] border border-white/10 bg-[#16122a] p-5 text-white shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3">
+          <div><p className="text-[10px] uppercase tracking-[0.25em] text-cyan-300">Evrenlerim</p><h2 className="mt-1 text-xl font-black">{universe.title}</h2></div>
+          <button type="button" onClick={onClose} aria-label="Kapat" className="rounded-full bg-white/10 p-2"><X className="h-4 w-4" /></button>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">Loop anlatı haritası kartında görünecek görselleri seç.</p>
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          {gallery.map((image, index) => (
+            <div key={`${image}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-white/10">
+              <img src={image} alt={`${universe.title} ${index + 1}`} className="h-full w-full object-cover" />
+              <button type="button" onClick={() => setGallery(items => items.filter((_, itemIndex) => itemIndex !== index))} aria-label="Görseli sil" className="absolute right-1.5 top-1.5 rounded-full bg-black/70 p-1 text-rose-300"><X className="h-3 w-3" /></button>
+            </div>
+          ))}
+          {gallery.length < 3 && (
+            <label className="flex aspect-square cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-cyan-300/40 bg-cyan-400/5 text-cyan-200">
+              <ImagePlus className="h-6 w-6" /><span className="mt-1 text-[10px] font-bold">Görsel ekle</span>
+              <input type="file" accept="image/*" className="hidden" onChange={addImage} />
+            </label>
+          )}
+        </div>
+        <p className="mt-3 text-[10px] text-slate-500">{gallery.length}/3 görsel seçildi</p>
+        <button type="button" onClick={() => onSave({ ...universe, gallery })} className="mt-5 w-full rounded-xl bg-cyan-400 py-3 text-sm font-black text-slate-950">Görselleri kaydet</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Calismalari() {
   const search     = useSearch();
-  const initTab    = (new URLSearchParams(search).get("tab") as Tab) ?? "all";
-  const [tab, setTab]       = useState<Tab>(initTab);
+  const initTab    = new URLSearchParams(search).get("tab");
+  const initialTab: Tab | "universes" = initTab === "universes" ? "universes" : (initTab as Tab | null) ?? "all";
+  const [tab, setTab]       = useState<Tab | "universes">(initialTab);
+  const [universes, setUniverses] = useState<Universe[]>(() => readUniverses());
+  const [selectedUniverse, setSelectedUniverse] = useState<Universe | null>(null);
+  const [createUniverseOpen, setCreateUniverseOpen] = useState(false);
+  const universePressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [query, setQuery]   = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const { user } = useAuth();
   const isPremiumUser = user?.role === "admin";
 
-  const load = useCallback(() => setDrafts(getAllDrafts()), []);
+  const load = useCallback(async () => {
+    const localDrafts = getAllDrafts();
+    setDrafts(localDrafts);
+    try {
+      const response = await fetch("/api/books", { credentials: "include", cache: "no-store" });
+      const remoteBooks = response.ok ? await response.json() : [];
+      const merged = localDrafts.map(draft => {
+        const remote = Array.isArray(remoteBooks) ? remoteBooks.find((book: Draft) => book.id === draft.id) : null;
+        return remote
+          ? { ...draft, cover: draft.cover ?? remote.cover, trailers: draft.trailers.some(Boolean) ? draft.trailers : (remote.trailers ?? draft.trailers) }
+          : draft;
+      });
+      setDrafts(merged);
+    } catch {
+      setDrafts(localDrafts);
+    }
+  }, []);
   useEffect(() => { load(); }, [load]);
 
   const TABS: { id: Tab; label: string }[] = [
@@ -574,6 +715,47 @@ export default function Calismalari() {
     { id: "draft",     label: "Taslaklar" },
     { id: "published", label: "Yayınlar"  },
   ];
+
+  const saveUniverse = (universe: Universe) => {
+    const next = universes.map(item => item.title === universe.title ? universe : item);
+    setUniverses(next);
+    localStorage.setItem(UNIVERSES_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event("loop-universes-updated"));
+    setSelectedUniverse(null);
+    toast.success("Evren görselleri kaydedildi ✓");
+  };
+
+  const deleteUniverse = async (universe: Universe) => {
+    if (!window.confirm(`"${universe.title}" evreni silinsin mi?`)) return;
+    if (universe.id) {
+      const response = await fetch(`/api/universes/${encodeURIComponent(universe.id)}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) { toast.error("Evren silinemedi"); return; }
+    }
+    const next = universes.filter(item => item.id ? item.id !== universe.id : item.title !== universe.title);
+    setUniverses(next);
+    localStorage.setItem(UNIVERSES_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event("loop-universes-updated"));
+    toast.success("Evren silindi");
+  };
+
+  const createUniverse = async (universe: Universe) => {
+    const next = [...universes, universe];
+    setUniverses(next);
+    localStorage.setItem(UNIVERSES_KEY, JSON.stringify(next));
+    const response = await fetch("/api/universes", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify(universe) });
+    if (!response.ok) { toast.error("Evren ortak alana kaydedilemedi"); return; }
+    window.dispatchEvent(new Event("loop-universes-updated"));
+    setCreateUniverseOpen(false);
+    toast.success("Kendi evren kartın oluşturuldu ✓");
+  };
+
+  const startUniversePress = (universe: Universe) => {
+    universePressTimer.current = setTimeout(() => setSelectedUniverse(universe), 550);
+  };
+  const cancelUniversePress = () => {
+    if (universePressTimer.current) clearTimeout(universePressTimer.current);
+    universePressTimer.current = null;
+  };
 
   const filtered = drafts
     .filter(d => tab === "all" || d.status === tab)
@@ -639,7 +821,7 @@ export default function Calismalari() {
 
         {/* Sekmeler */}
         <div className="flex gap-2">
-          {TABS.map(t => (
+          {[...TABS, { id: "universes" as const, label: "Evrenlerim" }].map(t => (
             <button key={t.id} type="button" onClick={() => setTab(t.id)}
               className={`flex-1 rounded-xl py-2 text-[12px] font-bold border transition-all
                 ${tab === t.id ? "bg-violet-500/20 border-violet-400/50 text-violet-300" : "bg-white/4 border-white/8 text-slate-500"}`}>
@@ -655,6 +837,26 @@ export default function Calismalari() {
       </div>
 
       {/* Liste */}
+      {tab === "universes" ? (
+        <div className="grid flex-1 gap-4 px-4 pt-4 sm:grid-cols-2">
+          <button type="button" onClick={() => setCreateUniverseOpen(true)} className="flex min-h-56 flex-col items-center justify-center rounded-[1.5rem] border border-dashed border-cyan-300/40 bg-cyan-400/5 text-cyan-200 transition hover:bg-cyan-400/10">
+            <Plus className="h-8 w-8" /><span className="mt-2 text-sm font-black">Kendi evren kartını oluştur</span><span className="mt-1 text-[10px] text-cyan-200/60">En fazla 3 görsel ekleyebilirsin</span>
+          </button>
+          {universes.map(universe => (
+            <article key={universe.id ?? universe.title} onPointerDown={() => startUniversePress(universe)} onPointerUp={cancelUniversePress} onPointerLeave={cancelUniversePress} onPointerCancel={cancelUniversePress} className={`relative min-h-56 overflow-hidden rounded-[1.5rem] bg-gradient-to-br ${universe.color} p-5 text-white shadow-lg`}>
+              {universe.gallery[0] && <img src={universe.gallery[0]} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+              <button type="button" onClick={(event) => { event.stopPropagation(); void deleteUniverse(universe); }} aria-label={`${universe.title} evrenini sil`} className="absolute right-3 top-3 z-10 rounded-full bg-black/60 p-2 text-rose-200 transition hover:bg-rose-500/80 hover:text-white"><Trash2 className="h-4 w-4" /></button>
+              <div className="relative flex h-full min-h-48 flex-col justify-end">
+                <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-cyan-200">Loop anlatı haritası</p>
+                <h2 className="mt-1 text-xl font-black">{universe.title}</h2>
+                <p className="mt-1 line-clamp-2 text-xs text-white/70">{universe.description}</p>
+                <p className="mt-3 text-[10px] font-bold text-cyan-200">Basılı tut: görselleri düzenle · {universe.gallery.length}/3</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
       <div className="flex-1 px-4 pt-4 space-y-3">
         {filtered.length === 0
           ? <Empty tab={tab} />
@@ -670,6 +872,9 @@ export default function Calismalari() {
           ))
         }
       </div>
+      )}
+      {selectedUniverse && <UniverseEditSheet universe={selectedUniverse} onClose={() => setSelectedUniverse(null)} onSave={saveUniverse} />}
+      {createUniverseOpen && <UniverseCreateSheet onClose={() => setCreateUniverseOpen(false)} onCreate={createUniverse} />}
     </div>
   );
 }

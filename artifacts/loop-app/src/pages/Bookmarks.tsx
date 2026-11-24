@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PostCard } from "@/components/shared/PostCard";
 import { Bookmark } from "lucide-react";
+import { useLanguage } from "@/hooks/use-language";
 
 export default function Bookmarks() {
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -19,7 +21,7 @@ export default function Bookmarks() {
       <div className="p-4 pb-20 space-y-4">
         <div className="flex items-center gap-2 px-1 mb-2">
           <Bookmark className="w-5 h-5 text-primary" />
-          <h1 className="text-xl font-bold">Kaydedilenler</h1>
+          <h1 className="text-xl font-bold">{t("bookmarks")}</h1>
         </div>
 
         {isLoading ? (
@@ -32,8 +34,8 @@ export default function Bookmarks() {
               <Bookmark className="w-8 h-8 text-muted-foreground" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">Henüz kaydettiğin gönderi yok</p>
-              <p className="text-sm text-muted-foreground mt-1">Gönderilerdeki yer imi simgesine tıkla</p>
+              <p className="font-semibold text-foreground">{t("noSavedPosts")}</p>
+              <p className="text-sm text-muted-foreground mt-1">{t("saveHint")}</p>
             </div>
           </div>
         ) : (

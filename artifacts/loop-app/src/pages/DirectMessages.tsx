@@ -9,13 +9,16 @@ import {
   Search, SlidersHorizontal, Mic, StopCircle, Pin,
   MessageSquarePlus, X, MoreVertical,
   BellOff, Heart, Trash2, CheckCircle2, Circle,
-  Camera, Users, Phone, Video, Info, Gamepad2, BadgeCheck, Reply,
-  Bookmark, Palette, ChevronRight, Copy, ExternalLink,
-  ImageIcon, ShieldOff, Flag,
+  Camera, Users, Phone, Video, Info, Gamepad2, Reply,
+  Bookmark, Palette, ChevronRight, Copy, ExternalLink, Archive,
+  ImageIcon, ShieldAlert, ShieldOff, Flag, Pencil, Flame, Plus,
 } from "lucide-react";
 import GifPicker from "@/components/shared/GifPicker";
 import CompanionMascot from "@/components/companion/CompanionMascot";
 import GamePanel from "@/components/games/GamePanel";
+import { UserNameWithDecorations } from "@/components/shared/UserNameWithDecorations";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useListStories, getListStoriesQueryKey } from "@workspace/api-client-react";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _mapGiphyResults = (data: any[]) =>
@@ -35,13 +38,136 @@ const FAV_EMOJIS: { emoji: string; color: string; glow: string; label: string }[
   { emoji: "💙", color: "#3b82f6", glow: "#3b82f6", label: "Mavi kalp" },
   { emoji: "💚", color: "#22c55e", glow: "#22c55e", label: "Yeşil kalp" },
   { emoji: "❤️", color: "#ef4444", glow: "#ef4444", label: "Kırmızı kalp" },
+  { emoji: "🧡", color: "#f97316", glow: "#f97316", label: "Turuncu kalp" },
+  { emoji: "💛", color: "#eab308", glow: "#eab308", label: "Sarı kalp" },
+  { emoji: "🖤", color: "#64748b", glow: "#64748b", label: "Siyah kalp" },
+  { emoji: "🤍", color: "#cbd5e1", glow: "#cbd5e1", label: "Beyaz kalp" },
+  { emoji: "🤎", color: "#a16207", glow: "#a16207", label: "Kahverengi kalp" },
+  { emoji: "💔", color: "#dc2626", glow: "#dc2626", label: "Kırık kalp" },
+  { emoji: "💕", color: "#f472b6", glow: "#f472b6", label: "Çift kalp" },
+  { emoji: "💖", color: "#ec4899", glow: "#ec4899", label: "Parlayan kalp" },
+  { emoji: "💗", color: "#fb7185", glow: "#fb7185", label: "Büyüyen kalp" },
+  { emoji: "💘", color: "#e11d48", glow: "#e11d48", label: "Kalp oku" },
+  { emoji: "💝", color: "#db2777", glow: "#db2777", label: "Kurdeleli kalp" },
+  { emoji: "😂", color: "#f59e0b", glow: "#f59e0b", label: "Kahkaha" },
+  { emoji: "🤣", color: "#fb923c", glow: "#fb923c", label: "Yerlere yatan kahkaha" },
+  { emoji: "😄", color: "#facc15", glow: "#facc15", label: "Neşeli" },
+  { emoji: "😁", color: "#eab308", glow: "#eab308", label: "Sırıtma" },
+  { emoji: "😊", color: "#f59e0b", glow: "#f59e0b", label: "Gülümseme" },
+  { emoji: "🙂", color: "#fbbf24", glow: "#fbbf24", label: "Hafif gülümseme" },
+  { emoji: "😎", color: "#0ea5e9", glow: "#0ea5e9", label: "Havalı" },
+  { emoji: "🤩", color: "#f97316", glow: "#f97316", label: "Yıldız gözler" },
+  { emoji: "🥳", color: "#d946ef", glow: "#d946ef", label: "Parti yüzü" },
+  { emoji: "😭", color: "#3b82f6", glow: "#3b82f6", label: "Yüksek sesle ağlama" },
+  { emoji: "😢", color: "#60a5fa", glow: "#60a5fa", label: "Üzgün" },
+  { emoji: "😅", color: "#f59e0b", glow: "#f59e0b", label: "Tedirgin gülümseme" },
+  { emoji: "😮", color: "#f97316", glow: "#f97316", label: "Şaşkın" },
+  { emoji: "😱", color: "#a855f7", glow: "#a855f7", label: "Korku" },
+  { emoji: "🤔", color: "#eab308", glow: "#eab308", label: "Düşünüyor" },
+  { emoji: "🙄", color: "#64748b", glow: "#64748b", label: "Göz devirme" },
+  { emoji: "😴", color: "#6366f1", glow: "#6366f1", label: "Uykulu" },
+  { emoji: "😍", color: "#ec4899", glow: "#ec4899", label: "Kalpli gözler" },
+  { emoji: "🥰", color: "#f43f5e", glow: "#f43f5e", label: "Sevgi" },
+  { emoji: "😘", color: "#e11d48", glow: "#e11d48", label: "Öpücük" },
+  { emoji: "🤗", color: "#fb7185", glow: "#fb7185", label: "Sarılma" },
+  { emoji: "🤭", color: "#f472b6", glow: "#f472b6", label: "Kıkırdama" },
+  { emoji: "🤯", color: "#ef4444", glow: "#ef4444", label: "Beyin patlaması" },
+  { emoji: "😡", color: "#dc2626", glow: "#dc2626", label: "Kızgın" },
+  { emoji: "👍", color: "#2563eb", glow: "#2563eb", label: "Beğeni" },
+  { emoji: "👎", color: "#64748b", glow: "#64748b", label: "Beğenmeme" },
+  { emoji: "👌", color: "#14b8a6", glow: "#14b8a6", label: "Tamam" },
+  { emoji: "✌️", color: "#8b5cf6", glow: "#8b5cf6", label: "Barış" },
+  { emoji: "🤞", color: "#f59e0b", glow: "#f59e0b", label: "Şans" },
+  { emoji: "👏", color: "#d97706", glow: "#d97706", label: "Alkış" },
+  { emoji: "🙌", color: "#14b8a6", glow: "#14b8a6", label: "Kutlama" },
+  { emoji: "💪", color: "#f97316", glow: "#f97316", label: "Güç" },
+  { emoji: "🙏", color: "#8b5cf6", glow: "#8b5cf6", label: "Dua" },
+  { emoji: "👋", color: "#06b6d4", glow: "#06b6d4", label: "El sallama" },
+  { emoji: "🤝", color: "#0ea5e9", glow: "#0ea5e9", label: "Tokalaşma" },
+  { emoji: "🫶", color: "#f43f5e", glow: "#f43f5e", label: "Kalp eller" },
+  { emoji: "🎉", color: "#e11d48", glow: "#e11d48", label: "Parti" },
+  { emoji: "🎊", color: "#f97316", glow: "#f97316", label: "Konfeti" },
+  { emoji: "🎁", color: "#ec4899", glow: "#ec4899", label: "Hediye" },
+  { emoji: "🏆", color: "#eab308", glow: "#eab308", label: "Kupa" },
+  { emoji: "🥇", color: "#f59e0b", glow: "#f59e0b", label: "Birincilik" },
+  { emoji: "💥", color: "#f97316", glow: "#f97316", label: "Çarpışma" },
+  { emoji: "💫", color: "#818cf8", glow: "#818cf8", label: "Baş döndürme" },
+  { emoji: "🚀", color: "#0ea5e9", glow: "#0ea5e9", label: "Roket" },
+  { emoji: "✅", color: "#22c55e", glow: "#22c55e", label: "Onay" },
+  { emoji: "❌", color: "#ef4444", glow: "#ef4444", label: "Çarpı" },
+  { emoji: "❗", color: "#ef4444", glow: "#ef4444", label: "Önemli" },
+  { emoji: "❓", color: "#3b82f6", glow: "#3b82f6", label: "Soru" },
+  { emoji: "💡", color: "#facc15", glow: "#facc15", label: "Fikir" },
+  { emoji: "💯", color: "#ef4444", glow: "#ef4444", label: "Yüz" },
+  { emoji: "👀", color: "#06b6d4", glow: "#06b6d4", label: "Gözler" },
+  { emoji: "✨", color: "#facc15", glow: "#facc15", label: "Parıltı" },
+  { emoji: "🐶", color: "#d97706", glow: "#d97706", label: "Köpek" },
+  { emoji: "🐱", color: "#f97316", glow: "#f97316", label: "Kedi" },
+  { emoji: "🐭", color: "#94a3b8", glow: "#94a3b8", label: "Fare" },
+  { emoji: "🐹", color: "#f59e0b", glow: "#f59e0b", label: "Hamster" },
+  { emoji: "🐰", color: "#f472b6", glow: "#f472b6", label: "Tavşan" },
+  { emoji: "🦊", color: "#ea580c", glow: "#ea580c", label: "Tilki" },
+  { emoji: "🐻", color: "#92400e", glow: "#92400e", label: "Ayı" },
+  { emoji: "🐼", color: "#64748b", glow: "#64748b", label: "Panda" },
+  { emoji: "🐨", color: "#94a3b8", glow: "#94a3b8", label: "Koala" },
+  { emoji: "🐯", color: "#f97316", glow: "#f97316", label: "Kaplan" },
+  { emoji: "🦁", color: "#eab308", glow: "#eab308", label: "Aslan" },
+  { emoji: "🐮", color: "#a16207", glow: "#a16207", label: "İnek" },
+  { emoji: "🐷", color: "#fb7185", glow: "#fb7185", label: "Domuz" },
+  { emoji: "🐸", color: "#22c55e", glow: "#22c55e", label: "Kurbağa" },
+  { emoji: "🐵", color: "#a16207", glow: "#a16207", label: "Maymun" },
+  { emoji: "🙈", color: "#92400e", glow: "#92400e", label: "Görmeyen maymun" },
+  { emoji: "🙉", color: "#92400e", glow: "#92400e", label: "Duymayan maymun" },
+  { emoji: "🙊", color: "#92400e", glow: "#92400e", label: "Konuşmayan maymun" },
+  { emoji: "🐔", color: "#ef4444", glow: "#ef4444", label: "Tavuk" },
+  { emoji: "🐧", color: "#0f172a", glow: "#0f172a", label: "Penguen" },
+  { emoji: "🐦", color: "#38bdf8", glow: "#38bdf8", label: "Kuş" },
+  { emoji: "🐤", color: "#facc15", glow: "#facc15", label: "Civciv" },
+  { emoji: "🦆", color: "#eab308", glow: "#eab308", label: "Ördek" },
+  { emoji: "🦅", color: "#78350f", glow: "#78350f", label: "Kartal" },
+  { emoji: "🦉", color: "#7c3aed", glow: "#7c3aed", label: "Baykuş" },
+  { emoji: "🦇", color: "#4c1d95", glow: "#4c1d95", label: "Yarasa" },
+  { emoji: "🐺", color: "#64748b", glow: "#64748b", label: "Kurt" },
+  { emoji: "🐗", color: "#78350f", glow: "#78350f", label: "Yaban domuzu" },
+  { emoji: "🐴", color: "#a16207", glow: "#a16207", label: "At" },
+  { emoji: "🦄", color: "#d946ef", glow: "#d946ef", label: "Unicorn" },
+  { emoji: "🐝", color: "#eab308", glow: "#eab308", label: "Arı" },
+  { emoji: "🐛", color: "#84cc16", glow: "#84cc16", label: "Tırtıl" },
+  { emoji: "🦋", color: "#c084fc", glow: "#c084fc", label: "Kelebek" },
+  { emoji: "🐌", color: "#a16207", glow: "#a16207", label: "Salyangoz" },
+  { emoji: "🐞", color: "#dc2626", glow: "#dc2626", label: "Uğur böceği" },
+  { emoji: "🐜", color: "#78350f", glow: "#78350f", label: "Karınca" },
+  { emoji: "🕷️", color: "#475569", glow: "#475569", label: "Örümcek" },
+  { emoji: "🦂", color: "#b45309", glow: "#b45309", label: "Akrep" },
+  { emoji: "🐢", color: "#16a34a", glow: "#16a34a", label: "Kaplumbağa" },
+  { emoji: "🐍", color: "#65a30d", glow: "#65a30d", label: "Yılan" },
+  { emoji: "🦎", color: "#22c55e", glow: "#22c55e", label: "Kertenkele" },
+  { emoji: "🦖", color: "#15803d", glow: "#15803d", label: "T-Rex" },
+  { emoji: "🐙", color: "#e11d48", glow: "#e11d48", label: "Ahtapot" },
+  { emoji: "🦑", color: "#c026d3", glow: "#c026d3", label: "Kalamar" },
+  { emoji: "🦀", color: "#ef4444", glow: "#ef4444", label: "Yengeç" },
+  { emoji: "🐠", color: "#06b6d4", glow: "#06b6d4", label: "Tropik balık" },
+  { emoji: "🐟", color: "#0ea5e9", glow: "#0ea5e9", label: "Balık" },
+  { emoji: "🐬", color: "#0284c7", glow: "#0284c7", label: "Yunus" },
+  { emoji: "🐳", color: "#2563eb", glow: "#2563eb", label: "Balina" },
+  { emoji: "🦈", color: "#475569", glow: "#475569", label: "Köpek balığı" },
+  { emoji: "🐊", color: "#15803d", glow: "#15803d", label: "Timsah" },
+  { emoji: "🐘", color: "#64748b", glow: "#64748b", label: "Fil" },
+  { emoji: "🦏", color: "#475569", glow: "#475569", label: "Gergedan" },
+  { emoji: "🦛", color: "#64748b", glow: "#64748b", label: "Su aygırı" },
+  { emoji: "🐪", color: "#d97706", glow: "#d97706", label: "Deve" },
+  { emoji: "🦒", color: "#eab308", glow: "#eab308", label: "Zürafa" },
+  { emoji: "🦓", color: "#475569", glow: "#475569", label: "Zebra" },
+  { emoji: "🦘", color: "#a16207", glow: "#a16207", label: "Kanguru" },
+  { emoji: "🦬", color: "#78350f", glow: "#78350f", label: "Bizon" },
+  { emoji: "🦌", color: "#a16207", glow: "#a16207", label: "Geyik" },
+  { emoji: "🦙", color: "#d97706", glow: "#d97706", label: "Lama" },
   { emoji: "🌙", color: "#818cf8", glow: "#818cf8", label: "Ay" },
   { emoji: "⭐", color: "#fbbf24", glow: "#fbbf24", label: "Yıldız" },
   { emoji: "🌊", color: "#06b6d4", glow: "#06b6d4", label: "Dalga" },
   { emoji: "🌸", color: "#f472b6", glow: "#f472b6", label: "Çiçek" },
   { emoji: "💎", color: "#67e8f9", glow: "#67e8f9", label: "Elmas" },
   { emoji: "🎯", color: "#fb923c", glow: "#fb923c", label: "Hedef" },
-  { emoji: "🦋", color: "#c084fc", glow: "#c084fc", label: "Kelebek" },
   { emoji: "🌈", color: "#f9a8d4", glow: "#f9a8d4", label: "Gökkuşağı" },
   { emoji: "🍀", color: "#4ade80", glow: "#4ade80", label: "Yonca" },
   { emoji: "🎸", color: "#fde68a", glow: "#fde68a", label: "Gitar" },
@@ -71,6 +197,7 @@ import { formatDistanceToNow, format, isToday, isYesterday, isSameWeek } from "d
 import { tr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { useCall } from "@/lib/callContext";
+import { useLanguage } from "@/hooks/use-language";
 
 interface DmUser {
   id: number;
@@ -78,6 +205,10 @@ interface DmUser {
   displayName: string;
   avatarUrl: string | null;
   thought?: string | null;
+  thoughtUpdatedAt?: string | null;
+  badgeAssetUrl?: string | null;
+  emblemAssetUrl?: string | null;
+  badgeLabel?: string | null;
 }
 
 interface DmMessage {
@@ -90,8 +221,31 @@ interface DmMessage {
   voiceUrl: string | null;
   voiceDuration: number | null;
   isRead: boolean;
+  likeCount?: number;
+  isLiked?: boolean;
+  likedEmoji?: string | null;
+  reactionEmoji?: string | null;
   sender: DmUser | null;
   createdAt: string;
+}
+
+interface DmSticker {
+  id: number;
+  creatorId: number;
+  name: string;
+  mediaUrl: string;
+  createdAt: string;
+  isFavorite: boolean;
+}
+
+interface DmStreak {
+  isCompanion: boolean;
+  days: number;
+  currentDayComplete: boolean;
+  startDate: string | null;
+  lastActiveDate: string | null;
+  messageCount: number;
+  voiceSeconds: number;
 }
 
 interface Conversation {
@@ -100,7 +254,32 @@ interface Conversation {
   unreadCount: number;
 }
 
-type FilterTab = "tumu" | "okunmamis" | "gruplar" | "sabitlenen" | "arsivlenen";
+interface IncomingMessageRequest {
+  id: number;
+  senderId: number;
+  content: string;
+  createdAt: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+}
+
+type FilterTab = "tumu" | "okunmamis" | "requests" | "gruplar" | "sabitlenen" | "arsivlenen";
+
+function streakAccent(days: number) {
+  if (days >= 100) return "#a855f7";
+  if (days >= 30) return "#ec4899";
+  if (days >= 7) return "#ef4444";
+  return "#f97316";
+}
+
+function formatVoiceTime(seconds: number) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours} sa ${minutes} dk ses`;
+  if (minutes > 0) return `${minutes} dk ses`;
+  return seconds > 0 ? `${seconds} sn ses` : "";
+}
 
 function formatMsgTime(dateStr: string) {
   const d = new Date(dateStr);
@@ -111,7 +290,45 @@ function formatMsgTime(dateStr: string) {
   return format(d, "dd.MM");
 }
 
-function lastMsgPreview(msg: DmMessage) {
+function formatDmBanWarning(reason?: string, expiresAt?: string | null) {
+  if (!expiresAt) return `${reason || "DM alanında mesajlaşma erişimin kısıtlandı."} Süre: Süresiz.`;
+  const remaining = new Date(expiresAt).getTime() - Date.now();
+  if (remaining <= 0) return reason || "DM alanında mesajlaşma erişimin kısıtlandı.";
+  const minutes = Math.ceil(remaining / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+  const duration = `${days > 0 ? `${days} gün ` : ""}${hours > 0 ? `${hours} saat ` : ""}${mins > 0 || (days === 0 && hours === 0) ? `${mins} dakika` : ""}`.trim();
+  return `${reason || "DM alanında mesajlaşma erişimin kısıtlandı."} Kalan süre: ${duration}.`;
+}
+
+function SharedBookCard({ bookId, fallbackTitle, isMe, onOpen }: { bookId: string; fallbackTitle: string; isMe: boolean; onOpen: () => void }) {
+  const [book, setBook] = useState<{ title?: string; cover?: string | null; author?: { displayName?: string } | null } | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/books/${encodeURIComponent(bookId)}`, { credentials: "include", cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => setBook(data))
+      .catch(() => {});
+  }, [bookId]);
+
+  return (
+    <button type="button" onClick={onOpen} className={`group flex w-[240px] flex-col overflow-hidden rounded-[18px] text-left shadow-sm transition hover:scale-[1.01] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90"}`}>
+      <div className="relative h-[190px] w-full overflow-hidden bg-violet-950/40">
+        {book?.cover ? <img src={book.cover} alt={book.title || fallbackTitle} className="h-full w-full object-cover transition duration-500 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-5xl">📖</div>}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+        <span className="absolute left-3 top-3 rounded-full bg-black/55 px-2 py-1 text-[10px] font-bold text-white backdrop-blur">📚 Kitap</span>
+      </div>
+      <div className="p-3">
+        <p className="line-clamp-2 text-[14px] font-black text-foreground">{book?.title || fallbackTitle}</p>
+        {book?.author?.displayName && <p className="mt-1 truncate text-[11px] text-muted-foreground">{book.author.displayName}</p>}
+        <p className="mt-2 text-[10px] font-semibold text-primary">Kitabı görüntüle <ExternalLink className="ml-1 inline h-3 w-3" /></p>
+      </div>
+    </button>
+  );
+}
+
+function lastMsgPreview(msg: Pick<DmMessage, "content" | "mediaUrl" | "mediaType" | "voiceUrl">) {
   if (msg.voiceUrl) return "🎤 sesli mesaj gönderdi";
   if (msg.content) {
     if (msg.content.startsWith("__STORY_REACTION__:")) {
@@ -122,10 +339,20 @@ function lastMsgPreview(msg: DmMessage) {
       const text = msg.content.split(":").slice(2).join(":");
       return `📖 hikaye yanıtı: ${text}`;
     }
+    if (msg.content.startsWith("__LOOP_HIGHLIGHT_REPLY__:")) {
+      const text = msg.content.split(":").slice(2).join(":");
+      return `✨ öne çıkanınıza yorum yaptı: ${text}`;
+    }
+    if (msg.content.startsWith("__LOOP_STORY_MENTION__:")) return "📖 Loopda sizden bahsetti";
     if (msg.content.startsWith("__LOOP_POST_SHARE__:")) {
       return "📎 bir gönderi paylaştı";
     }
+    if (msg.content.startsWith("__LOOP_BOOK_SHARE__:") || msg.content.startsWith("_LOOP_BOOK_SHARE_:") || msg.content.startsWith("__LOOP_BOOK_SHARE_:")) {
+      return "📚 bir kitap paylaştı";
+    }
+    if (msg.content.startsWith("__LOOP_VIDEO_SHARE__:")) return "🎬 bir Loop videosu paylaştı";
     if (msg.content.startsWith("__LOOP_GIF__:")) return "🖼 GIF gönderdi";
+    if (msg.content.startsWith("__LOOP_STICKER__:")) return "🎨 Sticker gönderdi";
     if (msg.content.startsWith("__LOOP_CALL_VOICE__")) return "📞 sesli arama";
     if (msg.content.startsWith("__LOOP_CALL_VIDEO__")) return "📹 görüntülü arama";
     return msg.content;
@@ -169,33 +396,21 @@ function ThoughtBubble({ text, color = "primary", isEmpty = false }: {
 }) {
   const c = BUBBLE_COLORS[color];
   return (
-    <div className="relative w-full" style={{ paddingBottom: 9 }}>
+    <div className="relative w-full" style={{ paddingBottom: 5 }}>
       {/* Balon gövdesi — bg-card ile tam opak, kenarlık inline */}
       <div
-        className="relative w-full bg-card rounded-2xl rounded-bl-none px-2.5 py-2 shadow-sm"
-        style={{ border: `2px solid ${c.border}` }}
+        className="relative w-full rounded-[14px] bg-white px-2.5 py-1.5 pl-4 shadow-[0_7px_20px_rgba(0,0,0,0.24)] dark:bg-[#171027]"
+        style={{ border: `1px solid ${c.border}`, borderLeft: `3px solid ${c.text}` }}
       >
+        <span className="absolute left-1.5 top-1 text-[12px] font-black leading-none opacity-35" style={{ color: c.text }}>&ldquo;</span>
+        <span className="mb-0.5 block text-[6px] font-black uppercase tracking-[0.18em] opacity-45" style={{ color: c.text }}>Düşünce</span>
         <p
-          className={`text-[8px] font-semibold leading-snug line-clamp-3 tracking-tight ${isEmpty ? "italic" : ""}`}
+          className={`text-[8px] font-medium leading-[1.25] line-clamp-2 tracking-tight ${isEmpty ? "italic" : ""}`}
           style={{ color: isEmpty ? `${c.text}80` : c.text }}
         >
           {text}
         </p>
       </div>
-      {/* Kuyruk — döndürülmüş kare, sol alt köşeden çıkıyor */}
-      <div
-        className="absolute bg-card"
-        style={{
-          width: 10,
-          height: 10,
-          bottom: 4,
-          left: 11,
-          border: `2px solid ${c.border}`,
-          borderTop: "none",
-          borderRight: "none",
-          transform: "rotate(-45deg)",
-        }}
-      />
     </div>
   );
 }
@@ -261,7 +476,7 @@ function GroupRow({ g, onClick }: { g: { id: number; name: string; members: any[
         </div>
         <p className="text-sm text-muted-foreground truncate">
           {g.lastMessage?.content
-            ? `${g.members.find((m: any) => m.id === g.lastMessage.senderId)?.displayName?.split(" ")[0] ?? ""}: ${g.lastMessage.content}`
+            ? `${g.members.find((m: any) => m.id === g.lastMessage.senderId)?.displayName?.split(" ")[0] ?? ""}: ${lastMsgPreview(g.lastMessage)}`
             : g.members.map((m: any) => m.displayName.split(" ")[0]).join(", ")}
         </p>
       </div>
@@ -288,6 +503,10 @@ interface DmGroupMessage {
   mediaUrl: string | null;
   mediaType: string | null;
   createdAt: string;
+  likeCount?: number;
+  isLiked?: boolean;
+  likedEmoji?: string | null;
+  reactionEmoji?: string | null;
   sender: { id: number; displayName: string; avatarUrl: string | null; username: string } | null;
 }
 
@@ -295,14 +514,43 @@ export default function DirectMessages() {
   const { userId, groupId } = useParams<{ userId?: string; groupId?: string }>();
   const [, setLocation] = useLocation();
   const { user: me } = useAuth();
+  const { data: storyGroups } = useListStories({
+    query: { queryKey: getListStoriesQueryKey(), refetchOnMount: "always" },
+  });
+  const storyUserIds = new Set((storyGroups ?? []).filter(group => group.hasUnviewed).map((group) => group.user.id));
   const { toast } = useToast();
+  const { t } = useLanguage();
+  const doubleTapEnabled = localStorage.getItem("loop-setting-doubleTap") !== "false";
+  const doubleTapEmoji = localStorage.getItem("loop-setting-doubleTapEmoji") || "❤️";
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [incomingMessageRequests, setIncomingMessageRequests] = useState<IncomingMessageRequest[]>([]);
+  const [messageRequestsLoading, setMessageRequestsLoading] = useState(false);
+  const [messageRequestError, setMessageRequestError] = useState("");
+  const [respondingRequestId, setRespondingRequestId] = useState<number | null>(null);
+  const [conversationNames, setConversationNames] = useState<Record<number, { mine: string; theirs: string }>>({});
   const [messages, setMessages] = useState<DmMessage[]>([]);
+  const [dmStreak, setDmStreak] = useState<DmStreak | null>(null);
+  const [dmStreakError, setDmStreakError] = useState<string | null>(null);
+  const [dmStreakOpen, setDmStreakOpen] = useState(false);
+  const fetchedAcceptedFriendshipsRef = useRef<Set<string>>(new Set());
   const [otherUser, setOtherUser] = useState<DmUser | null>(null);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [stickerPanelOpen, setStickerPanelOpen] = useState(false);
+  const [stickerTab, setStickerTab] = useState<"all" | "favorites">("all");
+  const [stickers, setStickers] = useState<DmSticker[]>([]);
+  const [stickersLoading, setStickersLoading] = useState(false);
+  const [stickerSendingId, setStickerSendingId] = useState<number | null>(null);
+  const stickerUploadRef = useRef<HTMLInputElement>(null);
+  const [dmNames, setDmNames] = useState({ mine: "", theirs: "" });
+  const [dmBanWarning, setDmBanWarning] = useState<string | null>(null);
+  const [dmAccessMessage, setDmAccessMessage] = useState<string | null>(null);
+  const [dmRequestPending, setDmRequestPending] = useState(false);
+  const [nameDialogOpen, setNameDialogOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState({ mine: "", theirs: "" });
+  const [savingNames, setSavingNames] = useState(false);
 
   // Swipe to reply
   const [dmReplyTo, setDmReplyTo] = useState<{ id: number; content: string; displayName: string } | null>(null);
@@ -311,6 +559,8 @@ export default function DirectMessages() {
   const swipeTouchMsgId = useRef<number | null>(null);
   const [swipingMsgId, setSwipingMsgId] = useState<number | null>(null);
   const [swipeOffset, setSwipeOffset] = useState(0);
+  const [dmComposerShift, setDmComposerShift] = useState(0);
+  const [groupComposerShift, setGroupComposerShift] = useState(0);
 
   // Voice recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -326,13 +576,35 @@ export default function DirectMessages() {
   // GIF picker state
   const [gifOpen, setGifOpen] = useState(false);
 
+  useEffect(() => {
+    if (!stickerPanelOpen) return;
+    let cancelled = false;
+    setStickersLoading(true);
+    fetch("/api/dm/stickers", { credentials: "include", cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Stickerlar yüklenemedi.");
+        return await response.json() as DmSticker[];
+      })
+      .then((items) => { if (!cancelled) setStickers(items); })
+      .catch((error) => {
+        if (!cancelled) toast({ title: error instanceof Error ? error.message : "Stickerlar yüklenemedi.", variant: "destructive" });
+      })
+      .finally(() => { if (!cancelled) setStickersLoading(false); });
+    return () => { cancelled = true; };
+  }, [stickerPanelOpen, toast]);
+
   // Friendship series state — { msgId: "accepted" | "rejected" | "pending" }
   const [friendshipStatus, setFriendshipStatus] = useState<Record<number, "accepted" | "rejected" | "pending">>({});
+  const [gameInviteStatus, setGameInviteStatus] = useState<Record<number, "accepted" | "rejected">>({});
   const friendshipKey = userId ? `dm_friendship_${userId}` : null;
 
   // Companion (Yoldaş) state
   const [showCompanionPicker, setShowCompanionPicker] = useState(false);
   const [showGamePanel,       setShowGamePanel]       = useState(false);
+  const initialXoxGameId = Number(new URLSearchParams(window.location.search).get("xoxGameId")) || null;
+  useEffect(() => {
+    if (initialXoxGameId) setShowGamePanel(true);
+  }, [initialXoxGameId]);
   const [companion, setCompanion] = useState<string | null>(null); // slug e.g. "bear"
   const companionKey = userId ? `dm_companion_${userId}` : null;
   const [companionName, setCompanionName] = useState("Yoldaşım");
@@ -345,14 +617,45 @@ export default function DirectMessages() {
   // resolved imgUrl for active companion
   const companionImgUrl = companions.find(c => c.slug === companion)?.imageUrl ?? null;
 
+  const parseFriendshipResponse = (content: string | null) => {
+    if (!content?.startsWith("__LOOP_FRIENDSHIP_RESPONSE__:")) return null;
+    const [, requestId, status] = content.split(":");
+    if (!requestId || (status !== "accepted" && status !== "rejected")) return null;
+    return { requestId: Number(requestId), status } as const;
+  };
+
+  const parseGameInvite = (content: string | null) => {
+    const match = content?.match(/^__LOOP_GAME_INVITE__:xox:(\d+)$/);
+    return match ? Number(match[1]) : null;
+  };
+
+  const respondGameInvite = async (messageId: number, inviteId: number, response: "accepted" | "rejected") => {
+    const result = await fetch(`/api/games/xox/invites/${inviteId}/respond`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ response }),
+    });
+    const data = await result.json();
+    if (!result.ok) return;
+    setGameInviteStatus(current => ({ ...current, [messageId]: response }));
+    if (response === "accepted" && data.gameId && otherUser) {
+      setLocation(`/dm/${otherUser.id}?xoxGameId=${data.gameId}`);
+    }
+  };
+
   // ── Info paneli & Tema & Kayıtlı Anlar ──────────────────────────────────
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [infoSection, setInfoSection] = useState<"genel"|"tema"|"anlar"|"medya">("genel");
+  const [reportDialogOpen, setReportDialogOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("Spam");
+  const [reportSending, setReportSending] = useState(false);
   const [dmTheme, setDmTheme] = useState<DmTheme>({ bubble: "violet", bgStyle: "none" });
   const [savedMsgsCache, setSavedMsgsCache] = useState<DmMessage[]>([]);
   const [savedMsgIds, setSavedMsgIds] = useState<Set<number>>(new Set());
   const [msgCtxMenu, setMsgCtxMenu] = useState<{ msg: DmMessage; x: number; y: number } | null>(null);
   const msgLongPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [animatedLikeId, setAnimatedLikeId] = useState<number | null>(null);
 
   // ── Group DM state ─────────────────────────────────────────────────────────
   const [groups, setGroups] = useState<DmGroup[]>([]);
@@ -360,6 +663,34 @@ export default function DirectMessages() {
   const [groupContent, setGroupContent] = useState("");
   const [groupSending, setGroupSending] = useState(false);
   const groupScrollRef = useRef<HTMLDivElement>(null);
+
+  const toggleDmLike = async (messageId: number) => {
+    if (!doubleTapEnabled || !userId) return;
+    const response = await fetch(`/api/dm/messages/${messageId}/like`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji: doubleTapEmoji }),
+    });
+    if (!response.ok) return;
+    const result = await response.json() as { liked: boolean; likeCount: number; reactionEmoji: string | null };
+    setMessages(current => current.map(message => message.id === messageId ? { ...message, isLiked: result.liked, likedEmoji: result.liked ? doubleTapEmoji : null, likeCount: result.likeCount, reactionEmoji: result.reactionEmoji } : message));
+    if (result.liked) setAnimatedLikeId(messageId);
+  };
+
+  const toggleGroupLike = async (messageId: number) => {
+    if (!doubleTapEnabled || !groupId) return;
+    const response = await fetch(`/api/dm/groups/${groupId}/messages/${messageId}/like`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ emoji: doubleTapEmoji }),
+    });
+    if (!response.ok) return;
+    const result = await response.json() as { liked: boolean; likeCount: number; reactionEmoji: string | null };
+    setGroupMessages(current => current.map(message => message.id === messageId ? { ...message, isLiked: result.liked, likedEmoji: result.liked ? doubleTapEmoji : null, likeCount: result.likeCount, reactionEmoji: result.reactionEmoji } : message));
+    if (result.liked) setAnimatedLikeId(messageId);
+  };
 
   // Group media state
   const [groupShowPlusMenu, setGroupShowPlusMenu] = useState(false);
@@ -426,12 +757,57 @@ export default function DirectMessages() {
 
   const [activeTab, setActiveTab] = useState<FilterTab>("tumu");
   const [searchQuery, setSearchQuery] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<DmUser[]>([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [userSearchError, setUserSearchError] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
   const prevMsgCountRef = useRef(0);
   const isAtGroupBottomRef = useRef(true);
   const prevGroupMsgCountRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2 || activeTab === "arsivlenen") {
+      setUserSearchResults([]);
+      setUserSearchLoading(false);
+      setUserSearchError("");
+      return;
+    }
+    let cancelled = false;
+    const timeout = window.setTimeout(async () => {
+      setUserSearchLoading(true);
+      setUserSearchError("");
+      try {
+        const response = await fetch(`/api/users?q=${encodeURIComponent(query)}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Kullanıcılar aranamadı");
+        const users = await response.json() as DmUser[];
+        const existingIds = new Set(conversations.map(conversation => conversation.user?.id));
+        if (!cancelled) {
+          setUserSearchResults(
+            (Array.isArray(users) ? users : []).filter(candidate =>
+              candidate.id !== me?.id && !existingIds.has(candidate.id),
+            ),
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setUserSearchResults([]);
+          setUserSearchError(error instanceof Error ? error.message : "Kullanıcılar aranamadı");
+        }
+      } finally {
+        if (!cancelled) setUserSearchLoading(false);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [searchQuery, activeTab, conversations, me?.id]);
 
   // ── Grup ayarları paneli ──
   const [showGroupInfo, setShowGroupInfo] = useState(false);
@@ -468,8 +844,10 @@ export default function DirectMessages() {
   interface LoopPhoto {
     id: number;
     mediaUrl: string;
+    mediaType?: "video" | "image";
     createdAt: string;
     viewed: boolean;
+    archived?: boolean;
     sender: { id: number; displayName: string; avatarUrl: string | null; username: string } | null;
   }
   interface LoopPhotoDetail {
@@ -488,14 +866,18 @@ export default function DirectMessages() {
   const [loopSharePreview, setLoopSharePreview] = useState<string | null>(null);
   const [loopShareFile,  setLoopShareFile]  = useState<File | null>(null);
   const [loopSharing,    setLoopSharing]    = useState(false);
+  const [storyMentionPreview, setStoryMentionPreview] = useState<{ url: string; type: string } | null>(null);
   const loopCamRef = useRef<HTMLInputElement>(null);
 
   const unviewedPhotos = loopPhotos.filter(p => !p.viewed);
 
   const fetchLoopPhotos = async () => {
     try {
-      const res = await fetch("/api/loop/photos", { cache: "no-store" });
-      if (res.ok) setLoopPhotos(await res.json());
+      const res = await fetch("/api/dm/instant-shares", { cache: "no-store", credentials: "include" });
+      if (res.ok) {
+        const photos = await res.json() as LoopPhoto[];
+        setLoopPhotos(photos.filter(photo => photo.mediaType === "image"));
+      }
     } catch { /* silent */ }
   };
 
@@ -510,7 +892,7 @@ export default function DirectMessages() {
 
   const loadPhotoDetail = async (photoId: number) => {
     try {
-      const res = await fetch(`/api/loop/photos/${photoId}`, { cache: "no-store" });
+      const res = await fetch(`/api/dm/instant-shares/${photoId}`, { cache: "no-store", credentials: "include" });
       if (res.ok) setLoopViewDetail(await res.json());
     } catch { /* silent */ }
   };
@@ -519,7 +901,7 @@ export default function DirectMessages() {
     const photo = unviewedPhotos[loopViewIdx];
     if (photo) {
       // Sunucuda görüldü olarak işaretle
-      await fetch(`/api/loop/photos/${photo.id}/view`, { method: "POST" }).catch(() => {});
+      await fetch(`/api/dm/instant-shares/${photo.id}/view`, { method: "POST", credentials: "include" }).catch(() => {});
       setLoopPhotos(prev => prev.map(p => p.id === photo.id ? { ...p, viewed: true } : p));
     }
     if (loopViewIdx < unviewedPhotos.length - 1) {
@@ -537,9 +919,10 @@ export default function DirectMessages() {
   const sendLoopReact = async (emoji: string) => {
     const photo = unviewedPhotos[loopViewIdx];
     if (!photo) return;
-    await fetch(`/api/loop/photos/${photo.id}/react`, {
+    await fetch(`/api/dm/instant-shares/${photo.id}/react`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ emoji }),
     }).catch(() => {});
     loadPhotoDetail(photo.id);
@@ -548,14 +931,33 @@ export default function DirectMessages() {
   const sendLoopReply = async () => {
     const photo = unviewedPhotos[loopViewIdx];
     if (!photo || !loopViewReply.trim()) return;
-    await fetch(`/api/loop/photos/${photo.id}/reply`, {
+    await fetch(`/api/dm/instant-shares/${photo.id}/reply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ content: loopViewReply.trim() }),
     }).catch(() => {});
     setLoopViewReply("");
     loadPhotoDetail(photo.id);
     toast({ title: "Yanıt gönderildi ✨" });
+  };
+
+  const toggleInstantShareArchive = async (photo: LoopPhoto) => {
+    const archived = !photo.archived;
+    try {
+      const response = await fetch(`/api/dm/instant-shares/${photo.id}/archive`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ archived }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Arşiv güncellenemedi");
+      setLoopPhotos(current => current.map(item => item.id === photo.id ? { ...item, archived } : item));
+      toast({ title: archived ? "DM anlık paylaşımı arşive eklendi" : "Arşivden çıkarıldı" });
+    } catch (error) {
+      toast({ title: "Hata", description: error instanceof Error ? error.message : "Arşiv güncellenemedi", variant: "destructive" });
+    }
   };
 
   const handleLoopShareFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -571,15 +973,23 @@ export default function DirectMessages() {
     try {
       const fd = new FormData();
       fd.append("file", loopShareFile);
-      const res = await fetch("/api/loop/photos", { method: "POST", body: fd });
+      const res = await fetch("/api/dm/instant-shares", {
+        method: "POST",
+        body: fd,
+        credentials: "include",
+      });
       if (res.ok) {
         toast({ title: "Anlık fotoğraf paylaşıldı! 📸", description: "Arkadaşların tek seferlik görebilir." });
+        await fetchLoopPhotos();
         setLoopShareOpen(false);
         setLoopSharePreview(null);
         setLoopShareFile(null);
       } else {
-        toast({ title: "Hata", description: "Fotoğraf gönderilemedi.", variant: "destructive" });
+        const result = await res.json().catch(() => null) as { error?: string } | null;
+        toast({ title: "Hata", description: result?.error || "Fotoğraf gönderilemedi.", variant: "destructive" });
       }
+    } catch {
+      toast({ title: "Hata", description: "Fotoğraf gönderilemedi. Bağlantını kontrol edip tekrar dene.", variant: "destructive" });
     } finally {
       setLoopSharing(false);
     }
@@ -600,14 +1010,14 @@ export default function DirectMessages() {
   const fetchMyThoughtLikers = async () => {
     if (!me?.id) return;
     try {
-      const res = await fetch(`/api/thoughts/${me.id}/likes`, { cache: "no-store" });
+      const res = await fetch(`/api/thoughts/${me.id}/likes`, { cache: "no-store", credentials: "include" });
       if (res.ok) setMyThoughtLikers(await res.json());
     } catch { /* silent */ }
   };
 
   const fetchFriendThoughtLikers = async (friendId: number) => {
     try {
-      const res = await fetch(`/api/thoughts/${friendId}/likes`, { cache: "no-store" });
+      const res = await fetch(`/api/thoughts/${friendId}/likes`, { cache: "no-store", credentials: "include" });
       if (res.ok) {
         const likers: ThoughtLiker[] = await res.json();
         setFriendThoughtLikers(prev => new Map(prev).set(friendId, likers));
@@ -620,7 +1030,7 @@ export default function DirectMessages() {
   };
 
   const toggleThoughtLike = async (friendId: number) => {
-    const res = await fetch(`/api/thoughts/${friendId}/like`, { method: "POST" }).catch(() => null);
+    const res = await fetch(`/api/thoughts/${friendId}/like`, { method: "POST", credentials: "include" }).catch(() => null);
     if (!res?.ok) return;
     const data = await res.json() as { liked: boolean };
     setMyLikes(prev => {
@@ -636,6 +1046,7 @@ export default function DirectMessages() {
     // Düşünce yanıtı = DM olarak gönder
     await fetch(`/api/dm/${thoughtSheet.userId}`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: `💭 "${thoughtSheet.thought}"\n\n${thoughtReply.trim()}` }),
     }).catch(() => {});
@@ -669,6 +1080,7 @@ export default function DirectMessages() {
       return next;
     });
     setMenuId(null);
+    setMenuPos(null);
   };
   const removeFav = (id: number) => {
     setFavMap(prev => {
@@ -678,6 +1090,7 @@ export default function DirectMessages() {
       return next;
     });
     setMenuId(null);
+    setMenuPos(null);
   };
   const addFav = (id: number, entry: FavEntry) => {
     setFavMap(prev => {
@@ -688,6 +1101,7 @@ export default function DirectMessages() {
     });
     setFavEmojiDialogId(null);
     setMenuId(null);
+    setMenuPos(null);
   };
   const muteFor = (id: number, hours: number) => {
     setMutedMap(prev => {
@@ -698,6 +1112,7 @@ export default function DirectMessages() {
     });
     setMuteDialogId(null);
     setMenuId(null);
+    setMenuPos(null);
   };
   const hideConvs = (ids: Set<number>) => {
     setHiddenIds(prev => {
@@ -708,8 +1123,10 @@ export default function DirectMessages() {
     setSelectedIds(new Set());
     setIsSelecting(false);
     setMenuId(null);
+    setMenuPos(null);
   };
 
+  const THOUGHT_TTL_MS = 24 * 60 * 60 * 1000;
   const THOUGHT_PROMPTS = [
     "Bugün ne düşünüyorsun? 🌙",
     "Nasıl hissediyorsun? 💫",
@@ -726,18 +1143,54 @@ export default function DirectMessages() {
     () => THOUGHT_PROMPTS[Math.floor(Math.random() * THOUGHT_PROMPTS.length)]
   );
 
+  const isThoughtExpired = (updatedAt?: string | Date | null) => {
+    if (!updatedAt) return false;
+    const timestamp = updatedAt instanceof Date ? updatedAt.getTime() : new Date(updatedAt).getTime();
+    if (!Number.isFinite(timestamp)) return false;
+    return Date.now() - timestamp >= THOUGHT_TTL_MS;
+  };
+
   // Düşünce balonu state — localStorage + server sync
-  const [thought, setThought] = useState<string>(() => localStorage.getItem("loop_thought") ?? "");
+  const [thought, setThought] = useState<string>(() => {
+    const savedText = localStorage.getItem("loop_thought") ?? "";
+    const savedAt = Number(localStorage.getItem("loop_thought_updated_at") || 0);
+    if (savedText && savedAt && Date.now() - savedAt >= THOUGHT_TTL_MS) {
+      localStorage.removeItem("loop_thought");
+      localStorage.removeItem("loop_thought_updated_at");
+      return "";
+    }
+    return savedText;
+  });
   const [thoughtOpen, setThoughtOpen] = useState(false);
   const [thoughtDraft, setThoughtDraft] = useState("");
   const thoughtInputRef = useRef<HTMLTextAreaElement>(null);
 
+  useEffect(() => {
+    const open = Boolean(thoughtOpen || thoughtSheet);
+    document.body.classList.toggle("mobile-sheet-open", open);
+    return () => document.body.classList.remove("mobile-sheet-open");
+  }, [thoughtOpen, thoughtSheet]);
+
   // Server'dan gelen thought ile senkronize et (localStorage yoksa)
   useEffect(() => {
     const serverThought = (me as { thought?: string | null } | null)?.thought;
+    const serverThoughtUpdatedAt = (me as DmUser | null | undefined)?.thoughtUpdatedAt;
+
     if (serverThought && !localStorage.getItem("loop_thought")) {
       setThought(serverThought);
       localStorage.setItem("loop_thought", serverThought);
+      localStorage.setItem("loop_thought_updated_at", serverThoughtUpdatedAt ? String(new Date(serverThoughtUpdatedAt).getTime()) : String(Date.now()));
+    }
+
+    if (isThoughtExpired(serverThoughtUpdatedAt)) {
+      setThought("");
+      localStorage.removeItem("loop_thought");
+      localStorage.removeItem("loop_thought_updated_at");
+      void fetch("/api/users/me/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thought: null }),
+      }).catch(() => {});
     }
   }, [me]);
 
@@ -748,8 +1201,10 @@ export default function DirectMessages() {
   };
   const saveThought = async () => {
     const val = thoughtDraft.trim();
+    const now = Date.now();
     setThought(val);
     localStorage.setItem("loop_thought", val);
+    localStorage.setItem("loop_thought_updated_at", String(now));
     setThoughtOpen(false);
     // persist to server so friends can see it
     try {
@@ -763,6 +1218,7 @@ export default function DirectMessages() {
   const clearThought = async () => {
     setThought("");
     localStorage.removeItem("loop_thought");
+    localStorage.removeItem("loop_thought_updated_at");
     setThoughtOpen(false);
     try {
       await fetch("/api/users/me/profile", {
@@ -774,13 +1230,97 @@ export default function DirectMessages() {
   };
 
   const fetchConversations = async () => {
-    const res = await fetch("/api/dm/conversations", { cache: "no-store" });
-    if (res.ok) setConversations(await res.json());
+    const res = await fetch("/api/dm/conversations", { cache: "no-store", credentials: "include" });
+    if (res.status === 403) {
+      const data = await res.json().catch(() => null) as { error?: string; reason?: string; expiresAt?: string | null } | null;
+      if (data?.error === "dm_banned") setDmBanWarning(formatDmBanWarning(data.reason, data.expiresAt));
+      return;
+    }
+    if (res.ok) {
+      const data = await res.json() as Conversation[];
+      setConversations(data);
+      const names = await Promise.all(data.map(async conversation => {
+        const id = conversation.user?.id;
+        if (!id) return null;
+        const namesResponse = await fetch(`/api/dm/${id}/names`, { credentials: "include", cache: "no-store" });
+        if (!namesResponse.ok) return null;
+        return { id, names: await namesResponse.json() as { mine?: string; theirs?: string } };
+      }));
+      setConversationNames(current => Object.fromEntries([
+        ...Object.entries(current),
+        ...names.filter(Boolean).map(item => [item!.id, { mine: item!.names.mine ?? "", theirs: item!.names.theirs ?? "" }]),
+      ]));
+    }
   };
 
+  const fetchIncomingMessageRequests = async () => {
+    setMessageRequestsLoading(true);
+    try {
+      const response = await fetch("/api/dm/requests/inbox", {
+        credentials: "include",
+        cache: "no-store",
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Mesaj istekleri yüklenemedi");
+      setIncomingMessageRequests(Array.isArray(result) ? result as IncomingMessageRequest[] : []);
+      setMessageRequestError("");
+    } catch (error) {
+      setMessageRequestError(error instanceof Error ? error.message : "Mesaj istekleri yüklenemedi");
+    } finally {
+      setMessageRequestsLoading(false);
+    }
+  };
+
+  const respondToIncomingMessageRequest = async (request: IncomingMessageRequest, action: "accepted" | "rejected") => {
+    setRespondingRequestId(request.id);
+    try {
+      const response = await fetch(`/api/dm/requests/${request.id}/respond`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const result = await response.json().catch(() => ({})) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Mesaj isteği yanıtlanamadı");
+      await Promise.all([fetchIncomingMessageRequests(), fetchConversations()]);
+      toast({
+        title: action === "accepted" ? "Mesaj isteği kabul edildi" : "Mesaj isteği reddedildi",
+      });
+      if (action === "accepted") setLocation(`/dm/${request.senderId}`);
+    } catch (error) {
+      toast({
+        title: error instanceof Error ? error.message : "Mesaj isteği yanıtlanamadı",
+        variant: "destructive",
+      });
+    } finally {
+      setRespondingRequestId(null);
+    }
+  };
+
+  useEffect(() => {
+    if (userId || groupId) return;
+    void fetchIncomingMessageRequests();
+    const interval = window.setInterval(() => void fetchIncomingMessageRequests(), 10000);
+    return () => window.clearInterval(interval);
+  }, [userId, groupId]);
+
   const fetchMessages = async (uid: number) => {
-    const res = await fetch(`/api/dm/${uid}`);
+    const res = await fetch(`/api/dm/${uid}`, { credentials: "include" });
+    if (res.status === 403) {
+      const data = await res.json().catch(() => null) as { error?: string; reason?: string; expiresAt?: string | null } | null;
+      if (data?.error === "dm_banned") {
+        setDmBanWarning(formatDmBanWarning(data.reason, data.expiresAt));
+        setDmAccessMessage(null);
+      } else {
+        setDmBanWarning(null);
+        setDmAccessMessage(data?.error || "Bu kişiyle mesajlaşamazsın.");
+      }
+      setMessages([]);
+      return;
+    }
     if (res.ok) {
+      setDmBanWarning(null);
+      setDmAccessMessage(null);
       const data = await res.json();
       setMessages(data);
       const other = data.find((m: DmMessage) => m.senderId !== me?.id);
@@ -788,11 +1328,78 @@ export default function DirectMessages() {
     }
   };
 
+  const fetchDmRequestStatus = async (uid: number) => {
+    const response = await fetch(`/api/dm/${uid}/request-status`, { credentials: "include", cache: "no-store" });
+    if (!response.ok) return;
+    const result = await response.json() as { pending?: boolean };
+    if (Number(userId) === uid) setDmRequestPending(Boolean(result.pending));
+  };
+
+  const fetchDmStreak = async (uid: number) => {
+    try {
+      const response = await fetch(`/api/dm/${uid}/streak`, { credentials: "include", cache: "no-store" });
+      const result = await response.json() as DmStreak & { error?: string };
+      if (!response.ok) throw new Error(result.error || "Seri bilgisi alınamadı");
+      if (Number(userId) === uid) {
+        setDmStreak(result);
+        setDmStreakError(null);
+      }
+    } catch (error) {
+      if (Number(userId) === uid) {
+        setDmStreakError(error instanceof Error ? error.message : "Seri bilgisi alınamadı");
+      }
+    }
+  };
+
   const fetchOtherUser = async (uid: number) => {
-    const res = await fetch(`/api/users/${uid}`);
+    const res = await fetch(`/api/users/${uid}`, { credentials: "include" });
     if (res.ok) {
       const data = await res.json();
-      setOtherUser({ id: data.id, username: data.username, displayName: data.displayName, avatarUrl: data.avatarUrl });
+      setOtherUser(data);
+    }
+  };
+
+  const fetchDmNames = async (uid: number) => {
+    const res = await fetch(`/api/dm/${uid}/names`, { credentials: "include", cache: "no-store" });
+    if (res.status === 403) {
+      const data = await res.json().catch(() => null) as { error?: string; reason?: string; expiresAt?: string | null } | null;
+      if (data?.error === "message_request_required") return;
+      if (data?.error === "dm_banned") {
+        setDmBanWarning(formatDmBanWarning(data.reason, data.expiresAt));
+        setDmAccessMessage(null);
+      } else {
+        setDmBanWarning(null);
+        setDmAccessMessage(data?.error || "Bu kişiyle mesajlaşamazsın.");
+      }
+      return;
+    }
+    if (res.ok) {
+      const names = await res.json() as { mine?: string; theirs?: string };
+      setDmNames({ mine: names.mine ?? "", theirs: names.theirs ?? "" });
+    }
+  };
+
+  const saveDmNames = async () => {
+    if (!userId || savingNames) return;
+    setSavingNames(true);
+    try {
+      const res = await fetch(`/api/dm/${userId}/names`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(nameDraft),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const data = await res.json() as { mine: string; theirs: string; message?: DmMessage };
+      setDmNames({ mine: data.mine, theirs: data.theirs });
+      setConversationNames(current => ({ ...current, [Number(userId)]: { mine: data.mine, theirs: data.theirs } }));
+      if (data.message) setMessages(current => [...current, data.message!]);
+      setNameDialogOpen(false);
+      toast({ title: "Adlandırma kaydedildi", duration: 1400 });
+    } catch {
+      toast({ title: "Adlandırma kaydedilemedi", variant: "destructive" });
+    } finally {
+      setSavingNames(false);
     }
   };
 
@@ -924,13 +1531,35 @@ export default function DirectMessages() {
   useEffect(() => {
     if (userId) {
       const uid = parseInt(userId);
+      setDmStreak(null);
+      setDmStreakError(null);
+      setDmStreakOpen(false);
+      setDmAccessMessage(null);
+      setDmRequestPending(false);
       fetchMessages(uid);
-      fetchOtherUser(uid);
+      void fetchDmRequestStatus(uid);
+      fetchDmNames(uid);
+      void fetchDmStreak(uid);
       const interval = setInterval(() => fetchMessages(uid), 3000);
-      return () => clearInterval(interval);
+      const requestStatusInterval = setInterval(() => void fetchDmRequestStatus(uid), 5000);
+      const streakInterval = setInterval(() => void fetchDmStreak(uid), 30000);
+      return () => {
+        clearInterval(interval);
+        clearInterval(requestStatusInterval);
+        clearInterval(streakInterval);
+      };
     }
     return undefined;
   }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const uid = Number(userId);
+    const conversation = conversations.find(item => item.user?.id === uid);
+    if (conversation?.user && conversation.user.id !== me?.id) {
+      setOtherUser(conversation.user);
+    }
+  }, [conversations, me?.id, userId]);
 
   // Kullanıcı değişince tema & kayıtlı anları yükle
   useEffect(() => {
@@ -946,6 +1575,7 @@ export default function DirectMessages() {
     } catch { setSavedMsgsCache([]); setSavedMsgIds(new Set()); }
     setShowInfoPanel(false);
     setMsgCtxMenu(null);
+    setNameDialogOpen(false);
   }, [userId]);
 
   useEffect(() => {
@@ -1009,20 +1639,92 @@ export default function DirectMessages() {
     }
   }, [friendshipKey, companionKey, companionNameKey]);
 
-  const respondFriendship = (msgId: number, response: "accepted" | "rejected") => {
+  // Friendship and companion choices are shared through the existing DM stream.
+  useEffect(() => {
+    if (!messages.length || !me) return;
+
+    const nextStatuses: Record<number, "accepted" | "rejected" | "pending"> = {};
+    let newlyAcceptedFriendship = false;
+    for (const msg of messages) {
+      if (msg.content === "__LOOP_FRIENDSHIP__") {
+        // The recipient must keep this unset so the accept/reject buttons remain visible.
+        if (msg.senderId === me.id) nextStatuses[msg.id] = "pending";
+      }
+      const response = parseFriendshipResponse(msg.content);
+      if (response) {
+        nextStatuses[response.requestId] = response.status;
+        if (response.status === "accepted") {
+          const acceptedKey = `${userId}:${response.requestId}`;
+          if (!fetchedAcceptedFriendshipsRef.current.has(acceptedKey)) {
+            fetchedAcceptedFriendshipsRef.current.add(acceptedKey);
+            newlyAcceptedFriendship = true;
+          }
+        }
+      }
+    }
+
+    const latestCompanion = messages
+      .filter(msg => msg.content?.startsWith("__LOOP_COMPANION__:"))
+      .sort((a, b) => new Date(String(b.createdAt ?? 0)).getTime() - new Date(String(a.createdAt ?? 0)).getTime())[0];
+    if (latestCompanion?.content) {
+      const [, slug, ...nameParts] = latestCompanion.content.split(":");
+      if (slug) {
+        setCompanion(slug);
+        if (nameParts.join(":").trim()) setCompanionName(nameParts.join(":"));
+      }
+    }
+
     setFriendshipStatus(prev => {
-      const next = { ...prev, [msgId]: response };
-      if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(next));
-      return next;
+      const requestIds = new Set(messages.filter(msg => msg.content === "__LOOP_FRIENDSHIP__").map(msg => msg.id));
+      const merged = Object.fromEntries(
+        Object.entries({ ...prev, ...nextStatuses }).filter(([id]) => !requestIds.has(Number(id)) || nextStatuses[Number(id)]),
+      ) as Record<number, "accepted" | "rejected" | "pending">;
+      if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(merged));
+      return merged;
     });
-    if (response === "accepted") {
-      setTimeout(() => setShowCompanionPicker(true), 400);
+    if (newlyAcceptedFriendship && userId) void fetchDmStreak(Number(userId));
+  }, [messages, me, friendshipKey, userId]);
+
+  const respondFriendship = async (msgId: number, response: "accepted" | "rejected") => {
+    if (!userId) return;
+    try {
+      const savedResponse = await fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: `__LOOP_FRIENDSHIP_RESPONSE__:${msgId}:${response}` }),
+      });
+      if (!savedResponse.ok) throw new Error("Yoldaşlık yanıtı kaydedilemedi");
+      setFriendshipStatus(prev => {
+        const next = { ...prev, [msgId]: response };
+        if (friendshipKey) localStorage.setItem(friendshipKey, JSON.stringify(next));
+        return next;
+      });
+      if (response === "accepted") {
+        fetchedAcceptedFriendshipsRef.current.add(`${userId}:${msgId}`);
+        void fetchDmStreak(Number(userId));
+        setTimeout(() => setShowCompanionPicker(true), 400);
+      }
+    } catch (error) {
+      toast({
+        title: "Yoldaşlık yanıtı gönderilemedi",
+        description: error instanceof Error ? error.message : undefined,
+        variant: "destructive",
+      });
     }
   };
 
   const selectCompanion = (id: string) => {
     setCompanion(id);
     if (companionKey) localStorage.setItem(companionKey, id);
+    if (userId) {
+      void fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: `__LOOP_COMPANION__:${id}:${companionName}` }),
+      });
+    }
     setShowCompanionPicker(false);
     toast({ title: "🐾 Yoldaşın seçildi!", description: "Sohbet alanında seninle birlikte!", duration: 2500 });
   };
@@ -1030,6 +1732,14 @@ export default function DirectMessages() {
   const saveCompanionName = (n: string) => {
     setCompanionName(n);
     if (companionNameKey) localStorage.setItem(companionNameKey, n);
+    if (userId && companion) {
+      void fetch(`/api/dm/${userId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: `__LOOP_COMPANION__:${companion}:${n}` }),
+      });
+    }
   };
 
   const handleSendFriendshipRequest = async () => {
@@ -1148,6 +1858,19 @@ export default function DirectMessages() {
     audio.onended = () => setPlayingVoiceId(null);
   };
 
+  const prepareStreakShareDraft = () => {
+    if (!dmStreak || dmStreak.days < 3 || !otherUser || !me) return;
+    const voiceTime = formatVoiceTime(dmStreak.voiceSeconds);
+    const draft = [
+      `🔥 ${dmStreak.days} günlük yoldaşlık serimiz!`,
+      `@${otherUser.username} ile ${dmStreak.messageCount} mesaj biriktirdik.`,
+      voiceTime ? `Birbirimize ${voiceTime} sesli mesaj gönderdik.` : "",
+      "Anılarımıza ortak ol ✨",
+    ].filter(Boolean).join("\n");
+    localStorage.setItem("loop_streak_share_draft", draft);
+    setLocation("/create?streak=1");
+  };
+
   const cancelRecording = () => {
     if (recordingTimerRef.current) { clearInterval(recordingTimerRef.current); recordingTimerRef.current = null; }
     const mr = mediaRecorderRef.current;
@@ -1184,6 +1907,7 @@ export default function DirectMessages() {
         const res = await fetch(`/api/dm/${userId}/voice`, { method: "POST", body: formData });
         if (res.ok) {
           fetchMessages(parseInt(userId));
+          void fetchDmStreak(parseInt(userId));
           fetchConversations();
         } else {
           toast({ title: "Sesli mesaj gönderilemedi", variant: "destructive" });
@@ -1226,18 +1950,22 @@ export default function DirectMessages() {
     if (!userId) return;
     setGifOpen(false);
     try {
-      await fetch(`/api/dm/${userId}`, {
+      const response = await fetch(`/api/dm/${userId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content: `__LOOP_GIF__:${url}` }),
       });
+      if (!response.ok) throw new Error("GIF gönderilemedi");
       fetchMessages(parseInt(userId));
+      void fetchDmStreak(parseInt(userId));
       fetchConversations();
-    } catch { /* sessiz */ }
+    } catch {
+      toast({ title: "GIF gönderilemedi", variant: "destructive" });
+    }
   };
 
   const handleSend = async () => {
-    if (!content.trim() || !userId) return;
+    if (!content.trim() || !userId || dmBanWarning || dmAccessMessage) return;
     setSending(true);
     const finalContent = dmReplyTo
       ? `__LOOP_REPLY__:${dmReplyTo.displayName}:${dmReplyTo.content.slice(0, 100)}\n${content}`
@@ -1250,10 +1978,25 @@ export default function DirectMessages() {
         body: JSON.stringify({ content: finalContent }),
       });
       if (res.ok) {
+        if (res.status === 202) {
+          setContent("");
+          setDmRequestPending(true);
+          toast({ title: "Mesaj isteğin gönderildi", description: "Kabul edildiğinde mesajın iletilecek." });
+          return;
+        }
         setContent("");
         setMsgSentToggle(v => !v);
         fetchMessages(parseInt(userId));
+        void fetchDmStreak(parseInt(userId));
         fetchConversations();
+      } else if (res.status === 403 || res.status === 409) {
+        const data = await res.json().catch(() => null) as { error?: string; reason?: string; expiresAt?: string | null } | null;
+        if (res.status === 409) toast({ title: data?.error || "Bekleyen mesaj isteğin var." });
+        else if (data?.error === "dm_banned") setDmBanWarning(formatDmBanWarning(data.reason, data.expiresAt));
+        else {
+          setDmBanWarning(null);
+          setDmAccessMessage(data?.error || "Bu kişiyle mesajlaşamazsın.");
+        }
       }
     } finally {
       setSending(false);
@@ -1268,10 +2011,64 @@ export default function DirectMessages() {
       const res = await fetch(`/api/dm/${userId}/media`, { method: "POST", body: formData });
       if (res.ok) {
         fetchMessages(parseInt(userId));
+        void fetchDmStreak(parseInt(userId));
         fetchConversations();
       }
     } catch {
       toast({ title: "Hata", description: "Dosya gönderilemedi.", variant: "destructive" });
+    }
+  };
+
+  const handleStickerUpload = async (file: File) => {
+    const name = file.name.replace(/\.[^.]+$/, "").trim().slice(0, 60) || "Sticker";
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("name", name);
+    try {
+      const response = await fetch("/api/dm/stickers", { method: "POST", body: formData, credentials: "include" });
+      const result = await response.json().catch(() => null) as (DmSticker & { error?: string }) | null;
+      if (!response.ok) throw new Error(result?.error || "Sticker eklenemedi.");
+      if (!result || typeof result.id !== "number") throw new Error("Sunucudan geçersiz sticker yanıtı alındı.");
+      setStickers(current => [result, ...current.filter(sticker => sticker.id !== result.id)]);
+      setStickerTab("all");
+      toast({ title: "Sticker koleksiyonuna eklendi." });
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Sticker eklenemedi.", variant: "destructive" });
+    }
+  };
+
+  const toggleStickerFavorite = async (sticker: DmSticker) => {
+    const method = sticker.isFavorite ? "DELETE" : "POST";
+    try {
+      const response = await fetch(`/api/dm/stickers/${sticker.id}/favorite`, { method, credentials: "include" });
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(result?.error || "Favori durumu güncellenemedi.");
+      setStickers(current => current.map(item => item.id === sticker.id ? { ...item, isFavorite: !sticker.isFavorite } : item));
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Favori durumu güncellenemedi.", variant: "destructive" });
+    }
+  };
+
+  const sendSticker = async (sticker: DmSticker) => {
+    if (!userId || dmBanWarning) return;
+    setStickerSendingId(sticker.id);
+    try {
+      const response = await fetch(`/api/dm/${userId}/stickers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ stickerId: sticker.id }),
+      });
+      const result = await response.json().catch(() => null) as { error?: string } | null;
+      if (!response.ok) throw new Error(result?.error || "Sticker gönderilemedi.");
+      setStickerPanelOpen(false);
+      setMsgSentToggle(value => !value);
+      void fetchMessages(parseInt(userId));
+      void fetchConversations();
+    } catch (error) {
+      toast({ title: error instanceof Error ? error.message : "Sticker gönderilemedi.", variant: "destructive" });
+    } finally {
+      setStickerSendingId(null);
     }
   };
 
@@ -1281,10 +2078,10 @@ export default function DirectMessages() {
     const activeGroup = groups.find(g => g.id === gid);
 
     return (
-      <AppLayout>
-        <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)]">
+      <AppLayout fullHeight>
+        <div className="flex min-h-0 flex-col overflow-hidden h-[calc(100dvh-3.5rem-4rem)] md:h-[calc(100vh-3.5rem-4rem)]">
           {/* Header */}
-          <div className="flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
+          <div className="relative flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
             <button
               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
               onClick={() => { setShowGroupInfo(false); setActiveTab("gruplar"); setLocation("/dm"); }}
@@ -1457,12 +2254,13 @@ export default function DirectMessages() {
 
           {/* Messages */}
           <div
-            className="flex-1 overflow-y-auto bg-background px-3 py-2"
+            className="flex-1 overflow-x-hidden overflow-y-auto overscroll-contain bg-background px-3 py-2"
             ref={groupScrollRef}
             onScroll={() => {
               const el = groupScrollRef.current;
               if (!el) return;
-              isAtGroupBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+              isAtGroupBottomRef.current = distanceFromBottom < 80;
             }}
           >
             {groupMessages.length === 0 && (
@@ -1470,8 +2268,8 @@ export default function DirectMessages() {
                 <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                   <Users className="w-8 h-8 text-primary/40" />
                 </div>
-                <p className="text-sm font-medium">Henüz mesaj yok</p>
-                <p className="text-xs opacity-70">İlk mesajı sen gönder ✨</p>
+                <p className="text-sm font-medium">{t("noMessages")}</p>
+                <p className="text-xs opacity-70">{t("firstMessage")} ✨</p>
               </div>
             )}
             {groupMessages.map((msg, idx) => {
@@ -1498,7 +2296,7 @@ export default function DirectMessages() {
                   >
                   <div className="w-8 flex-shrink-0 self-end">
                     {!isMe && isLastInRun ? (
-                      <Avatar className="w-8 h-8">
+                      <Avatar data-story-user-id={msg.senderId ?? undefined} className={`w-8 h-8 ${msg.senderId && storyUserIds.has(msg.senderId) ? "story-avatar-ring" : ""}`}>
                         <AvatarImage src={msg.sender?.avatarUrl || ""} />
                         <AvatarFallback className="text-[10px] font-bold bg-muted/80">
                           {msg.sender?.displayName?.charAt(0)}
@@ -1506,10 +2304,10 @@ export default function DirectMessages() {
                       </Avatar>
                     ) : <div className="w-8" />}
                   </div>
-                  <div className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`}>
+                  <div className={`dm-message-card relative flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"}`} onDoubleClick={() => void toggleGroupLike(msg.id)}>
                     {!isMe && isLastInRun && (
                       <span className="text-[10px] text-muted-foreground font-medium mb-0.5 ml-1">
-                        {msg.sender?.displayName}
+                        <UserNameWithDecorations user={msg.sender} />
                       </span>
                     )}
                     {/* GIF */}
@@ -1523,12 +2321,24 @@ export default function DirectMessages() {
                         <span className="text-2xl">{msg.content.split(":")[2]}</span>
                         <span className="text-xs text-muted-foreground">hikayene tepki verdi</span>
                       </div>
+                    ) : msg.content?.startsWith("__LOOP_HIGHLIGHT_REPLY__:") ? (
+                      <div className={`max-w-[260px] rounded-[18px] border border-amber-200/70 px-3 py-2.5 ${isMe ? "bg-amber-50 dark:bg-amber-950/30" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`}>
+                        <p className="mb-1 text-[10px] font-semibold text-amber-600 dark:text-amber-300">✨ Öne çıkanınıza yorum yaptı</p>
+                        <p className="break-words text-[14px] leading-[1.5] text-foreground">{msg.content.split(":").slice(2).join(":")}</p>
+                      </div>
                     ) : msg.content?.startsWith("__STORY_REPLY__:") ? (
                       /* Hikaye metin yanıtı */
                       <div className={`px-3 py-2 rounded-[16px] ${isMe ? "bg-[#EAE4FF] dark:bg-violet-900/40" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220 }}>
                         <p className="text-[10px] text-muted-foreground font-medium mb-1">📖 Hikaye yanıtı</p>
                         <p className="text-[14px] text-foreground break-words">{msg.content.split(":").slice(2).join(":")}</p>
                       </div>
+                    ) : msg.content?.startsWith("__LOOP_BOOK_SHARE__:") ? (
+                      (() => {
+                        const parts = msg.content.split(":");
+                        const bookId = parts[1];
+                        const title = parts.slice(2).join(":") || "Kitabı görüntüle";
+                        return <SharedBookCard bookId={bookId} fallbackTitle={title} isMe={isMe} onOpen={() => setLocation(`/kitap/${encodeURIComponent(bookId)}`)} />;
+                      })()
                     ) : msg.content?.startsWith("__LOOP_POST_SHARE__:") ? (
                       /* Paylaşılan gönderi kartı — overlay açar */
                       (() => {
@@ -1578,7 +2388,10 @@ export default function DirectMessages() {
                       </div>
                     )}
                     {isLastInRun && (
-                      <span className="text-[10px] text-muted-foreground mt-0.5 mx-1">{msgTime}</span>
+                      <div className="dm-message-time flex items-center gap-1 mt-0.5 mx-1">
+                        <span className="text-[10px] text-muted-foreground">{msgTime}</span>
+                                {(msg.likeCount ?? 0) > 0 && <span className={`dm-like-badge pointer-events-none inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold shadow-sm ${msg.isLiked && animatedLikeId === msg.id ? "animate-dm-heart-pop" : ""}`} onAnimationEnd={() => setAnimatedLikeId(current => current === msg.id ? null : current)}><span className="text-sm leading-none">{msg.reactionEmoji || doubleTapEmoji}</span>{(msg.likeCount ?? 0) > 1 && <span className="text-muted-foreground">{msg.likeCount}</span>}</span>}
+                      </div>
                     )}
                   </div>
                   </div>
@@ -1638,7 +2451,9 @@ export default function DirectMessages() {
               </>
             )}
 
-            <div className="border-t border-border/40 bg-background/95 backdrop-blur-sm px-3 py-2.5">
+            <div
+              className="relative z-[30] border-t border-border/40 bg-background/95 backdrop-blur-sm px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))]"
+            >
               <input ref={groupFileInputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleGroupFileUpload(f); e.target.value = ""; }} />
               <div className="flex items-center gap-2">
@@ -1742,11 +2557,11 @@ export default function DirectMessages() {
     const firstUnreadIdx = messages.findIndex(m => m.senderId !== me?.id && !m.isRead);
 
     return (
-      <AppLayout>
-        <div className="flex flex-col h-[calc(100vh-3.5rem-4rem)]">
+      <AppLayout fullHeight>
+        <div className="flex min-h-0 flex-col overflow-hidden h-[calc(100dvh-3.5rem-4rem)] md:h-[calc(100vh-3.5rem-4rem)]">
 
           {/* ── Header ── */}
-          <div className="flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
+          <div className="relative flex items-center gap-2 px-2 py-2 bg-background border-b border-border/40 sticky top-0 z-10">
             {/* Geri */}
             <button
               className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/60 transition-colors flex-shrink-0"
@@ -1762,21 +2577,34 @@ export default function DirectMessages() {
                 onClick={() => setLocation(`/profile/${otherUser.id}`)}
               >
                 <div className="relative flex-shrink-0">
-                  <Avatar className="w-10 h-10">
+                  <Avatar data-story-user-id={otherUser.id} className={`w-10 h-10 ${storyUserIds.has(otherUser.id) ? "story-avatar-ring" : ""}`}>
                     <AvatarImage src={otherUser.avatarUrl || ""} />
                     <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
-                      {otherUser.displayName.charAt(0)}
+                      {(dmNames.theirs || otherUser.displayName).charAt(0)}
                     </AvatarFallback>
                   </Avatar>
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1">
-                    <span className="font-bold text-[15px] leading-tight truncate">{otherUser.displayName}</span>
-                    <BadgeCheck className="w-4 h-4 text-primary flex-shrink-0" />
+                    <UserNameWithDecorations user={{ ...otherUser, displayName: dmNames.theirs || otherUser.displayName }} className="font-bold text-[15px] leading-tight truncate" />
                   </div>
                   <p className="text-[11px] text-green-500 font-semibold leading-tight">Çevrimiçi</p>
                 </div>
+              </button>
+            )}
+
+            {otherUser && (
+              <button
+                type="button"
+                aria-label={dmStreakError ? "Yoldaşlık serisi yüklenemedi" : `Yoldaşlık serisi: ${dmStreak?.isCompanion ? dmStreak.days : 0} gün`}
+                aria-expanded={dmStreakOpen}
+                title="Yoldaşlık serisi"
+                onClick={() => setDmStreakOpen(open => !open)}
+                className="flex h-9 shrink-0 items-center gap-1 rounded-full border border-orange-400/25 bg-orange-500/[0.08] px-2 text-xs font-black text-orange-500 transition hover:bg-orange-500/[0.14]"
+              >
+                <Flame className="h-4 w-4" />
+                {dmStreakError ? "!" : dmStreak?.isCompanion ? dmStreak.days : 0}
               </button>
             )}
 
@@ -1803,37 +2631,121 @@ export default function DirectMessages() {
             </div>
           </div>
 
-          {/* ── Mesajlar + Floating Companion ── */}
-          <div className="relative flex-1 min-h-0 overflow-hidden">
-          {/* Floating yoldaş maskotu */}
+          <Dialog open={dmStreakOpen} onOpenChange={setDmStreakOpen}>
+            <DialogContent className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl border-orange-300/20 p-5">
+              <DialogHeader className="pr-6 text-left">
+                <DialogTitle>Yoldaşlık serisi</DialogTitle>
+                <DialogDescription>
+                  {otherUser ? `${dmNames.theirs || otherUser.displayName} ile mesajlaşma seriniz` : "Mesajlaşma seriniz"}
+                </DialogDescription>
+              </DialogHeader>
+              {dmStreakError ? (
+                <div className="text-sm text-destructive">
+                  <p>{dmStreakError}</p>
+                  <button type="button" onClick={() => void fetchDmStreak(Number(userId))} className="mt-2 font-bold underline">Yeniden dene</button>
+                </div>
+              ) : dmStreak?.isCompanion ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl" style={{ backgroundColor: `${streakAccent(dmStreak.days)}18` }}>
+                      <Flame className="h-6 w-6" style={{ color: streakAccent(dmStreak.days), fill: `${streakAccent(dmStreak.days)}35` }} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black" style={{ color: streakAccent(dmStreak.days) }}>{dmStreak.days} günlük yoldaşlık serisi</p>
+                      <p className="text-[11px] text-muted-foreground">{dmStreak.currentDayComplete ? "Bugün karşılıklı mesajlaştınız" : "Seriyi sürdürmek için bugün ikiniz de yazın"}</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {dmStreak.messageCount} mesaj
+                    {dmStreak.voiceSeconds > 0 ? ` · ${formatVoiceTime(dmStreak.voiceSeconds)}` : ""}
+                    {dmStreak.days < 3 ? " · Anı şablonu 3. günde açılır" : ""}
+                  </p>
+                  {dmStreak.days >= 3 && (
+                    <button
+                      type="button"
+                      onClick={prepareStreakShareDraft}
+                      className="w-full rounded-full px-3 py-2 text-[11px] font-bold text-white shadow-sm transition active:scale-95"
+                      style={{ backgroundColor: streakAccent(dmStreak.days) }}
+                    >
+                      Anılarımıza ortak et
+                    </button>
+                  )}
+                </>
+              ) : dmStreak ? (
+                <div className="flex items-start gap-3">
+                  <Flame className="mt-0.5 h-5 w-5 shrink-0 text-orange-500" />
+                  <div>
+                    <p className="text-sm font-black">Yoldaşlık serisi henüz başlamadı</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Yoldaşlık isteği kabul edildiğinde sayım başlar. Seriyi sürdürmek için kabulden sonra her gün ikiniz de mesajlaşın.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Yoldaşlık serisi yükleniyor…</p>
+              )}
+            </DialogContent>
+          </Dialog>
+
+            {/* ── Mesajlar + Floating Companion ── */}
+            <div className="relative flex-1 min-h-0 overflow-hidden bg-background">
+          {/* Floating yoldaÅŸ, isolated from message layout and scrolling */}
           {companion && companionImgUrl && (
-            <CompanionMascot
-              imgUrl={companionImgUrl}
-              name={companionName}
-              isTyping={content.length > 0}
-              onMessageSent={msgSentToggle}
-              onRename={saveCompanionName}
-            />
+            <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" style={{ contain: "layout paint" }}>
+              <CompanionMascot
+                imgUrl={companionImgUrl}
+                name={companionName}
+                isTyping={content.length > 0}
+                onMessageSent={msgSentToggle}
+                onRename={saveCompanionName}
+              />
+            </div>
           )}
           <div
-            className="h-full overflow-y-auto bg-background"
+            className="h-full overflow-x-hidden overflow-y-auto overscroll-contain bg-background pb-[calc(5rem+env(safe-area-inset-bottom))]"
             ref={scrollRef}
             style={getBgStyleCss()}
             onScroll={() => {
               const el = scrollRef.current;
               if (!el) return;
-              isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+              isAtBottomRef.current = distanceFromBottom < 80;
             }}
           >
             <div className="px-3 py-2">
 
-              {messages.length === 0 && (
+              {dmBanWarning && (
+                <div role="alert" className="mx-auto my-4 max-w-md rounded-2xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-center shadow-sm">
+                  <div className="mb-1 flex items-center justify-center gap-2 text-destructive">
+                    <ShieldAlert className="h-4 w-4" />
+                    <p className="text-sm font-bold">Sistem mesajı</p>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">DM erişimi kısıtlandı</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{dmBanWarning}</p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Bu alanda mesaj gönderemezsin.</p>
+                </div>
+              )}
+
+              {dmAccessMessage && (
+                <div role="alert" className="mx-auto my-4 max-w-md rounded-2xl border border-border bg-muted/60 px-4 py-3 text-center">
+                  <p className="text-sm font-semibold text-foreground">{dmAccessMessage}</p>
+                </div>
+              )}
+
+              {dmRequestPending && (
+                <div role="status" className="mx-auto my-4 max-w-md rounded-2xl border border-primary/25 bg-primary/5 px-4 py-3 text-center">
+                  <p className="text-sm font-bold">Mesaj isteğin bekliyor</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Karşı taraf kabul ederse mesajın iletilecek.</p>
+                </div>
+              )}
+
+              {messages.length === 0 && !dmAccessMessage && (
                 <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
                   <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                     <MessageCircle className="w-8 h-8 text-primary/40" />
                   </div>
-                  <p className="text-sm font-medium">Henüz mesaj yok</p>
-                  <p className="text-xs text-muted-foreground/60">İlk mesajı sen gönder ✨</p>
+                    <p className="text-sm font-medium">{t("noMessages")}</p>
+                    <p className="text-xs text-muted-foreground/60">{t("firstMessage")} ✨</p>
                 </div>
               )}
 
@@ -1894,7 +2806,7 @@ export default function DirectMessages() {
                           {/* Avatar — karşı taraf, serinin son mesajı */}
                           <div className="w-8 flex-shrink-0 self-end">
                             {!isMe && isLastInRun ? (
-                              <Avatar className="w-8 h-8">
+                              <Avatar data-story-user-id={msg.senderId ?? undefined} className={`w-8 h-8 ${msg.senderId && storyUserIds.has(msg.senderId) ? "story-avatar-ring" : ""}`}>
                                 <AvatarImage src={msg.sender?.avatarUrl || ""} />
                                 <AvatarFallback className="text-[10px] font-bold bg-muted/80">
                                   {msg.sender?.displayName?.charAt(0)}
@@ -1907,7 +2819,8 @@ export default function DirectMessages() {
 
                           {/* Balon + saat-tik altında */}
                           <div
-                            className={`flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"} relative`}
+                            className={`dm-message-card flex flex-col max-w-[68%] ${isMe ? "items-end" : "items-start"} relative`}
+                            onDoubleClick={() => void toggleDmLike(msg.id)}
                             onContextMenu={(e) => { e.preventDefault(); setMsgCtxMenu({ msg, x: e.clientX, y: e.clientY }); }}
                             onTouchStart={(e) => {
                               const sx = e.touches[0].clientX; const sy = e.touches[0].clientY;
@@ -1917,6 +2830,9 @@ export default function DirectMessages() {
                             onTouchEnd={() => { if (msgLongPressRef.current) { clearTimeout(msgLongPressRef.current); msgLongPressRef.current = null; } }}
                             onTouchMove={() => { if (msgLongPressRef.current) { clearTimeout(msgLongPressRef.current); msgLongPressRef.current = null; } }}
                           >
+                            {!isMe && isLastInRun && (
+                              <UserNameWithDecorations user={msg.sender ? { ...msg.sender, displayName: dmNames.theirs || msg.sender.displayName } : null} className="mb-0.5 ml-1 text-[10px] font-medium text-muted-foreground" />
+                            )}
                             {/* Kayıtlı an rozeti */}
                             {savedMsgIds.has(msg.id) && (
                               <div className={`absolute -top-1 z-20 ${isMe ? "-left-5" : "-right-5"}`}>
@@ -1927,6 +2843,27 @@ export default function DirectMessages() {
                               const voiceMatch = msg.content.match(/^__LOOP_CALL_VOICE__(?::(.+))?$/);
                               const videoMatch = msg.content.match(/^__LOOP_CALL_VIDEO__(?::(.+))?$/);
                               const isCallMsg  = !!(voiceMatch || videoMatch);
+
+                              if (msg.content?.startsWith("__LOOP_DM_NAMES__:")) {
+                                const payload = msg.content.slice("__LOOP_DM_NAMES__:".length);
+                                try {
+                                  const names = JSON.parse(payload) as { mine?: string; theirs?: string };
+                                  const senderName = msg.senderId === me?.id ? (me?.displayName || "Kullanıcı") : (otherUser?.displayName || "Kullanıcı");
+                                  const recipientName = msg.senderId === me?.id ? (otherUser?.displayName || "Kullanıcı") : (me?.displayName || "Kullanıcı");
+                                  const details = msg.senderId === me?.id
+                                    ? [
+                                        names.mine ? `${recipientName}, ${senderName}'i “${names.mine}” olarak görecek` : "",
+                                        names.theirs ? `${senderName}, ${recipientName}'ı “${names.theirs}” olarak görecek` : "",
+                                      ].filter(Boolean).join(" · ")
+                                    : [
+                                        names.mine ? `${senderName}, ${recipientName}'ı “${names.mine}” olarak görecek` : "",
+                                        names.theirs ? `${recipientName}, ${senderName}'i “${names.theirs}” olarak görecek` : "",
+                                      ].filter(Boolean).join(" · ");
+                                  return <div className="my-2 max-w-[280px] rounded-full border border-primary/15 bg-primary/5 px-4 py-2 text-center text-[11px] font-medium text-muted-foreground">{details || "DM adlandırması güncellendi"}</div>;
+                                } catch {
+                                  return null;
+                                }
+                              }
 
                               if (isCallMsg) {
                                 const callType  = voiceMatch ? "voice" : "video" as "voice" | "video";
@@ -1956,6 +2893,27 @@ export default function DirectMessages() {
                                       >
                                         Katıl
                                       </button>
+                                    )}
+                                  </div>
+                                );
+                              }
+
+                              const gameInviteId = parseGameInvite(msg.content);
+                              if (gameInviteId) {
+                                const response = gameInviteStatus[msg.id];
+                                const canRespond = !isMe && !response;
+                                return (
+                                  <div className="w-[230px] rounded-2xl border border-amber-300/50 bg-amber-50 px-4 py-3 text-center shadow-sm dark:bg-amber-950/30">
+                                    <Gamepad2 className="mx-auto h-7 w-7 text-amber-500" />
+                                    <p className="mt-1 text-sm font-black text-amber-900 dark:text-amber-100">XOX oyun daveti</p>
+                                    <p className="mt-1 text-xs text-amber-700/80 dark:text-amber-200/70">{isMe ? "Rakibinin yanıtı bekleniyor" : "Seninle oynamak istiyor"}</p>
+                                    {response === "accepted" && <p className="mt-2 text-xs font-bold text-emerald-600">Kabul edildi</p>}
+                                    {response === "rejected" && <p className="mt-2 text-xs font-bold text-rose-500">Reddedildi</p>}
+                                    {canRespond && (
+                                      <div className="mt-3 flex gap-2">
+                                        <button type="button" className="flex-1 rounded-xl bg-emerald-500 px-2 py-2 text-xs font-bold text-white" onClick={() => void respondGameInvite(msg.id, gameInviteId, "accepted")}>Kabul Et</button>
+                                        <button type="button" className="flex-1 rounded-xl bg-rose-500 px-2 py-2 text-xs font-bold text-white" onClick={() => void respondGameInvite(msg.id, gameInviteId, "rejected")}>Reddet</button>
+                                      </div>
                                     )}
                                   </div>
                                 );
@@ -2048,6 +3006,23 @@ export default function DirectMessages() {
                                 );
                               }
 
+                              // Synchronization messages are state, not chat content.
+                              if (
+                                msg.content?.startsWith("__LOOP_FRIENDSHIP_RESPONSE__:") ||
+                                msg.content?.startsWith("__LOOP_COMPANION__:")
+                              ) {
+                                return null;
+                              }
+
+                              // Kitap paylaşımı: eski ve yeni prefix formatlarını destekle.
+                              if (msg.content?.startsWith("__LOOP_BOOK_SHARE__:") || msg.content?.startsWith("_LOOP_BOOK_SHARE_:") || msg.content?.startsWith("__LOOP_BOOK_SHARE_:") ) {
+                                const marker = msg.content.startsWith("_LOOP_BOOK_SHARE_:") ? "_LOOP_BOOK_SHARE_:" : msg.content.startsWith("__LOOP_BOOK_SHARE_:") ? "__LOOP_BOOK_SHARE_:" : "__LOOP_BOOK_SHARE__:";
+                                const parts = msg.content.slice(marker.length).split(":");
+                                const bookId = parts.shift() ?? "";
+                                const title = parts.join(":") || "Kitabı görüntüle";
+                                return <SharedBookCard bookId={bookId} fallbackTitle={title} isMe={isMe} onOpen={() => setLocation(`/kitap/${encodeURIComponent(bookId)}`)} />;
+                              }
+
                               // GIF mesajı
                               if (msg.content?.startsWith("__LOOP_GIF__:")) {
                                 const gifUrl = msg.content.slice("__LOOP_GIF__:".length);
@@ -2056,6 +3031,23 @@ export default function DirectMessages() {
                                     <img src={gifUrl} alt="GIF" className="w-full h-auto block" loading="lazy" />
                                   </div>
                                 );
+                              }
+
+                              if (msg.content?.startsWith("__LOOP_STICKER__:")) return null;
+
+                              // Loop video paylaşımı: URL yerine önizlemeli kart.
+                              if (msg.content?.startsWith("__LOOP_VIDEO_SHARE__:")) {
+                                try {
+                                  const sharedLoop = JSON.parse(msg.content.slice("__LOOP_VIDEO_SHARE__:".length)) as { id: number; title?: string; caption?: string; videoUrl?: string; username?: string };
+                                  return (
+                                    <button type="button" onClick={() => setLocation(`/loops?loop=${sharedLoop.id}`)} className={`block w-full overflow-hidden rounded-[16px] text-left transition hover:opacity-90 ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 240, ...(isMe ? { background: getBubbleBg() } : {}) }}>
+                                      {sharedLoop.videoUrl && <video src={sharedLoop.videoUrl} muted playsInline preload="metadata" className="block aspect-[9/12] w-full object-cover" />}
+                                      <div className="px-3 py-2.5"><p className="text-[10px] font-semibold text-primary">🎬 Loop videosu</p><p className="mt-0.5 line-clamp-2 text-[13px] font-bold text-foreground">{sharedLoop.title || "Loop videosu"}</p><p className="mt-1 text-[10px] text-muted-foreground">@{sharedLoop.username || "loop"} · Görüntülemek için dokun</p></div>
+                                    </button>
+                                  );
+                                } catch {
+                                  return <p className="text-sm text-foreground">Loop videosu</p>;
+                                }
                               }
 
                               // Hikaye emoji tepkisi
@@ -2077,6 +3069,15 @@ export default function DirectMessages() {
                                     <p className="text-[10px] text-muted-foreground font-medium mb-1">📖 Hikaye yanıtı</p>
                                     <p className="text-[14px] text-foreground break-words">{text}</p>
                                   </div>
+                                );
+                              }
+
+                              if (msg.content?.startsWith("__LOOP_STORY_MENTION__:")) {
+                                return (
+                                  <button type="button" onClick={() => msg.mediaUrl && setStoryMentionPreview({ url: msg.mediaUrl, type: msg.mediaType || "image" })} className={`w-full px-3 py-2 rounded-[16px] text-left transition hover:opacity-85 ${isMe ? "" : "bg-white dark:bg-zinc-800/90 shadow-[0_1px_4px_rgba(0,0,0,0.08)]"}`} style={{ maxWidth: 220, ...(isMe ? { background: getBubbleBg() } : {}) }}>
+                                    <p className="text-[12px] font-semibold text-foreground">📖 Loopda sizden bahsetti</p>
+                                    {msg.mediaUrl && <p className="mt-1 text-[10px] text-muted-foreground">Hikayeyi görüntüle</p>}
+                                  </button>
                                 );
                               }
 
@@ -2117,10 +3118,14 @@ export default function DirectMessages() {
                               );
                             })()}
                             {msg.mediaUrl && (
-                              <div className="overflow-hidden rounded-[16px] shadow-sm" style={{ maxWidth: 220 }}>
+                              <div className={`overflow-hidden ${msg.mediaType === "sticker" ? "max-w-[180px]" : "max-w-[220px] rounded-[16px] shadow-sm"}`}>
                                 {msg.mediaType === "video"
                                   ? <video src={msg.mediaUrl} controls className="w-full block" />
-                                  : <img src={msg.mediaUrl} alt="medya" className="w-full h-auto block" />
+                                  : <img
+                                      src={msg.mediaUrl}
+                                      alt={msg.mediaType === "sticker" ? (msg.content?.replace("__LOOP_STICKER__:", "") || "Sticker") : "medya"}
+                                      className="w-full h-auto block"
+                                    />
                                 }
                               </div>
                             )}
@@ -2158,9 +3163,10 @@ export default function DirectMessages() {
                             )}
                             {/* Saat + tik — balonun altında */}
                             {isLastInRun && (
-                              <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                              <div className="dm-message-time flex items-center gap-1 mt-1" >
                                 <span className="text-[11px] text-muted-foreground/60 leading-none">{msgTime}</span>
                                 {tickEl}
+                                {(msg.likeCount ?? 0) > 0 && <span className={`dm-like-badge pointer-events-none inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold shadow-sm ${msg.isLiked && animatedLikeId === msg.id ? "animate-dm-heart-pop" : ""}`} onAnimationEnd={() => setAnimatedLikeId(current => current === msg.id ? null : current)}><span className="text-sm leading-none">{msg.reactionEmoji || doubleTapEmoji}</span>{(msg.likeCount ?? 0) > 1 && <span className="text-muted-foreground">{msg.likeCount}</span>}</span>}
                               </div>
                             )}
                           </div>
@@ -2174,10 +3180,11 @@ export default function DirectMessages() {
 
             </div>
           </div>
-          </div>{/* end relative flex-1 min-h-0 */}
 
           {/* ── Input Bar ── */}
-          <div className="relative">
+          <div
+            className="absolute inset-x-0 bottom-0 z-[30] pb-[calc(0.25rem+env(safe-area-inset-bottom))]"
+          >
             {/* Reply preview bar — 1:1 DM */}
             {dmReplyTo && (
               <div className="px-4 py-2 bg-muted/40 border-t border-border flex items-center gap-3">
@@ -2197,6 +3204,73 @@ export default function DirectMessages() {
                 onSelect={(url) => { handleSendGif(url); setGifOpen(false); }}
                 onClose={() => setGifOpen(false)}
               />
+            )}
+
+            {stickerPanelOpen && (
+              <div className="absolute bottom-[calc(100%+8px)] left-3 right-3 z-30 max-h-[min(55vh,460px)] overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+                <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-semibold">Stickerlar</p>
+                    <p className="text-[11px] text-muted-foreground">Seçerek sohbette paylaş</p>
+                  </div>
+                  <button type="button" onClick={() => setStickerPanelOpen(false)} aria-label="Sticker panelini kapat" className="rounded-full p-1.5 hover:bg-muted">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex items-center gap-2 px-3 pt-3">
+                  <button type="button" onClick={() => setStickerTab("all")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stickerTab === "all" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    Stickerlarım
+                  </button>
+                  <button type="button" onClick={() => setStickerTab("favorites")} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${stickerTab === "favorites" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                    Favoriler
+                  </button>
+                  <button type="button" onClick={() => stickerUploadRef.current?.click()} className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted">
+                    <Plus className="h-3.5 w-3.5" /> Sticker ekle
+                  </button>
+                </div>
+                <input
+                  ref={stickerUploadRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                  className="hidden"
+                  onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (file) void handleStickerUpload(file);
+                    event.target.value = "";
+                  }}
+                />
+                <div className="grid max-h-[min(38vh,330px)] grid-cols-4 gap-2 overflow-y-auto p-3">
+                  {stickersLoading ? (
+                    <p className="col-span-4 py-8 text-center text-sm text-muted-foreground">Stickerlar yükleniyor…</p>
+                  ) : (stickerTab === "favorites" ? stickers.filter(sticker => sticker.isFavorite) : stickers).length ? (
+                    (stickerTab === "favorites" ? stickers.filter(sticker => sticker.isFavorite) : stickers).map(sticker => (
+                      <div key={sticker.id} className="group relative aspect-square min-w-0">
+                        <button
+                          type="button"
+                          disabled={stickerSendingId === sticker.id}
+                          onClick={() => void sendSticker(sticker)}
+                          aria-label={`${sticker.name} sticker'ını gönder`}
+                          className="flex h-full w-full items-center justify-center rounded-xl p-2 hover:bg-muted disabled:opacity-50"
+                        >
+                          <img src={sticker.mediaUrl} alt={sticker.name} loading="lazy" className="max-h-full max-w-full object-contain" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void toggleStickerFavorite(sticker)}
+                          aria-label={sticker.isFavorite ? "Favorilerden çıkar" : "Favorilere ekle"}
+                          className="absolute right-1 top-1 rounded-full bg-background/90 p-1 shadow"
+                        >
+                          <Heart className={`h-3.5 w-3.5 ${sticker.isFavorite ? "fill-rose-500 text-rose-500" : "text-muted-foreground"}`} />
+                        </button>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="col-span-4 py-8 text-center text-sm text-muted-foreground">
+                      {stickerTab === "favorites" ? "Henüz favori stickerın yok." : "Henüz stickerın yok. Bir görsel ekleyebilirsin."}
+                    </p>
+                  )}
+                </div>
+              </div>
             )}
 
             {/* + popup menü */}
@@ -2226,7 +3300,7 @@ export default function DirectMessages() {
                   <div className="h-px bg-border/40 mx-3" />
                   <button
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium hover:bg-muted/60 transition-colors"
-                    onClick={() => { setShowPlusMenu(false); toast({ title: "Sticker yakında geliyor 🎨" }); }}
+                    onClick={() => { setShowPlusMenu(false); setStickerPanelOpen(true); }}
                   >
                     <div className="w-8 h-8 rounded-xl bg-yellow-500/10 flex items-center justify-center">
                       <span className="text-lg">😊</span>
@@ -2247,7 +3321,9 @@ export default function DirectMessages() {
               </>
             )}
 
-            <div className="flex items-center gap-2 px-3 py-2.5 bg-background border-t border-border/40">
+            <div
+              className="relative z-[30] flex items-center gap-2 px-3 py-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom))] bg-background border-t border-border/40"
+            >
               <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); }} />
 
@@ -2292,6 +3368,7 @@ export default function DirectMessages() {
                   {/* + butonu */}
                   <button
                     onClick={() => setShowPlusMenu(v => !v)}
+                    disabled={!!dmBanWarning || !!dmAccessMessage || dmRequestPending}
                     className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all"
                   >
                     <span className="text-primary-foreground text-[22px] font-light leading-none" style={{ marginTop: -2 }}>+</span>
@@ -2301,6 +3378,7 @@ export default function DirectMessages() {
                   <div className="flex-1 flex items-center bg-muted/50 rounded-full px-4 h-10 border border-border/30">
                     <input
                       value={content}
+                      disabled={!!dmBanWarning || !!dmAccessMessage || dmRequestPending}
                       onChange={e => { setContent(e.target.value); if (showPlusMenu) setShowPlusMenu(false); }}
                       onKeyDown={e => e.key === "Enter" && handleSend()}
                       placeholder="Mesaj yaz..."
@@ -2312,7 +3390,7 @@ export default function DirectMessages() {
                   {content.trim() ? (
                     <button
                       onClick={handleSend}
-                      disabled={sending}
+                      disabled={sending || !!dmBanWarning || !!dmAccessMessage || dmRequestPending}
                       className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0 shadow hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
                     >
                       <Send className="w-4 h-4 text-primary-foreground" />
@@ -2339,6 +3417,8 @@ export default function DirectMessages() {
             </div>
           </div>
 
+          </div>{/* end relative flex-1 min-h-0 */}
+
         </div>
 
         {/* ── Oyun Paneli ─────────────────────────────────────────────── */}
@@ -2348,6 +3428,7 @@ export default function DirectMessages() {
             onClose={() => setShowGamePanel(false)}
             me={{ id: me.id, displayName: me.displayName, avatarUrl: me.avatarUrl ?? null }}
             other={otherUser ? { id: otherUser.id, displayName: otherUser.displayName, avatarUrl: otherUser.avatarUrl ?? null } : null}
+            initialGameId={initialXoxGameId}
           />
         )}
 
@@ -2493,6 +3574,36 @@ export default function DirectMessages() {
           </>
         )}
 
+        {nameDialogOpen && otherUser && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 px-4" onClick={() => setNameDialogOpen(false)}>
+            <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl" onClick={event => event.stopPropagation()}>
+              <div className="mb-4 flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold">DM'de adlandır</h2>
+                  <p className="mt-1 text-xs text-muted-foreground">Bu isimler sadece bu konuşmada geçerlidir.</p>
+                </div>
+                <button type="button" className="rounded-full p-1.5 text-muted-foreground hover:bg-muted" onClick={() => setNameDialogOpen(false)} aria-label="Kapat">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="space-y-3">
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold">Beni bu şekilde gör</span>
+                  <Input value={nameDraft.mine} maxLength={60} onChange={event => setNameDraft(current => ({ ...current, mine: event.target.value }))} placeholder={`Karşı taraf seni nasıl görsün?`} />
+                </label>
+                <label className="block space-y-1.5">
+                  <span className="text-xs font-semibold">Onu bu şekilde gör</span>
+                  <Input value={nameDraft.theirs} maxLength={60} onChange={event => setNameDraft(current => ({ ...current, theirs: event.target.value }))} placeholder={`${otherUser.displayName} için bir ad yaz`} />
+                </label>
+              </div>
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" className="rounded-xl px-4 py-2 text-sm font-medium hover:bg-muted" onClick={() => setNameDialogOpen(false)}>Vazgeç</button>
+                <button type="button" disabled={savingNames} className="rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground disabled:opacity-50" onClick={() => void saveDmNames()}>{savingNames ? "Kaydediliyor..." : "Kaydet"}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Info Paneli ── */}
         {showInfoPanel && otherUser && (
           <div className="fixed inset-0 z-[60] flex">
@@ -2520,8 +3631,7 @@ export default function DirectMessages() {
                 </Avatar>
                 <div className="text-center">
                   <div className="flex items-center justify-center gap-1">
-                    <p className="font-black text-xl leading-tight">{otherUser.displayName}</p>
-                    <BadgeCheck className="w-5 h-5 text-primary flex-shrink-0" />
+                    <UserNameWithDecorations user={otherUser} className="font-black text-xl leading-tight" />
                   </div>
                   <p className="text-sm text-muted-foreground mt-0.5">@{otherUser.username}</p>
                 </div>
@@ -2604,6 +3714,20 @@ export default function DirectMessages() {
                         </div>
                         <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                       </button>
+                      <div className="h-px bg-border/30 mx-4" />
+                      <button
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-muted/40 transition-colors text-left"
+                        onClick={() => { setNameDraft(dmNames); setNameDialogOpen(true); }}
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Pencil className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">Adlandır</p>
+                          <p className="text-xs text-muted-foreground">Bu konuşmada birbirinizi farklı adlarla görün</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      </button>
                     </div>
 
                     {/* Bildirim / Sessize Al */}
@@ -2628,6 +3752,7 @@ export default function DirectMessages() {
                     {/* Tehlikeli Bölge */}
                     <div className="rounded-2xl border border-destructive/20 overflow-hidden mt-2">
                       <button
+                        type="button"
                         className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-destructive/5 transition-colors text-left"
                         onClick={() => toast({ title: "Engelleme yakında geliyor 🔒", duration: 2000 })}
                       >
@@ -2638,14 +3763,48 @@ export default function DirectMessages() {
                       </button>
                       <div className="h-px bg-destructive/10 mx-4" />
                       <button
+                        type="button"
                         className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-destructive/5 transition-colors text-left"
-                        onClick={() => toast({ title: "Şikayet gönderildi", duration: 2000 })}
+                        onClick={async () => {
+                          const reportedUserId = otherUser?.id;
+                          if (!reportedUserId) {
+                            toast({ title: "Kullanıcı bilgisi bulunamadı", duration: 2000 });
+                            return;
+                          }
+                          setReportReason("Spam");
+                          setReportDialogOpen(true);
+                        }}
                       >
                         <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
                           <Flag className="w-4 h-4 text-destructive" />
                         </div>
                         <p className="text-sm font-semibold text-destructive">Şikayet Et</p>
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {reportDialogOpen && otherUser && (
+                  <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4 backdrop-blur-sm">
+                    <div role="dialog" aria-modal="true" aria-labelledby="dm-report-title" className="w-full max-w-sm rounded-2xl border border-border bg-background p-5 shadow-2xl">
+                      <h2 id="dm-report-title" className="text-base font-bold">Şikayet gönder</h2>
+                      <p className="mt-1 text-xs text-muted-foreground">@{otherUser.username} için bildirim nedeni</p>
+                      <textarea value={reportReason} onChange={(event) => setReportReason(event.target.value)} placeholder="Şikayet nedenini yaz" maxLength={120} autoFocus className="mt-4 min-h-24 w-full resize-none rounded-xl border border-border bg-muted/30 p-3 text-sm outline-none focus:border-primary" />
+                      <div className="mt-4 flex justify-end gap-2">
+                        <button type="button" onClick={() => setReportDialogOpen(false)} className="rounded-lg border border-border px-3 py-2 text-sm">İptal</button>
+                        <button type="button" disabled={reportSending || !reportReason.trim()} onClick={async () => {
+                          setReportSending(true);
+                          try {
+                            const request = { method: "POST", credentials: "include" as const, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reportedUserId: otherUser.id, targetType: "dm", reason: reportReason.trim() }) };
+                            let response = await fetch("/api/reports", request);
+                            if (response.status === 404 || response.status >= 500) response = await fetch("/api/admin/reports", request);
+                            const data = await response.json().catch(() => ({}));
+                            if (response.ok) { setReportDialogOpen(false); toast({ title: "Şikayet moderasyon merkezine iletildi", duration: 2500 }); }
+                            else toast({ title: "Şikayet gönderilemedi", description: data.error || "Lütfen tekrar dene.", duration: 2500 });
+                          } catch { toast({ title: "Şikayet gönderilemedi", description: "Bağlantını kontrol edip tekrar dene.", duration: 2500 }); }
+                          finally { setReportSending(false); }
+                        }} className="rounded-lg bg-destructive px-3 py-2 text-sm font-semibold text-destructive-foreground disabled:opacity-50">{reportSending ? "Gönderiliyor..." : "Gönder"}</button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2799,7 +3958,7 @@ export default function DirectMessages() {
 
   const filteredConvs = conversations
     .filter(c => {
-      if (activeTab === "gruplar") return false; // gruplar sekmesinde bireysel DM gizle
+      if (activeTab === "requests" || activeTab === "gruplar") return false;
       const id = c.user?.id ?? -1;
       if (hiddenIds.has(id)) return false;
       if (searchQuery) {
@@ -2840,6 +3999,7 @@ export default function DirectMessages() {
   const TABS: { id: FilterTab; label: string; count?: number }[] = [
     { id: "tumu", label: "Tümü", count: totalUnread > 0 ? totalUnread : undefined },
     { id: "okunmamis", label: "Okunmamış", count: unreadCount > 0 ? unreadCount : undefined },
+    { id: "requests", label: "İstekler", count: incomingMessageRequests.length > 0 ? incomingMessageRequests.length : undefined },
     { id: "gruplar", label: "Gruplar", count: groups.length > 0 ? groups.length : undefined },
     { id: "sabitlenen", label: "Sabitlenen" },
     { id: "arsivlenen", label: "Arşivlenen" },
@@ -2856,7 +4016,8 @@ export default function DirectMessages() {
               <input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Sohbetlerde ara..."
+                placeholder="Sohbet veya kullanıcı adı ara..."
+                aria-label="Sohbet veya kullanıcı adı ara"
                 className="w-full pl-9 pr-4 py-2.5 rounded-2xl bg-muted/60 border border-transparent focus:border-primary/30 focus:outline-none text-sm placeholder:text-muted-foreground transition-colors"
               />
             </div>
@@ -2895,7 +4056,11 @@ export default function DirectMessages() {
                     >
                       <div className="bg-white shadow-lg rounded-[3px] p-0.5 pb-2.5 w-10">
                         {photo.mediaUrl ? (
-                          <img src={`/api${photo.mediaUrl}`} alt="" className="w-9 h-9 object-cover rounded-[2px]" />
+                          photo.mediaType === "video" ? (
+                            <video src={photo.mediaUrl.startsWith("/api/uploads/") ? photo.mediaUrl : photo.mediaUrl.startsWith("/uploads/") ? `/api${photo.mediaUrl}` : `/${photo.mediaUrl}`} muted playsInline preload="metadata" className="w-9 h-9 object-cover rounded-[2px]" />
+                          ) : (
+                            <img src={photo.mediaUrl.startsWith("/api/uploads/") ? photo.mediaUrl : photo.mediaUrl.startsWith("/uploads/") ? `/api${photo.mediaUrl}` : `/${photo.mediaUrl}`} alt="" className="w-9 h-9 object-cover rounded-[2px]" />
+                          )
                         ) : (
                           <div className={`w-9 h-9 bg-gradient-to-br ${gradients[i % 3]} rounded-[2px] flex items-center justify-center`}>
                             <span className="text-white font-bold text-xs drop-shadow">{photo.sender?.displayName?.charAt(0) ?? "?"}</span>
@@ -2927,18 +4092,73 @@ export default function DirectMessages() {
               )}
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => setLocation("/community")}
+            className="mt-3 flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-violet-300/40 bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 px-4 py-3 text-left text-white shadow-[0_8px_24px_rgba(109,40,217,0.2)] transition hover:brightness-110 active:scale-[0.99]"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+              <Users className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-extrabold">Topluluk sunucuları</span>
+              <span className="mt-0.5 block truncate text-[11px] text-white/70">Kanallarını ve rollerini yönet</span>
+            </span>
+            <span className="shrink-0 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold">Aç</span>
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {(searchQuery.trim().length >= 2 && activeTab !== "arsivlenen") && (
+            <section className="border-b border-border bg-background px-4 py-3">
+              <h2 className="mb-2 text-xs font-bold uppercase tracking-wide text-muted-foreground">Kullanıcılar</h2>
+              {userSearchLoading ? (
+                <p className="py-3 text-center text-sm text-muted-foreground">Kullanıcılar aranıyor...</p>
+              ) : userSearchError ? (
+                <p role="alert" className="py-3 text-center text-sm text-destructive">{userSearchError}</p>
+              ) : userSearchResults.length > 0 ? (
+                <div className="space-y-1">
+                  {userSearchResults.map(candidate => (
+                    <button
+                      key={candidate.id}
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setLocation(`/dm/${candidate.id}`);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-muted/70"
+                    >
+                      <Avatar data-story-user-id={candidate.id} className={`h-10 w-10 ${storyUserIds.has(candidate.id) ? "story-avatar-ring" : ""}`}>
+                        <AvatarImage src={candidate.avatarUrl || ""} />
+                        <AvatarFallback>{candidate.displayName?.charAt(0) || candidate.username.charAt(0)}</AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground">{candidate.displayName}</span>
+                        <span className="block truncate text-xs text-muted-foreground">@{candidate.username}</span>
+                      </span>
+                      <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+                    </button>
+                  ))}
+                </div>
+              ) : !userSearchLoading ? (
+                <p className="py-3 text-center text-sm text-muted-foreground">
+                  {searchQuery.trim().length < 2 ? "Aramak için en az 2 karakter yaz." : "Eşleşen başka kullanıcı bulunamadı."}
+                </p>
+              ) : null}
+            </section>
+          )}
+
           {/* Friend profile cards — horizontal scroll, square card style */}
-          <div className="pt-4 pb-3 border-b border-border/40 relative">
+          <div className="dm-profile-strip relative overflow-hidden border-b border-slate-200/80 bg-white pb-4 pt-5 text-slate-900 shadow-[inset_0_-1px_0_rgba(148,163,184,0.16)]">
+            <div className="pointer-events-none absolute -left-16 -top-20 h-44 w-44 rounded-full bg-violet-100/70 blur-3xl" />
+            <div className="pointer-events-none absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-sky-100/70 blur-3xl" />
 
             <div className="flex gap-3 px-4 overflow-x-auto hide-scrollbar pb-1">
 
               {/* ── My own card ── */}
-              <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
+              <div className="flex-shrink-0 flex flex-col items-center" style={{ width: 88 }}>
                 {/* Bubble slot */}
-                <div className="h-[60px] flex items-end w-full mb-1.5 relative">
+                <div className="relative mb-1 flex h-[48px] w-full items-end">
                   <button onClick={openThought} className="w-full group text-left">
                     <ThoughtBubble text={thought || thoughtPlaceholder} isEmpty={!thought} color="primary" />
                   </button>
@@ -2957,19 +4177,21 @@ export default function DirectMessages() {
                 </div>
                 {/* Kart — kamera butonu relative sarmalında */}
                 <div className="relative w-full">
-                  <button onClick={openThought} className="w-full rounded-2xl bg-card border-2 border-primary/40 shadow-md hover:border-primary/70 hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5">
+                  <button onClick={openThought} className="dm-profile-card group relative w-full overflow-hidden rounded-[22px] border border-violet-200 bg-white pb-2 pt-2 text-slate-900 shadow-[0_8px_22px_rgba(124,58,237,0.14)] transition-all hover:-translate-y-1 hover:border-violet-400 active:scale-95 flex flex-col items-center gap-1">
+                    <span className="absolute inset-x-0 top-0 h-2 bg-gradient-to-r from-violet-600 to-fuchsia-400" />
                     <div className="relative">
-                      <Avatar className="ring-2 ring-primary/30 ring-offset-1 ring-offset-card" style={{ width: 40, height: 40 }}>
+                      <Avatar data-story-user-id={me?.id} className={`rounded-[18px] ring-2 ring-violet-300 ring-offset-2 ring-offset-white shadow-[0_8px_18px_rgba(124,58,237,0.2)] ${me?.id && storyUserIds.has(me.id) ? "story-avatar-ring" : ""}`} style={{ width: 56, height: 56, marginTop: 5 }}>
                         <AvatarImage src={me?.avatarUrl || ""} />
                         <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">{me?.displayName?.charAt(0) ?? "?"}</AvatarFallback>
                       </Avatar>
                       <span className="absolute bottom-0.5 right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-card shadow-sm" />
                     </div>
-                    <p className="text-[10px] font-bold text-primary">Sen</p>
+                    <p className="text-[10px] font-bold text-slate-900">Sen</p>
+                    <span className="text-[8px] font-medium text-slate-400">Kendi profilin</span>
                   </button>
                   <button
                     onClick={e => { e.stopPropagation(); setLoopShareOpen(true); }}
-                    className="absolute -top-1.5 -right-1.5 z-10 w-[22px] h-[22px] bg-primary rounded-full flex items-center justify-center shadow-md hover:bg-primary/90 active:scale-90 transition-all"
+                      className="absolute -right-1.5 -top-1.5 z-10 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-violet-600 shadow-[0_4px_12px_rgba(124,58,237,0.32)] transition-all hover:bg-violet-500 active:scale-90"
                   >
                     <Camera className="w-2.5 h-2.5 text-primary-foreground" />
                   </button>
@@ -2983,17 +4205,17 @@ export default function DirectMessages() {
                 const likers = friendThoughtLikers.get(fid) ?? [];
                 const iLiked = myLikes.has(fid);
                 const palettes = [
-                  { border: "border-violet-400/50 hover:border-violet-500/70", ring: "ring-violet-400/40", color: "violet" as const },
-                  { border: "border-pink-400/50 hover:border-pink-500/70",     ring: "ring-pink-400/40",   color: "pink" as const },
-                  { border: "border-sky-400/50 hover:border-sky-500/70",       ring: "ring-sky-400/40",    color: "sky" as const },
-                  { border: "border-emerald-400/50 hover:border-emerald-500/70", ring: "ring-emerald-400/40", color: "emerald" as const },
-                  { border: "border-orange-400/50 hover:border-orange-500/70", ring: "ring-orange-400/40", color: "orange" as const },
+                  { border: "border-violet-200 hover:border-violet-400", ring: "ring-violet-400/55", color: "violet" as const, glow: "rgba(139,92,246,.16)", band: "from-violet-500 to-indigo-400" },
+                  { border: "border-pink-200 hover:border-pink-400",     ring: "ring-pink-400/55",   color: "pink" as const, glow: "rgba(236,72,153,.14)", band: "from-pink-500 to-rose-400" },
+                  { border: "border-sky-200 hover:border-sky-400",       ring: "ring-sky-400/55",    color: "sky" as const, glow: "rgba(14,165,233,.14)", band: "from-sky-500 to-cyan-400" },
+                  { border: "border-emerald-200 hover:border-emerald-400", ring: "ring-emerald-400/55", color: "emerald" as const, glow: "rgba(16,185,129,.14)", band: "from-emerald-500 to-teal-400" },
+                  { border: "border-orange-200 hover:border-orange-400", ring: "ring-orange-400/55", color: "orange" as const, glow: "rgba(249,115,22,.14)", band: "from-orange-500 to-amber-400" },
                 ];
                 const p = palettes[idx % palettes.length];
                 return (
-                  <div key={fid} className="flex-shrink-0 flex flex-col items-center" style={{ width: 76 }}>
+                  <div key={fid} className="flex-shrink-0 flex flex-col items-center" style={{ width: 88 }}>
                     {/* Bubble slot — tıklanabilir + liker avatarları */}
-                    <div className="h-[60px] flex items-end w-full mb-1.5 relative">
+                    <div className="relative mb-1 flex h-[48px] w-full items-end">
                       {friendThought ? (
                         <button
                           className="w-full text-left"
@@ -3018,10 +4240,12 @@ export default function DirectMessages() {
                     {/* Kart */}
                     <button
                       onClick={() => setLocation(`/dm/${c.user?.id}`)}
-                      className={`w-full rounded-2xl bg-card border-2 shadow-md hover:shadow-lg transition-all active:scale-95 flex flex-col items-center pt-3 pb-2.5 gap-1.5 ${p.border}`}
+                      className={`dm-profile-card group relative w-full overflow-hidden rounded-[22px] border bg-white pb-2 pt-2 text-slate-900 transition-all hover:-translate-y-1 active:scale-95 flex flex-col items-center gap-1 ${p.border}`}
+                      style={{ boxShadow: `0 8px 22px ${p.glow}` }}
                     >
+                      <span className={`absolute inset-x-0 top-0 h-2 bg-gradient-to-r ${p.band}`} />
                       <div className="relative">
-                        <Avatar className={`ring-2 ring-offset-1 ring-offset-card ${p.ring}`} style={{ width: 40, height: 40 }}>
+                        <Avatar data-story-user-id={c.user?.id} className={`rounded-[18px] ring-2 ring-offset-2 ring-offset-white shadow-[0_6px_16px_rgba(15,23,42,0.1)] ${p.ring} ${c.user?.id && storyUserIds.has(c.user.id) ? "story-avatar-ring" : ""}`} style={{ width: 56, height: 56, marginTop: 5 }}>
                           <AvatarImage src={c.user?.avatarUrl || ""} />
                           <AvatarFallback className="bg-muted text-foreground font-bold text-sm">{c.user?.displayName?.charAt(0) ?? "?"}</AvatarFallback>
                         </Avatar>
@@ -3032,9 +4256,8 @@ export default function DirectMessages() {
                           </span>
                         )}
                       </div>
-                      <p className="text-[10px] font-semibold text-foreground/80 truncate text-center px-1" style={{ maxWidth: 68 }}>
-                        {c.user?.displayName?.split(" ")[0] ?? "?"}
-                      </p>
+                      <UserNameWithDecorations user={c.user} showLabel={false} className="w-full max-w-[84px] justify-center px-1 text-[10px] font-bold text-slate-900 [&>img]:h-3 [&>img]:w-3" />
+                      <span className="text-[8px] font-medium text-slate-400">{isOnline ? "Şimdi aktif" : "DM kutusu"}</span>
                     </button>
                     {/* Beğen butonu — balon varsa balonun sağ alt köşesi */}
                     {friendThought && (
@@ -3076,8 +4299,68 @@ export default function DirectMessages() {
             ))}
           </div>
 
-          {/* Conversations — Gruplar sekmesi */}
-          {activeTab === "gruplar" ? (
+          {/* Gelen mesaj istekleri */}
+          {activeTab === "requests" ? (
+            <div className="space-y-3 p-4">
+              {messageRequestsLoading && incomingMessageRequests.length === 0 ? (
+                <p className="py-12 text-center text-sm text-muted-foreground">Mesaj istekleri yükleniyor...</p>
+              ) : messageRequestError ? (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-5 text-center">
+                  <p role="alert" className="text-sm text-destructive">{messageRequestError}</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={() => void fetchIncomingMessageRequests()}>
+                    Yeniden dene
+                  </Button>
+                </div>
+              ) : incomingMessageRequests.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+                    <MessageCircle className="h-8 w-8 text-primary/40" />
+                  </div>
+                  <p className="text-sm font-semibold">Bekleyen mesaj isteği yok</p>
+                  <p className="text-xs">Yeni mesaj istekleri burada görünecek.</p>
+                </div>
+              ) : incomingMessageRequests.map(request => (
+                <article key={request.id} className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-11 w-11">
+                      <AvatarImage src={request.avatarUrl || ""} />
+                      <AvatarFallback>{request.displayName?.charAt(0) || request.username.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold">{request.displayName}</p>
+                      <p className="truncate text-xs text-muted-foreground">@{request.username}</p>
+                    </div>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(request.createdAt), { locale: tr, addSuffix: true })}
+                    </span>
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap break-words rounded-xl bg-muted/60 px-3 py-2.5 text-sm text-foreground">
+                    {request.content}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Kabul ettiğinde mesaj sohbetine eklenir ve yanıt verebilirsin.
+                  </p>
+                  <div className="mt-3 flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={respondingRequestId !== null}
+                      onClick={() => void respondToIncomingMessageRequest(request, "rejected")}
+                    >
+                      Reddet
+                    </Button>
+                    <Button
+                      size="sm"
+                      disabled={respondingRequestId !== null}
+                      onClick={() => void respondToIncomingMessageRequest(request, "accepted")}
+                    >
+                      {respondingRequestId === request.id ? "İşleniyor..." : "Kabul et"}
+                    </Button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : activeTab === "gruplar" ? (
             <div>
               {/* Yeni Grup butonu */}
               <div className="px-4 py-3 border-b border-border/30">
@@ -3109,52 +4392,84 @@ export default function DirectMessages() {
               )}
             </div>
           ) : filteredConvs.length === 0 && filteredGroups.length === 0 ? (
-            <div className="flex flex-col items-center py-16 gap-3 text-muted-foreground px-4">
+            <div className="flex flex-col items-center gap-3 px-4 py-16 text-muted-foreground">
+              {dmBanWarning && (
+                <div role="alert" className="mb-2 w-full rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-center">
+                  <p className="text-sm font-bold text-destructive">DM erişimi kısıtlandı</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{dmBanWarning}</p>
+                </div>
+              )}
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
                 <MessageCircle className="w-8 h-8 text-primary/30" />
               </div>
               <p className="font-medium text-sm">
-                {searchQuery ? "Sonuç bulunamadı" : "Henüz mesajlaşma yok"}
+                {dmBanWarning ? "DM mesajlaşması kullanılamıyor" : searchQuery ? "Sonuç bulunamadı" : "Henüz mesajlaşma yok"}
               </p>
               <p className="text-xs text-center opacity-70">
-                {searchQuery ? "Farklı bir arama dene" : "Bir kullanıcının profiline gidip mesaj gönder!"}
+                {dmBanWarning ? "Bu alan için uygulanan yasağın kaldırılmasını bekleyin." : searchQuery ? "Farklı bir arama dene" : "Bir kullanıcının profiline gidip mesaj gönder!"}
               </p>
             </div>
           ) : (
             <div>
               {/* Tümü: gruplar + DM'ler, zaman sırasına göre interleaved */}
               {activeTab === "tumu" ? (
-                tumuItems.map(item => {
+                tumuItems.map((item, idx) => {
                   if (item.kind === "group") {
                     return <GroupRow key={`g-${item.data.id}`} g={item.data} onClick={() => setLocation(`/dm/group/${item.data.id}`)} />;
                   }
                   const c = item.data;
                   const uid = c.user?.id ?? 0;
+                  const visibleName = conversationNames[uid]?.theirs || c.user?.displayName || "Bilinmiyor";
                   const time = formatMsgTime(c.lastMessage.createdAt);
                   const preview = lastMsgPreview(c.lastMessage);
+                  const isOnline = idx < 4;
+                  const isPinned = pinnedIds.has(uid);
+                  const favEntry = favMap.get(uid);
+                  const isFav = !!favEntry;
+                  const favColor = favEntry?.color ?? DEFAULT_FAV.color;
+                  const favGlow = favEntry?.glow ?? DEFAULT_FAV.glow;
+                  const isMuted = !!mutedMap.get(uid) && mutedMap.get(uid)! > Date.now();
                   return (
                     <div
                       key={uid}
-                      className="flex items-center gap-3 px-4 py-3.5 border-b border-border/30 hover:bg-muted/40 active:bg-muted/60 transition-colors cursor-pointer"
+                      className={`relative flex items-center gap-3 px-4 py-3.5 transition-colors cursor-pointer ${isFav ? "mx-3 my-1.5 rounded-2xl overflow-hidden" : "border-b border-border/30 hover:bg-muted/40 active:bg-muted/60"}`}
+                      style={isFav ? { boxShadow: `0 0 0 1.5px ${favColor}55, 0 0 18px ${favGlow}28, 0 4px 16px ${favGlow}14` } : undefined}
                       onClick={() => {
                         if (menuId !== null) { setMenuId(null); return; }
+                        if (isSelecting) { toggleSelect(uid); return; }
                         setLocation(`/dm/${c.user?.id}`);
                       }}
+                      onTouchStart={() => !isSelecting && startLongPress(uid)}
+                      onTouchEnd={cancelLongPress}
+                      onTouchMove={cancelLongPress}
+                      onMouseDown={() => !isSelecting && startLongPress(uid)}
+                      onMouseUp={cancelLongPress}
+                      onMouseLeave={cancelLongPress}
                     >
-                      <Avatar className="border-2 border-background shadow-sm" style={{ width: 52, height: 52 }}>
+                      {isFav && <div className="absolute inset-0 rounded-2xl pointer-events-none" style={{ background: `linear-gradient(135deg, ${favColor}0d 0%, transparent 60%, ${favColor}08 100%)` }} />}
+                      {isFav && favEntry?.emoji && <div className="absolute top-1.5 right-10 z-10 flex h-7 w-7 items-center justify-center rounded-full" style={{ background: `${favColor}22`, boxShadow: `0 0 10px ${favGlow}99` }}><span className="text-[13px]">{favEntry.emoji}</span></div>}
+                      {isFav && !favEntry?.emoji && <div className="absolute top-1.5 right-10 z-10 flex h-[22px] w-[22px] items-center justify-center rounded-full" style={{ background: `radial-gradient(circle at 40% 35%, ${favColor}cc, ${favColor}66)`, boxShadow: `0 0 8px ${favGlow}cc` }}><Heart className="h-2.5 w-2.5 fill-white text-white" /></div>}
+                      {isSelecting && (
+                        <div className="flex-shrink-0 mr-1">
+                          {selectedIds.has(uid) ? <CheckCircle2 className="w-5 h-5 text-primary" /> : <Circle className="w-5 h-5 text-muted-foreground/50" />}
+                        </div>
+                      )}
+                      <div className="relative flex-shrink-0"><Avatar data-story-user-id={c.user?.id} className={`border-2 border-background shadow-sm ${c.user?.id && storyUserIds.has(c.user.id) ? "story-avatar-ring" : ""}`} style={{ width: 52, height: 52, borderColor: isFav ? `${favColor}88` : "hsl(var(--background))" }}>
                         <AvatarImage src={c.user?.avatarUrl || ""} />
                         <AvatarFallback className="bg-gradient-to-br from-primary/20 to-violet-400/30 text-primary font-bold text-base">
                           {c.user?.displayName?.charAt(0) ?? "?"}
                         </AvatarFallback>
-                      </Avatar>
+                      </Avatar>{isOnline && <span className="absolute bottom-0.5 right-0.5 h-3 w-3 rounded-full border-2 border-background bg-green-500" />}</div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <span className="font-bold text-[15px] truncate">{c.user?.displayName ?? "Bilinmiyor"}</span>
+                          <span style={isFav ? { color: favColor } : undefined}><UserNameWithDecorations user={c.user ? { ...c.user, displayName: visibleName } : null} showLabel={false} className="font-bold text-[15px] truncate" /></span>
+                          {isPinned && <Pin className="h-3 w-3 flex-shrink-0 text-primary/60" />}
+                          {isMuted && <BellOff className="h-3 w-3 flex-shrink-0 text-muted-foreground" />}
                           <span className="text-[11px] text-muted-foreground flex-shrink-0">{time}</span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm text-muted-foreground truncate">{preview}</p>
-                          {c.unreadCount > 0 && (
+                          {c.unreadCount > 0 && !isMuted && (
                             <span className="min-w-[20px] h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center bg-primary text-primary-foreground flex-shrink-0">
                               {c.unreadCount > 9 ? "9+" : c.unreadCount}
                             </span>
@@ -3162,8 +4477,10 @@ export default function DirectMessages() {
                         </div>
                       </div>
                       {/* Üç nokta menü */}
-                      <button
+                      {!isSelecting && <button
                         className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors -mr-1"
+                        onMouseDown={e => e.stopPropagation()}
+                        onTouchStart={e => e.stopPropagation()}
                         onClick={e => {
                           e.stopPropagation();
                           if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
@@ -3173,7 +4490,7 @@ export default function DirectMessages() {
                         }}
                       >
                         <MoreVertical className="w-4 h-4 text-muted-foreground" />
-                      </button>
+                      </button>}
                     </div>
                   );
                 })
@@ -3193,6 +4510,7 @@ export default function DirectMessages() {
                 const mutedUntil = mutedMap.get(uid);
                 const isMuted = !!mutedUntil && mutedUntil > Date.now();
                 const isSelected = selectedIds.has(uid);
+                const visibleName = conversationNames[uid]?.theirs || c.user?.displayName || "Bilinmiyor";
 
                 return (
                   <div
@@ -3267,7 +4585,8 @@ export default function DirectMessages() {
                       {/* Avatar */}
                       <div className="relative flex-shrink-0">
                         <Avatar
-                          className="shadow-sm border-2"
+                          data-story-user-id={c.user?.id}
+                          className={`shadow-sm border-2 ${c.user?.id && storyUserIds.has(c.user.id) ? "story-avatar-ring" : ""}`}
                           style={{ width: 52, height: 52, borderColor: isFav ? `${favColor}88` : "hsl(var(--background))" }}
                         >
                           <AvatarImage src={c.user?.avatarUrl || ""} />
@@ -3288,7 +4607,7 @@ export default function DirectMessages() {
                               className="font-bold text-[15px] truncate"
                               style={isFav ? { color: favColor } : undefined}
                             >
-                              {c.user?.displayName ?? "Bilinmiyor"}
+                              {visibleName}
                             </span>
                             {isPinned && <Pin className="w-3 h-3 text-primary/60 flex-shrink-0" />}
                             {isMuted && <BellOff className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
@@ -3323,6 +4642,8 @@ export default function DirectMessages() {
                       {!isSelecting && (
                         <button
                           className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full transition-colors -mr-1 hover:bg-muted/60"
+                          onMouseDown={e => e.stopPropagation()}
+                          onTouchStart={e => e.stopPropagation()}
                           onClick={e => {
                             e.stopPropagation();
                             if (menuId === uid) { setMenuId(null); setMenuPos(null); return; }
@@ -3395,7 +4716,7 @@ export default function DirectMessages() {
                 className="absolute inset-0 bg-black/60 backdrop-blur-sm"
                 onClick={() => setFavEmojiDialogId(null)}
               />
-              <div className="relative bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
+              <div className="relative flex max-h-[92vh] flex-col overflow-hidden bg-card rounded-t-3xl shadow-2xl px-5 pt-5 pb-10 animate-in slide-in-from-bottom-4">
                 {/* Tutamaç */}
                 <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
 
@@ -3415,7 +4736,8 @@ export default function DirectMessages() {
                 </p>
 
                 {/* Emoji grid */}
-                <div className="grid grid-cols-4 gap-3 mb-5">
+                <div className="mb-5 min-h-0 overflow-y-auto overscroll-contain pr-1">
+                  <div className="grid grid-cols-4 gap-3">
                   {FAV_EMOJIS.map(({ emoji, color, glow, label }) => (
                     <button
                       key={emoji}
@@ -3447,6 +4769,7 @@ export default function DirectMessages() {
                       <span className="text-[10px] text-muted-foreground font-medium truncate w-full text-center px-1">{label}</span>
                     </button>
                   ))}
+                  </div>
                 </div>
 
                 {/* Emojisiz favori / vazgeç */}
@@ -3585,7 +4908,7 @@ export default function DirectMessages() {
                                 <AvatarFallback className="bg-muted text-foreground font-bold text-sm">{c.user.displayName.charAt(0)}</AvatarFallback>
                               </Avatar>
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-sm truncate">{c.user.displayName}</p>
+                                <UserNameWithDecorations user={c.user} className="font-semibold text-sm truncate" />
                                 <p className="text-xs text-muted-foreground truncate">@{c.user.username}</p>
                               </div>
                               <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
@@ -3708,13 +5031,22 @@ export default function DirectMessages() {
                     <div key={i} className={`h-1 w-6 rounded-full ${i === loopViewIdx ? "bg-white" : "bg-white/30"}`} />
                   ))}
                 </div>
+                {photo.sender?.id === me?.id && (
+                  <button type="button" onClick={() => void toggleInstantShareArchive(photo)} aria-label={photo.archived ? "Arşivden çıkar" : "Arşivle"} className="rounded-full bg-white/10 p-2 text-white hover:bg-white/20">
+                    <Archive className={`h-4 w-4 ${photo.archived ? "fill-current" : ""}`} />
+                  </button>
+                )}
               </div>
 
               {/* Polaroid fotoğraf */}
               <div className="flex-1 flex items-center justify-center px-8">
                 <div className="bg-white rounded-sm shadow-2xl p-3 pb-10 w-full max-w-xs" style={{ transform: "rotate(-1.5deg)" }}>
                   {photo.mediaUrl ? (
-                    <img src={`/api${photo.mediaUrl}`} alt="" className="w-full aspect-square object-cover rounded-[2px]" />
+                    photo.mediaType === "video" ? (
+                      <video src={photo.mediaUrl.startsWith("/api/uploads/") ? photo.mediaUrl : photo.mediaUrl.startsWith("/uploads/") ? `/api${photo.mediaUrl}` : `/${photo.mediaUrl}`} autoPlay muted playsInline controls className="w-full aspect-square object-cover rounded-[2px]" />
+                    ) : (
+                      <img src={photo.mediaUrl.startsWith("/api/uploads/") ? photo.mediaUrl : photo.mediaUrl.startsWith("/uploads/") ? `/api${photo.mediaUrl}` : `/${photo.mediaUrl}`} alt="" className="w-full aspect-square object-cover rounded-[2px]" />
+                    )
                   ) : (
                     <div className="w-full aspect-square bg-gradient-to-br from-violet-400 to-fuchsia-500 rounded-[2px] flex items-center justify-center">
                       <span className="text-white font-bold text-5xl drop-shadow-lg">
@@ -3776,6 +5108,17 @@ export default function DirectMessages() {
           );
         })()}
 
+        {storyMentionPreview && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 p-4" onClick={() => setStoryMentionPreview(null)}>
+            <button type="button" onClick={() => setStoryMentionPreview(null)} aria-label="Hikayeyi kapat" className="absolute right-4 top-8 z-10 rounded-full bg-white/10 p-2 text-white"><X className="h-5 w-5" /></button>
+            {storyMentionPreview.type === "video" ? (
+              <video src={storyMentionPreview.url} controls autoPlay playsInline className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+            ) : (
+              <img src={storyMentionPreview.url} alt="Etiketlenen hikaye" className="max-h-full max-w-full object-contain" onClick={(event) => event.stopPropagation()} />
+            )}
+          </div>
+        )}
+
         {/* ── Loop Anlık Paylaş Bottom Sheet ── */}
         {loopShareOpen && (
           <div className="fixed inset-0 z-[60] flex flex-col justify-end">
@@ -3787,8 +5130,8 @@ export default function DirectMessages() {
                   <Camera className="w-5 h-5 text-primary" />
                 </div>
                 <div>
-                  <p className="font-bold text-base leading-tight">Loop diye anlık paylaş</p>
-                  <p className="text-xs text-muted-foreground">Arkadaşların tek seferlik görebilir</p>
+                  <p className="font-bold text-base leading-tight">DM anlık paylaşımı</p>
+                  <p className="text-xs text-muted-foreground">Sohbet alanında paylaşılır; Loops akışına eklenmez</p>
                 </div>
               </div>
 
@@ -3916,7 +5259,7 @@ export default function DirectMessages() {
               {/* Header */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2.5">
-                  <Avatar className="border-2 border-primary/20" style={{ width: 36, height: 36 }}>
+                  <Avatar data-story-user-id={me?.id} className={`border-2 border-primary/20 ${me?.id && storyUserIds.has(me.id) ? "story-avatar-ring" : ""}`} style={{ width: 36, height: 36 }}>
                     <AvatarImage src={me?.avatarUrl || ""} />
                     <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
                       {me?.displayName?.charAt(0) ?? "?"}

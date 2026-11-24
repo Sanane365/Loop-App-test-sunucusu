@@ -1,8 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import { getSessionUser } from "../lib/auth";
+import { getSessionUser, isPrivilegedUser } from "../lib/auth";
 import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { usersTable, bansTable } from "@workspace/db";
+import { and, eq, or, isNull, gt } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -46,14 +46,32 @@ export async function sessionMiddleware(req: Request, res: Response, next: NextF
     req.sessionId = sessionId;
     const user = await getSessionUser(sessionId);
     if (user) {
-      if (user.isBanned) {
-        res.status(403).json({ error: "banned", reason: user.banReason });
-        return;
+      if (!isPrivilegedUser(user)) {
+        const requestPath = req.originalUrl.split("?", 1)[0];
+        const isDmRequest = requestPath.startsWith("/api/dm");
+        const isChatRequest = requestPath.startsWith("/api/chat");
+        const activeBans = await db.select({ banType: bansTable.banType, reason: bansTable.reason, expiresAt: bansTable.expiresAt })
+          .from(bansTable)
+          .where(and(
+            or(eq(bansTable.userId, user.id), eq(bansTable.ipAddress, req.ipAddress)),
+            or(isNull(bansTable.expiresAt), gt(bansTable.expiresAt, new Date())),
+          ));
+        const scopedBan = activeBans.find(ban =>
+          (String(ban.banType).toLowerCase() === "dm" && isDmRequest) ||
+          (String(ban.banType).toLowerCase() === "chat" && isChatRequest),
+        );
+        const globalBan = activeBans.find(ban => !["dm", "chat"].includes(String(ban.banType).toLowerCase()));
+        const legacyGlobalBan = user.isBanned && activeBans.length === 0;
+        if (legacyGlobalBan || globalBan || scopedBan) {
+          const ban = scopedBan ?? globalBan;
+          res.status(403).json({ error: ban?.banType === "dm" ? "dm_banned" : ban?.banType === "chat" ? "chat_banned" : "banned", reason: ban?.reason ?? user.banReason, expiresAt: ban?.expiresAt?.toISOString() ?? null });
+          return;
+        }
       }
       req.user = user;
       // Update lastSeenAt non-blocking
       db.update(usersTable)
-        .set({ lastSeenAt: new Date() })
+        .set({ lastSeenAt: new Date(), lastIpAddress: req.ipAddress })
         .where(eq(usersTable.id, user.id))
         .catch(() => {});
     }

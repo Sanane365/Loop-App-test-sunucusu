@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Loop App</string>
+    <string name="title_activity_main">Loop App</string>
+    <string name="package_name">com.loopsocial.app</string>
+    <string name="custom_url_scheme">com.loopsocial.app</string>
+</resources>

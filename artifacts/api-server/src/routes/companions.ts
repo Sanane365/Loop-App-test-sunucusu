@@ -5,7 +5,7 @@
  *   GET /api/companions          → published list (admin sees all)
  *
  * Admin only:
- *   POST  /api/admin/companions           → upload PNG + name/description → create (draft)
+ *   POST  /api/admin/companions           → upload image/video + name/description → create (draft)
  *   PATCH /api/admin/companions/:id/publish → toggle published
  *   DELETE /api/admin/companions/:id      → delete (non-built-in only)
  */
@@ -19,7 +19,7 @@ import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { companionsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth } from "../lib/auth";
+import { requireAuth, isPrivilegedUser } from "../lib/auth";
 
 const router = Router();
 
@@ -36,25 +36,40 @@ const storage = multer.diskStorage({
 });
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: 50 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (!file.mimetype.startsWith("image/")) {
-      return cb(new Error("Sadece resim dosyaları kabul edilir"));
+    const extension = path.extname(file.originalname).toLowerCase();
+    const supportedExtension = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4", ".webm", ".mov", ".m4v"].includes(extension);
+    if (!file.mimetype.startsWith("image/") && !file.mimetype.startsWith("video/") && !supportedExtension) {
+      return cb(new Error("Sadece resim veya video dosyaları kabul edilir"));
     }
     cb(null, true);
   },
 });
 
+const companionUpload = (req: any, res: any, next: any) => {
+  upload.single("image")(req, res, (error: unknown) => {
+    if (error) {
+      const message = error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE"
+        ? "Yoldaş dosyası en fazla 50 MB olabilir"
+        : error instanceof Error ? error.message : "Yoldaş dosyası yüklenemedi";
+      res.status(400).json({ error: message });
+      return;
+    }
+    next();
+  });
+};
+
 /* ── auth helpers ───────────────────────────────────────────────────── */
 function requireAdmin(req: any, res: any, next: any) {
-  if (!req.user || (req.user.role !== "admin" && req.user.role !== "moderator")) {
+  if (!req.user || !isPrivilegedUser(req.user)) {
     return res.status(403).json({ error: "Yetersiz yetki" });
   }
   next();
 }
 
 function isAdminUser(req: any): boolean {
-  return !!req.user && (req.user.role === "admin" || req.user.role === "moderator");
+  return !!req.user && isPrivilegedUser(req.user);
 }
 
 /* ── ensure published column exists (migration-less) ────────────────── */
@@ -120,7 +135,7 @@ router.post(
   "/admin/companions",
   requireAuth,
   requireAdmin,
-  upload.single("image"),
+  companionUpload,
   async (req, res) => {
     try {
       if (!req.file) {

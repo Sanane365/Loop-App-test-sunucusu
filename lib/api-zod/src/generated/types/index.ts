@@ -6,10 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './avatarFrameTransform';
 export * from './chatMessage';
 export * from './chatMessageInput';
 export * from './chatMessageInputType';
 export * from './chatMessageType';
+export * from './chatRoom';
+export * from './chatRoomInput';
 export * from './comment';
 export * from './commentInput';
 export * from './healthStatus';
@@ -19,14 +22,18 @@ export * from './listUsersParams';
 export * from './loginInput';
 export * from './notification';
 export * from './notificationType';
+export * from './nullableAvatarFrameTransform';
 export * from './post';
 export * from './postInput';
 export * from './postInputPostType';
 export * from './profileUpdate';
 export * from './registerInput';
+export * from './removeStoryPreviewCover200';
 export * from './story';
 export * from './storyInput';
+export * from './updateAvatarFrameTransform200';
 export * from './uploadResult';
+export * from './uploadStoryPreviewCover200';
 export * from './user';
 export * from './userProfile';
 export * from './userStories';

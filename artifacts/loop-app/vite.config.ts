@@ -1,30 +1,26 @@
+import fs from "node:fs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
-const port = Number(rawPort);
+const port = Number(process.env.PORT ?? "3000");
 
 if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
+  throw new Error(`Invalid PORT value: "${process.env.PORT ?? "3000"}"`);
 }
 
-const basePath = process.env.BASE_PATH;
+const basePath = process.env.BASE_PATH ?? "/";
 
-if (!basePath) {
-  throw new Error(
-    "BASE_PATH environment variable is required but was not provided.",
-  );
-}
+const certPath = path.resolve(import.meta.dirname, "..", "..", "certs", "loop-lan.crt");
+const keyPath = path.resolve(import.meta.dirname, "..", "..", "certs", "loop-lan.key");
+const httpsConfig = fs.existsSync(certPath) && fs.existsSync(keyPath)
+  ? {
+      cert: fs.readFileSync(certPath, "utf-8"),
+      key: fs.readFileSync(keyPath, "utf-8"),
+    }
+  : undefined;
 
 export default defineConfig({
   base: basePath,
@@ -63,11 +59,20 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    https: httpsConfig,
+    watch: {
+      ignored: ["**/public/downloads/**"],
+    },
     fs: {
       strict: true,
     },
     proxy: {
       "/api": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        secure: false,
+      },
+      "/uploads": {
         target: "http://localhost:8080",
         changeOrigin: true,
         secure: false,
@@ -78,5 +83,6 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
+    https: httpsConfig,
   },
 });

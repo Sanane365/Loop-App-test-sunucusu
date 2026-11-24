@@ -107,7 +107,7 @@ const QUESTIONS = [
 function stripWhiteBackground(imgSrc: string): Promise<string> {
   return new Promise(resolve => {
     const img = new Image();
-    // No crossOrigin — same-origin proxy, CORS taint not needed
+    img.crossOrigin = "anonymous";
     img.onload = () => {
       const W = img.naturalWidth;
       const H = img.naturalHeight;
@@ -120,7 +120,11 @@ function stripWhiteBackground(imgSrc: string): Promise<string> {
 
       let id: ImageData;
       try { id = ctx.getImageData(0, 0, W, H); }
-      catch { resolve(imgSrc); return; }   // fallback if canvas still tainted
+      catch (error) {
+        console.error("Yoldaş görselinin arka planı temizlenemedi", error);
+        resolve(imgSrc);
+        return;
+      }
       const d = id.data;
 
       /* ── Mode A: check for existing transparency ────────────────── */
@@ -203,9 +207,109 @@ function stripWhiteBackground(imgSrc: string): Promise<string> {
       ctx.putImageData(id, 0, 0);
       resolve(cv.toDataURL("image/png"));
     };
-    img.onerror = () => resolve(imgSrc);
+    img.onerror = () => {
+      console.error("Yoldaş görseli yüklenemedi:", imgSrc);
+      resolve(imgSrc);
+    };
     img.src = imgSrc;
   });
+}
+
+function CompanionVideo({ src, filter }: { src: string; filter: string }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvasFailed, setCanvasFailed] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    setCanvasFailed(false);
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) return;
+    let frame = 0;
+    let stopped = false;
+
+    const drawFrame = () => {
+      if (stopped) return;
+      if (video.readyState >= 2 && video.videoWidth && video.videoHeight) {
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        let image: ImageData;
+        try {
+          image = context.getImageData(0, 0, canvas.width, canvas.height);
+        } catch (error) {
+          console.error("Yoldaş videosunun arka planı temizlenemedi", error);
+          setCanvasFailed(true);
+          stopped = true;
+          return;
+        }
+        const pixels = image.data;
+        const width = canvas.width;
+        const height = canvas.height;
+        const visited = new Uint8Array(width * height);
+        const queue: number[] = [];
+        const isBackground = (pixel: number) => {
+          const red = pixels[pixel];
+          const green = pixels[pixel + 1];
+          const blue = pixels[pixel + 2];
+          return red > 220 && green > 220 && blue > 220;
+        };
+        const enqueue = (index: number) => {
+          if (!visited[index] && isBackground(index * 4)) {
+            visited[index] = 1;
+            queue.push(index);
+          }
+        };
+        for (let x = 0; x < width; x += 2) {
+          enqueue(x); enqueue((height - 1) * width + x);
+        }
+        for (let y = 1; y < height - 1; y += 2) {
+          enqueue(y * width); enqueue(y * width + width - 1);
+        }
+        for (let head = 0; head < queue.length; head += 1) {
+          const index = queue[head]!;
+          pixels[index * 4 + 3] = 0;
+          const x = index % width;
+          const y = Math.floor(index / width);
+          if (y > 0) enqueue(index - width);
+          if (y < height - 1) enqueue(index + width);
+          if (x > 0) enqueue(index - 1);
+          if (x < width - 1) enqueue(index + 1);
+        }
+        context.putImageData(image, 0, 0);
+      }
+      frame = requestAnimationFrame(drawFrame);
+    };
+
+    video.play().catch(() => undefined);
+    frame = requestAnimationFrame(drawFrame);
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [src]);
+
+  return (
+    <>
+      <video
+        ref={videoRef}
+        crossOrigin="anonymous"
+        src={src}
+        muted
+        loop
+        playsInline
+        className={canvasFailed ? "h-full w-full object-contain" : "hidden"}
+        aria-label={canvasFailed ? "Hareketli yoldaş" : undefined}
+        aria-hidden={!canvasFailed}
+        style={canvasFailed ? { filter } : undefined}
+      />
+      <canvas ref={canvasRef} aria-label="Hareketli yoldaş" style={{ width: "100%", height: "100%", objectFit: "contain", display: canvasFailed ? "none" : "block", filter }} />
+    </>
+  );
 }
 
 /* ── keyframes ───────────────────────────────────────────────────────── */
@@ -285,6 +389,7 @@ export default function CompanionMascot({
   imgUrl, name, isTyping, onMessageSent, onRename,
 }: Props) {
   const rawSrc = imgUrl;
+  const isVideo = /\.(mp4|webm|mov|m4v)(\?|$)/i.test(rawSrc);
 
   const [src,        setSrc]        = useState<string | null>(null);
   const [posX,       setPosX]       = useState(14);
@@ -300,9 +405,10 @@ export default function CompanionMascot({
 
   /* canvas strip (flood-fill) */
   useEffect(() => {
+    if (isVideo) { setSrc(rawSrc); return; }
     setSrc(null);
     stripWhiteBackground(rawSrc).then(setSrc);
-  }, [rawSrc]);
+  }, [isVideo, rawSrc]);
 
   /* update evening flag every minute */
   useEffect(() => {
@@ -517,9 +623,9 @@ export default function CompanionMascot({
 
       <div
         ref={rootRef}
-        className="absolute z-20 pointer-events-auto select-none"
+        className="absolute z-20 pointer-events-none select-none"
         style={{
-          bottom: 0,
+          bottom: "calc(4.25rem + env(safe-area-inset-bottom))",
           left:   posX,
           /* smooth 2-D positional slide */
           transition: isWalking ? "left 3.6s linear" : "left 0.5s cubic-bezier(.4,0,.2,1)",
@@ -643,6 +749,7 @@ export default function CompanionMascot({
             {/* anim wrapper: walk/idle/wave/peek/happy/sleep */}
             <div
               onClick={handleTap}
+              className="pointer-events-auto"
               style={{
                 width:"100%", height:"100%",
                 cursor:"pointer",
@@ -651,20 +758,11 @@ export default function CompanionMascot({
                 transformOrigin:"50% 100%",
               }}
             >
-              {src && (
-                <img
-                  src={src}
-                  alt={name || "Yoldaş"}
-                  style={{
-                    width:"100%", height:"100%",
-                    objectFit:"contain", display:"block",
-                    userSelect:"none", WebkitUserSelect:"none", pointerEvents:"none",
-                    filter: nightFilter,
-                    transition:"filter 2s ease",
-                  }}
-                  draggable={false}
-                />
-              )}
+              {src && (isVideo ? (
+                <CompanionVideo src={src} filter={nightFilter} />
+              ) : (
+                <img src={src} alt={name || "Yoldaş"} style={{ width:"100%", height:"100%", objectFit:"contain", display:"block", userSelect:"none", WebkitUserSelect:"none", pointerEvents:"none", filter: nightFilter, transition:"filter 2s ease" }} draggable={false} />
+              ))}
             </div>
           </div>
         </div>

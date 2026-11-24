@@ -1,15 +1,37 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { storiesTable, storyViewsTable, followsTable, usersTable, directMessagesTable } from "@workspace/db";
-import { eq, and, gt, inArray, desc, sql } from "drizzle-orm";
+import { storiesTable, storyViewsTable, followsTable, usersTable, directMessagesTable, notificationsTable } from "@workspace/db";
+import { eq, and, gt, lte, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
 import { getUserWithStats } from "../lib/helpers";
+import { canMentionOrReplyToUser } from "../lib/userControls";
 import multer from "multer";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 
 const router = Router();
+
+await Promise.all([
+  db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text TEXT`),
+  db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text_color TEXT`),
+  db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text_background TEXT`),
+  db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false`),
+]);
+
+async function archiveExpiredStories() {
+  await db.update(storiesTable)
+    .set({ archived: true })
+    .where(and(eq(storiesTable.archived, false), lte(storiesTable.expiresAt, new Date())));
+}
+
+await archiveExpiredStories();
+const storyArchiveInterval = setInterval(() => {
+  void archiveExpiredStories().catch(error => {
+    console.error("Expired stories could not be archived:", error);
+  });
+}, 60_000);
+storyArchiveInterval.unref();
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
@@ -28,14 +50,21 @@ router.get("/stories", async (req, res) => {
     const viewerId = req.user?.id;
     const now = new Date();
 
+    await archiveExpiredStories();
     const activeStories = await db
       .select()
       .from(storiesTable)
-      .where(gt(storiesTable.expiresAt, now))
+      .where(and(gt(storiesTable.expiresAt, now), eq(storiesTable.archived, false)))
       .orderBy(desc(storiesTable.createdAt));
 
+    const excludedResult = viewerId
+      ? await db.execute(sql`SELECT user_id FROM story_visibility_exclusions WHERE excluded_user_id = ${viewerId}`)
+      : { rows: [] };
+    const excludedOwnerIds = new Set(excludedResult.rows.map((row: any) => Number(row.user_id)));
+    const visibleStories = activeStories.filter((story) => !excludedOwnerIds.has(story.userId));
+
     const groupedByUser = new Map<number, typeof activeStories>();
-    for (const story of activeStories) {
+    for (const story of visibleStories) {
       if (!groupedByUser.has(story.userId)) groupedByUser.set(story.userId, []);
       groupedByUser.get(story.userId)!.push(story);
     }
@@ -64,6 +93,10 @@ router.get("/stories", async (req, res) => {
             user,
             mediaUrl: s.mediaUrl,
             mediaType: s.mediaType,
+            storyText: s.storyText,
+            storyTextColor: s.storyTextColor,
+            storyTextBackground: s.storyTextBackground,
+            archived: s.archived,
             isViewed,
             createdAt: s.createdAt.toISOString(),
             expiresAt: s.expiresAt.toISOString(),
@@ -81,9 +114,79 @@ router.get("/stories", async (req, res) => {
   }
 });
 
+router.get("/stories/archive", requireAuth, async (req, res) => {
+  try {
+    await archiveExpiredStories();
+    const archivedStories = await db
+      .select()
+      .from(storiesTable)
+      .where(and(eq(storiesTable.userId, req.user!.id), eq(storiesTable.archived, true)))
+      .orderBy(desc(storiesTable.createdAt));
+    res.set("Cache-Control", "no-store");
+    res.json(archivedStories);
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Hikaye arşivi alınamadı" });
+  }
+});
+
+router.delete("/stories/:storyId/archive", requireAuth, async (req, res) => {
+  try {
+    const storyId = Number(req.params.storyId);
+    if (!Number.isInteger(storyId) || storyId < 1) {
+      res.status(400).json({ error: "Geçersiz hikaye numarası" });
+      return;
+    }
+    const [deletedStory] = await db
+      .delete(storiesTable)
+      .where(and(
+        eq(storiesTable.id, storyId),
+        eq(storiesTable.userId, req.user!.id),
+        eq(storiesTable.archived, true),
+      ))
+      .returning({ id: storiesTable.id });
+    if (!deletedStory) {
+      res.status(404).json({ error: "Arşivlenmiş hikaye bulunamadı" });
+      return;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Hikaye arşivden silinemedi" });
+  }
+});
+
+router.get("/stories/visibility", requireAuth, async (req, res) => {
+  try {
+    const result = await db.execute(sql`SELECT excluded_user_id FROM story_visibility_exclusions WHERE user_id = ${req.user!.id}`);
+    res.json({ excludedUserIds: result.rows.map((row: any) => Number(row.excluded_user_id)) });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Visibility settings could not be loaded" });
+  }
+});
+
+router.put("/stories/visibility", requireAuth, async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.excludedUserIds)
+      ? [...new Set(req.body.excludedUserIds.map((id: unknown) => Number(id)).filter((id: number) => Number.isInteger(id) && id > 0 && id !== req.user!.id))]
+      : [];
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`DELETE FROM story_visibility_exclusions WHERE user_id = ${req.user!.id}`);
+      for (const excludedUserId of ids) {
+        await tx.execute(sql`INSERT INTO story_visibility_exclusions (user_id, excluded_user_id) VALUES (${req.user!.id}, ${excludedUserId}) ON CONFLICT (user_id, excluded_user_id) DO NOTHING`);
+      }
+    });
+    res.json({ excludedUserIds: ids });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Visibility settings could not be saved" });
+  }
+});
+
 router.post("/stories", requireAuth, async (req, res) => {
   try {
-    const { mediaUrl, mediaType } = req.body;
+    const { mediaUrl, mediaType, storyText, storyTextColor, storyTextBackground } = req.body;
     if (!mediaUrl) {
       res.status(400).json({ error: "mediaUrl required" });
       return;
@@ -92,8 +195,35 @@ router.post("/stories", requireAuth, async (req, res) => {
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     const [story] = await db
       .insert(storiesTable)
-      .values({ userId: req.user!.id, mediaUrl, mediaType: mediaType || "image", expiresAt })
+      .values({ userId: req.user!.id, mediaUrl, mediaType: mediaType || "image", storyText: storyText?.trim() || null, storyTextColor: storyTextColor || null, storyTextBackground: storyTextBackground || null, expiresAt })
       .returning();
+
+    const mentions = [...new Set(
+      String(storyText || "").match(/@[a-zA-Z0-9_.-]+/g)?.map((mention) => mention.slice(1).toLowerCase()) || [],
+    )].filter(Boolean);
+    if (mentions.length > 0) {
+      const mentionedUsers = await db
+        .select({ id: usersTable.id, username: usersTable.username })
+        .from(usersTable)
+        .where(sql`LOWER(${usersTable.username}) IN (${sql.join(mentions.map((mention) => sql`${mention}`), sql`, `)})`);
+      for (const mentionedUser of mentionedUsers) {
+        if (mentionedUser.id === req.user!.id) continue;
+        if (!(await canMentionOrReplyToUser(req.user!.id, mentionedUser.id))) continue;
+        await db.insert(notificationsTable).values({
+          userId: mentionedUser.id,
+          fromUserId: req.user!.id,
+          type: "story_mention",
+          data: { storyId: story.id, mediaUrl, mediaType: mediaType || "image", text: "Loopda sizden bahsetti" },
+        });
+        await db.insert(directMessagesTable).values({
+          senderId: req.user!.id,
+          receiverId: mentionedUser.id,
+          content: `__LOOP_STORY_MENTION__:${story.id}:Loopda sizden bahsetti`,
+          mediaUrl,
+          mediaType: mediaType || "image",
+        });
+      }
+    }
 
     const user = await getUserWithStats(req.user!.id, req.user!.id);
     res.status(201).json({
@@ -138,19 +268,6 @@ router.post("/stories/:storyId/view", requireAuth, async (req, res) => {
   }
 });
 
-// Ensure story_replies table exists (with pinned column)
-db.execute(sql`
-  CREATE TABLE IF NOT EXISTS story_replies (
-    id SERIAL PRIMARY KEY,
-    story_id INTEGER NOT NULL,
-    from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    is_emoji BOOLEAN NOT NULL DEFAULT false,
-    pinned BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
-  )
-`).catch(() => {});
-
 // Add pinned column to existing tables if missing
 db.execute(sql`ALTER TABLE story_replies ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT false`).catch(() => {});
 
@@ -168,6 +285,10 @@ router.post("/stories/:storyId/reply", requireAuth, async (req, res) => {
 
     // Don't allow replying to own stories
     if (story.userId === fromUserId) { res.status(400).json({ error: "Kendi hikayene yanıt veremezsin" }); return; }
+    if (!(await canMentionOrReplyToUser(fromUserId, story.userId))) {
+      res.status(403).json({ error: "Bu kullanıcı yalnızca takipçilerinden yanıt kabul ediyor veya yanıtları kapattı." });
+      return;
+    }
 
     // Save to story_replies
     await db.execute(sql`

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
+import { saveDraft, calcWordCount, getDraft, type Draft, type DraftChapter, type ProgressStatus } from "@/lib/draftStore";
 import {
   ArrowLeft, Save, ChevronRight, ChevronLeft, Plus, X,
   Bold, Italic, Underline, Image as ImageIcon, Film,
@@ -8,14 +9,11 @@ import {
   CheckCircle2, Circle, Clock, ChevronDown, Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
-import { saveDraft, calcWordCount, getDraft } from "@/lib/draftStore";
 import { useAuth } from "@/lib/auth";
+import { BOOK_GENRES } from "@/data/genres";
 
 /* ── Sabitler ────────────────────────────────────────────────────────── */
-const GENRES = [
-  "Romantizm","Fantastik","Gerilim","Bilim Kurgu","Tarih",
-  "Gizem","Macera","Korku","Komedi","Drama","Şiir","Deneme",
-];
+const GENRES = BOOK_GENRES;
 const FONTS = [
   { id:"serif",    label:"Klasik",    family:"Georgia, serif",           sample:"Bir varmış bir yokmuş…" },
   { id:"sans",     label:"Modern",    family:"system-ui, sans-serif",    sample:"Bir varmış bir yokmuş…" },
@@ -54,6 +52,12 @@ interface Chapter {
 
 /* ── Yardımcı ────────────────────────────────────────────────────────── */
 const uid = () => Math.random().toString(36).slice(2);
+const fileToDataUrl = (file: File): Promise<string> => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result));
+  reader.onerror = () => reject(reader.error ?? new Error("Dosya okunamadı"));
+  reader.readAsDataURL(file);
+});
 const newBlock = (type: BlockType = "text"): Block => ({
   id: uid(), type, content: "",
   ...(type === "poll" ? { pollQuestion: "", pollOptions:[{id:uid(),text:""},{id:uid(),text:""}], pollDuration: 24 } : {}),
@@ -167,7 +171,7 @@ function BlockEditor({
               <input type="file" accept="image/*" className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0];
-                  if (f) onChange({ ...block, content: URL.createObjectURL(f) });
+                  if (f) void fileToDataUrl(f).then(content => onChange({ ...block, content }));
                 }} />
             </label>
           )
@@ -192,7 +196,7 @@ function BlockEditor({
               <input type="file" accept="video/*" className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0];
-                  if (f) onChange({ ...block, content: URL.createObjectURL(f) });
+                  if (f) void fileToDataUrl(f).then(content => onChange({ ...block, content }));
                 }} />
             </label>
           )
@@ -246,11 +250,37 @@ export default function MetinHikayesi() {
   const search = useSearch();
   const [step, setStep] = useState(0);
   const { user } = useAuth();
-  const isPremiumUser = user?.role === "admin";
+  const [hasPremiumWriterMembership, setHasPremiumWriterMembership] = useState(false);
+  const isPremiumUser = user?.role === "admin" || hasPremiumWriterMembership;
+
+  useEffect(() => {
+    if (!user?.id) {
+      setHasPremiumWriterMembership(false);
+      return;
+    }
+    let cancelled = false;
+    void fetch(`/api/live/membership-benefits/${user.id}`, { credentials: "include", cache: "no-store" })
+      .then(async response => {
+        if (!response.ok) throw new Error("Premium Yazar üyeliği doğrulanamadı");
+        return await response.json() as { activeMemberships?: Array<{ id: string }> };
+      })
+      .then(result => {
+        if (!cancelled) setHasPremiumWriterMembership(result.activeMemberships?.some(item => item.id === "premium_writer") === true);
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setHasPremiumWriterMembership(false);
+          console.error("Premium Yazar üyeliği yüklenemedi:", error);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [user?.id]);
 
   /* Adım 1 — Kapak & Bilgi */
   const [cover,      setCover]      = useState<string | null>(null);
-  const [trailers,   setTrailers]   = useState<(string|null)[]>([null, null]);
+  const [trailers,   setTrailers]   = useState<(string|null)[]>([null, null, null, null]);
+  const [trailerOrientations, setTrailerOrientations] = useState<("horizontal" | "vertical")[]>(["vertical", "vertical", "vertical", "vertical"]);
+  const [favoriteImages, setFavoriteImages] = useState<(string|null)[]>([null, null]);
   const [title,      setTitle]      = useState("");
   const [subtitle,   setSubtitle]   = useState("");
   const [genres,     setGenres]     = useState<string[]>([]);
@@ -270,13 +300,17 @@ export default function MetinHikayesi() {
   /* Adım 4 — Yayınla */
   const [visibility, setVisibility] = useState("public");
   const [isPremium,  setIsPremium]  = useState(false);
+  const [progressStatus, setProgressStatus] = useState<ProgressStatus>("ongoing");
   const [draftId,    setDraftId]    = useState<string | undefined>(undefined);
 
   /* Kaydet diyalog */
   const [saveDialog, setSaveDialog] = useState(false);
 
+  const wordCount = calcWordCount(chapters);
+
   const coverRef    = useRef<HTMLInputElement>(null);
-  const trailerRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const trailerRefs = Array.from({ length: 4 }, () => useRef<HTMLInputElement>(null));
+  const favoriteImageRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
 
   /* URL'den ?id ve ?step oku → taslağı yükle */
   useEffect(() => {
@@ -289,12 +323,15 @@ export default function MetinHikayesi() {
       if (draft) {
         setDraftId(draft.id);
         setCover(draft.cover);
-        setTrailers(draft.trailers ?? [null, null]);
+        setTrailers([...((draft.trailers ?? []).slice(0, 4)), ...Array(4).fill(null)].slice(0, 4));
+        setTrailerOrientations([...((draft.trailerOrientations ?? []).slice(0, 4)), ...Array(4).fill("vertical")].slice(0, 4) as ("horizontal" | "vertical")[]);
+        setFavoriteImages([...((draft.favoriteImages ?? []).slice(0, 2)), ...Array(2).fill(null)].slice(0, 2));
         setTitle(draft.title);
         setSubtitle(draft.subtitle ?? "");
         setGenres(draft.genres ?? []);
         setSynopsis(draft.synopsis ?? "");
         setAgeRating(draft.ageRating ?? "all");
+        setProgressStatus(draft.progressStatus ?? "ongoing");
 
         const f = FONTS.find(x => x.id === draft.fontId) ?? FONTS[0];
         const t = THEMES.find(x => x.id === draft.themeId) ?? THEMES[0];
@@ -336,43 +373,64 @@ export default function MetinHikayesi() {
     }));
   }, []);
 
-  const handleSave = useCallback((status: "draft" | "published" = "draft", showDialog = false) => {
+  const handleSave = useCallback(async (status: "draft" | "published" = "draft", showDialog = false) => {
     // Yayında olan kitabı Kaydet düğmesi taslağa indirmemeli —
     // mevcut "published" statüsü korunur; sadece "Yayınla" butonu "published" set eder.
     const existingStatus = draftId ? (getDraft(draftId)?.status ?? "draft") : "draft";
     const effectiveStatus: "draft" | "published" =
       status === "published" ? "published" : existingStatus;
 
-    const saved = saveDraft({
-      id:         draftId,
-      type:       "metin",
-      status:     effectiveStatus,
-      title,
-      subtitle,
-      cover,
-      trailers,
-      genres,
-      synopsis,
-      ageRating,
-      fontId:     font.id,
-      themeId:    theme.id,
-      fontSize,
-      textAlign,
-      chapters,
-      wordCount:  calcWordCount(chapters),
-      // Admin kullanıcılar premium yazar sayılır — kitap premium yazarlar bölümünde gösterilir
-      ...(effectiveStatus === "published" && { isPremiumAuthor: isPremiumUser }),
-    });
-    setDraftId(saved.id);
-    if (status === "published") {
-      toast.success("Yayınlandı! 🎉", { description: title || "Başlıksız", duration: 2500 });
-    } else if (showDialog) {
-      setSaveDialog(true);
-    } else {
-      toast.success("Kaydedildi 💾", { description: title || "Başlıksız", duration: 1800 });
+    try {
+      const saved = saveDraft({
+        id:         draftId,
+        type:       "metin",
+        status:     effectiveStatus,
+        title,
+        subtitle,
+        cover,
+        trailers,
+        trailerOrientations,
+        favoriteImages,
+        genres,
+        synopsis,
+        ageRating,
+        fontId:     font.id,
+        themeId:    theme.id,
+        fontSize,
+        textAlign,
+        chapters,
+        wordCount,
+        progressStatus,
+        // Admin kullanıcılar premium yazar sayılır — kitap premium yazarlar bölümünde gösterilir
+        ...(effectiveStatus === "published" && { isPremiumAuthor: isPremiumUser }),
+      });
+      setDraftId(saved.id);
+      if (effectiveStatus === "published") {
+        const response = await fetch("/api/books", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(saved),
+        });
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.error ?? `Yayın sunucusu ${response.status} döndürdü`);
+        }
+      }
+      if (status === "published") {
+        toast.success("Yayınlandı! 🎉", { description: title || "Başlıksız", duration: 2500 });
+      } else if (showDialog) {
+        setSaveDialog(true);
+      } else {
+        toast.success("Kaydedildi 💾", { description: title || "Başlıksız", duration: 1800 });
+      }
+      return saved;
+    } catch (error) {
+      toast.error("Kitap yayınlanamadı", { description: error instanceof Error ? error.message : "Sunucuya bağlanılamadı. Tekrar deneyin." });
+      console.error("Draft save failed", error);
+      return null;
     }
-    return saved;
-  }, [draftId, title, subtitle, cover, trailers, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters, isPremiumUser]);
+  }, [draftId, title, subtitle, cover, trailers, favoriteImages, genres, synopsis, ageRating, font, theme, fontSize, textAlign, chapters, progressStatus, isPremiumUser]);
 
   /* ── ADIM 1: Kapak & Bilgi ─────────────────────────────────────────── */
   const renderStep0 = () => (
@@ -403,7 +461,7 @@ export default function MetinHikayesi() {
           )}
         </button>
         <input ref={coverRef} type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) setCover(URL.createObjectURL(f)); }} />
+          onChange={async e => { const f = e.target.files?.[0]; if (f) setCover(await fileToDataUrl(f)); }} />
       </div>
 
       {/* Fragmanlar */}
@@ -411,15 +469,14 @@ export default function MetinHikayesi() {
         <p className="text-[11px] font-bold uppercase tracking-widest text-violet-400/70 mb-2">Fragman Videoları</p>
         <div className="grid grid-cols-2 gap-3">
           {trailers.map((t, i) => (
-            <button
+            <div
               key={i}
-              type="button"
-              onClick={() => trailerRefs[i].current?.click()}
-              className="relative overflow-hidden rounded-xl border border-dashed border-violet-400/25 hover:border-violet-400/50 transition-colors"
-              style={{ aspectRatio: "9/16", background: "rgba(109,40,217,0.07)" }}
+              className="relative overflow-hidden rounded-xl border border-dashed border-violet-400/25 p-2 hover:border-violet-400/50 transition-colors"
+              style={{ background: "rgba(109,40,217,0.07)" }}
             >
-              {t
-                ? <video src={t} className="w-full h-full object-cover" />
+              <button type="button" onClick={() => trailerRefs[i].current?.click()} className={`relative w-full overflow-hidden rounded-lg ${trailerOrientations[i] === "vertical" ? "aspect-[9/16]" : "aspect-video"}`}>
+                  {t
+                ? <video src={t} className="w-full h-full object-cover" preload="none" muted playsInline controls={false} />
                 : (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-slate-500">
                     <Film className="h-8 w-8" strokeWidth={1.2} />
@@ -427,6 +484,14 @@ export default function MetinHikayesi() {
                   </div>
                 )
               }
+              </button>
+              <div className="mt-2 flex gap-1 rounded-lg bg-black/20 p-1">
+                {(["horizontal", "vertical"] as const).map(orientation => (
+                  <button key={orientation} type="button" onClick={() => setTrailerOrientations(prev => prev.map((value, index) => index === i ? orientation : value))} className={`flex-1 rounded-md px-1.5 py-1 text-[9px] font-bold transition ${trailerOrientations[i] === orientation ? "bg-violet-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    {orientation === "horizontal" ? "Yatay" : "Dikey"}
+                  </button>
+                ))}
+              </div>
               {t && (
                 <button
                   type="button"
@@ -436,13 +501,27 @@ export default function MetinHikayesi() {
                   <X className="h-3.5 w-3.5" />
                 </button>
               )}
-            </button>
+            </div>
           ))}
         </div>
         {trailers.map((_, i) => (
           <input key={i} ref={trailerRefs[i]} type="file" accept="video/*" className="hidden"
-            onChange={e => { const f = e.target.files?.[0]; if (f) setTrailers(prev => prev.map((v, j) => j === i ? URL.createObjectURL(f) : v)); }} />
+                  onChange={async e => { const f = e.target.files?.[0]; if (f) { const dataUrl = await fileToDataUrl(f); setTrailers(prev => prev.map((v, j) => j === i ? dataUrl : v)); } }} />
         ))}
+      </div>
+
+      {/* Yazılmaya devam edilenler için favori görseller */}
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-violet-400/70 mb-2">Favori Görseller</p>
+        <p className="mb-3 text-[10px] text-slate-500">Bu iki görsel devam eden eserler kartının yanında görünecek.</p>
+        <div className="grid grid-cols-2 gap-3">
+          {favoriteImages.map((image, index) => (
+            <button key={index} type="button" onClick={() => favoriteImageRefs[index].current?.click()} className="relative aspect-[4/3] overflow-hidden rounded-xl border border-dashed border-cyan-400/30 bg-cyan-400/5">
+              {image ? <img src={image} alt={`Favori görsel ${index + 1}`} className="h-full w-full object-cover" /> : <span className="flex h-full flex-col items-center justify-center gap-2 text-slate-500"><ImageIcon className="h-7 w-7" /><span className="text-[10px] font-semibold">Favori görsel {index + 1}</span></span>}
+              <input ref={favoriteImageRefs[index]} type="file" accept="image/*" className="hidden" onChange={async e => { const file = e.target.files?.[0]; if (!file) return; const dataUrl = await fileToDataUrl(file); setFavoriteImages(prev => prev.map((value, j) => j === index ? dataUrl : value)); e.target.value = ""; }} />
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Başlık */}
@@ -616,14 +695,19 @@ export default function MetinHikayesi() {
           </button>
         </div>
 
-        {/* Bölüm başlığı */}
-        <div className="px-4 pt-3 pb-1 shrink-0 border-b border-white/8">
+        {/* Bölüm başlığı + canlı kelime sayacı */}
+        <div className="px-4 pt-3 pb-2 shrink-0 border-b border-white/8">
+          <div className="flex items-center justify-between gap-3">
           <input
             value={ch.title}
             onChange={e => updateChapter(activeChap, { ...ch, title: e.target.value })}
             className="w-full bg-transparent text-[18px] font-black text-white outline-none placeholder-slate-600"
             placeholder="Bölüm başlığı…"
           />
+            <span className="shrink-0 rounded-full bg-violet-500/15 px-2.5 py-1 text-[11px] font-bold text-violet-300">
+              {wordCount.toLocaleString("tr-TR")} kelime
+            </span>
+          </div>
         </div>
 
         {/* Bloklar */}
@@ -720,7 +804,10 @@ export default function MetinHikayesi() {
       {/* Yayınla butonu */}
       <button
         type="button"
-        onClick={() => { handleSave("published"); setTimeout(() => setLocation("/kitaplar"), 1200); }}
+        onClick={async () => {
+          const saved = await handleSave("published");
+          if (saved) setLocation("/kitaplar");
+        }}
         className="w-full rounded-2xl py-4 font-black text-[15px] text-white transition-all active:scale-95"
         style={{ background: "linear-gradient(135deg,#7c3aed,#a855f7,#7c3aed)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
       >
@@ -742,7 +829,7 @@ export default function MetinHikayesi() {
   const canPrev = step > 0;
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: "#0a0814" }}>
+    <div className="book-editor-shell fixed inset-0 flex flex-col" style={{ background: "#0a0814" }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-1 shrink-0">
         <button type="button" onClick={() => canPrev ? setStep(s => s - 1) : history.back()}

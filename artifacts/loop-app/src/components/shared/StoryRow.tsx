@@ -4,11 +4,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Plus } from "lucide-react";
 import { Link } from "wouter";
 import { StoryViewer } from "./StoryViewer";
+import { UserNameWithDecorations } from "./UserNameWithDecorations";
 import { useAuth } from "@/lib/auth";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
+import { useQueryClient } from "@tanstack/react-query";
+import { markStoryViewed } from "./StoryNavigation";
 
 export function StoryRow() {
+  const queryClient = useQueryClient();
   const { data: userStories, isLoading } = useListStories({ query: { queryKey: getListStoriesQueryKey() } });
   const { user } = useAuth();
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -20,8 +24,13 @@ export function StoryRow() {
   };
 
   const handleStoryView = async (storyId: number) => {
-    try { await fetch(`/api/stories/${storyId}/view`, { method: "POST" }); } catch {}
+    try {
+      await markStoryViewed(queryClient, storyId);
+    } catch (error) {
+      console.error("Hikaye görüntüleme durumu kaydedilemedi", error);
+    }
   };
+
 
   return (
     <>
@@ -61,9 +70,10 @@ export function StoryRow() {
               </div>
             </div>
 
-            {/* Alt: "Hikaye Ekle" yazısı */}
+            {/* Alt: Loopla çağrısı */}
             <div className="absolute bottom-2 left-0 right-0 flex flex-col items-center">
-              <span className="text-white text-[10px] font-bold drop-shadow-sm leading-tight">Hikaye Ekle</span>
+              <span className="text-white text-[11px] font-bold drop-shadow-sm leading-tight">Loopla</span>
+              <span className="mt-0.5 text-white/75 text-[8px] font-light leading-tight">yeni bir an paylaş</span>
             </div>
           </div>
           {/* Alt ince çizgi */}
@@ -72,6 +82,7 @@ export function StoryRow() {
 
         {/* ── Hikaye kartları ── */}
         {!isLoading && userStories?.map((us, idx) => {
+          const isOwnStory = us.user.id === user?.id;
           const latestStory = us.stories?.[0];
           const timeAgo = latestStory
             ? formatDistanceToNow(new Date(latestStory.createdAt), { locale: tr, addSuffix: false })
@@ -83,19 +94,16 @@ export function StoryRow() {
             <button
               key={us.user.id}
               onClick={() => handleStoryClick(idx)}
-              className="flex flex-col items-center flex-shrink-0 group focus:outline-none"
+              aria-label={`${us.user.displayName} hikayesini aç`}
+              className={`${us.hasUnviewed ? "story-card-premium-ring" : "story-viewed-card"} ${!isOwnStory && us.hasUnviewed ? "story-midnight-orbit" : ""} group flex flex-col items-center flex-shrink-0 rounded-[20px] p-[2px] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2`}
             >
               <div
-                className="w-[82px] h-[144px] overflow-hidden relative"
-                style={{
-                  borderRadius: "18px",
-                  border: us.hasUnviewed
-                    ? "2.5px solid hsl(var(--primary))"
-                    : "1.5px solid hsl(var(--border))",
-                }}
+                className="story-card-premium-content relative h-[144px] w-[82px] overflow-hidden rounded-[18px] bg-[#050817] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]"
               >
                 {/* Arka plan */}
-                {latestStory?.mediaUrl ? (
+                {us.user.storyPreviewUrl ? (
+                  <img src={us.user.storyPreviewUrl} alt={`${us.user.username} hikaye ön izleme kapağı`} className="w-full h-full object-cover" />
+                ) : latestStory?.mediaUrl ? (
                   latestStory.mediaType === "video" ? (
                     <video src={latestStory.mediaUrl} className="w-full h-full object-cover" muted playsInline />
                   ) : (
@@ -109,18 +117,12 @@ export function StoryRow() {
 
                 {/* Alt gradient */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-
-                {/* Üst progress bar */}
-                {us.hasUnviewed && (
-                  <div className="absolute top-1.5 left-1.5 right-1.5 h-[2.5px] bg-white/30 rounded-full overflow-hidden">
-                    <div className="h-full w-full bg-primary rounded-full" />
-                  </div>
-                )}
+                {us.hasUnviewed && <div className="story-card-sheen absolute inset-0 pointer-events-none" />}
 
                 {/* Sol alt: avatar + isim */}
                 <div className="absolute bottom-1.5 left-1.5 right-1.5">
                   <div
-                    className={`w-6 h-6 overflow-hidden border-2 mb-0.5 ${us.hasUnviewed ? "border-primary" : "border-white/60"}`}
+                    className={`w-6 h-6 overflow-hidden border-2 mb-0.5 ${us.hasUnviewed ? "story-highlight-avatar-ring" : "border-white/60"}`}
                     style={{ borderRadius: "50%" }}
                   >
                     <Avatar className="w-full h-full">
@@ -128,7 +130,7 @@ export function StoryRow() {
                       <AvatarFallback className="text-[9px] bg-primary/30">{us.user.displayName.charAt(0)}</AvatarFallback>
                     </Avatar>
                   </div>
-                  <p className="text-white text-[10px] font-semibold leading-tight truncate">{us.user.username}</p>
+                  <UserNameWithDecorations user={us.user} fallback="Kullanıcı" showLabel className="max-w-full text-white text-[10px] font-semibold leading-tight truncate [&>img]:h-3 [&>img]:w-3" />
                   {timeAgo && <p className="text-white/70 text-[9px] leading-tight">{timeAgo}</p>}
                 </div>
               </div>
@@ -149,6 +151,7 @@ export function StoryRow() {
           onView={handleStoryView}
         />
       )}
+
     </>
   );
 }

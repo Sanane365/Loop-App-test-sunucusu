@@ -1,4 +1,4 @@
-import { Bell, BookOpen, Search, User, LogOut, Home, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun, Menu } from "lucide-react";
+import { Bell, BookOpen, Search, User, LogOut, Home, MessageCircle, Mic, Mail, Shield, Bookmark, Moon, Sun, Menu, Settings as SettingsIcon, ScrollText, Globe2 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth";
 import { useLogout } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDarkMode } from "@/hooks/use-dark-mode";
+import { LANGUAGES, useLanguage } from "@/hooks/use-language";
 
 interface HeaderProps {
   feedType?: "akis" | "takipte";
@@ -19,10 +20,21 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
   const queryClient = useQueryClient();
   const logout = useLogout();
   const { dark, toggle: toggleDark } = useDarkMode();
+  const { language, setLanguage, t } = useLanguage();
   const [unreadCount, setUnreadCount] = useState(0);
+  const userEmail = (user as (typeof user & { email?: string | null }) | null)?.email;
 
-  const isMod = !!(user && (user.role === "admin" || user.role === "moderator"));
-  const isAdmin = user?.role === "admin";
+  const adminEmails = new Set([
+    "copoglumihammetyasin@gmail.com",
+    "copogluhakki@gmail.com",
+    "tabiiisanane@gmail.com",
+  ]);
+  const adminUsernames = new Set(["mami", "mami denemee"]);
+  const isPrivilegedEmail = !!userEmail && adminEmails.has(userEmail.toLowerCase());
+  const isPrivilegedUsername = !!user?.username && adminUsernames.has(user.username.toLowerCase());
+  const isMod = !!(user && (user.role === "admin" || user.role === "moderator" || isPrivilegedEmail || isPrivilegedUsername));
+  const canSeeModerationCenter = user?.role === "admin" || user?.role === "moderator";
+  const isAdmin = user?.role === "admin" || isPrivilegedEmail || isPrivilegedUsername;
 
   useEffect(() => {
     if (!user) return;
@@ -48,29 +60,33 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
   }
 
   const navItems = [
-    { href: "/", label: "Ana Sayfa", icon: Home },
-    { href: "/explore", label: "Keşfet", icon: Search },
-    { href: "/chat", label: "Genel Sohbet", icon: MessageCircle },
-    { href: "/voice", label: "Sesli Odalar", icon: Mic },
-    { href: "/notifications", label: "Bildirimler", icon: Bell },
-    { href: "/dm", label: "Mesajlarım", icon: Mail },
-    { href: "/bookmarks", label: "Kaydedilenler", icon: Bookmark },
+    { href: "/", label: t("home"), icon: Home },
+    { href: "/explore", label: t("explore"), icon: Search },
+    { href: "/chat", label: t("chat"), icon: MessageCircle },
+    { href: "/voice", label: t("voice"), icon: Mic },
+    { href: "/notifications", label: t("notifications"), icon: Bell },
+    { href: "/dm", label: t("messages"), icon: Mail },
+    { href: "/bookmarks", label: t("bookmarks"), icon: Bookmark },
+    { href: "/settings", label: t("settings"), icon: SettingsIcon },
   ];
 
   if (isMod) {
-    navItems.push({ href: "/admin", label: "Admin Paneli", icon: Shield });
+    navItems.push({ href: "/admin", label: t("admin"), icon: Shield });
   }
 
   const isHome = location === "/";
 
   return (
-    <header className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border">
+    <header
+      className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border"
+      style={{
+        paddingTop: "var(--safe-area-inset-top, 0px)",
+      }}
+    >
       <div className="flex h-14 items-center justify-between px-4 max-w-screen-md mx-auto">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0" data-testid="header-logo">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-            ∞
-          </div>
+          <img src="/loop-app-logo.png" alt="Loop App" className="h-8 w-8 rounded-2xl border border-primary/30 object-cover shadow-sm" />
           <span className="text-xl font-bold tracking-tight text-foreground">loop</span>
         </Link>
 
@@ -83,6 +99,17 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
 
         {/* Right icons */}
         <div className="flex items-center gap-4">
+          {canSeeModerationCenter && (
+            <Link
+              href="/account-center"
+              className="text-muted-foreground transition-colors hover:text-foreground"
+              data-testid="header-account-center"
+              aria-label="Moderasyon merkezi"
+              title="Moderasyon merkezi"
+            >
+              <ScrollText className="h-5 w-5" />
+            </Link>
+          )}
           <Link
             href="/notebook"
             className="text-muted-foreground hover:text-foreground transition-colors"
@@ -179,6 +206,21 @@ export function Header({ feedType, onFeedChange }: HeaderProps) {
                   {dark ? <Sun className="w-5 h-5 text-primary" /> : <Moon className="w-5 h-5 text-primary" />}
                   <span className="font-medium">{dark ? "Açık Tema" : "Koyu Tema"}</span>
                 </button>
+
+                <label className="flex items-center gap-3 px-5 py-3 text-foreground hover:bg-muted/60 transition-colors">
+                  <Globe2 className="w-5 h-5 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1 font-medium">{t("language")}</span>
+                  <select
+                    value={language}
+                    onChange={(event) => setLanguage(event.target.value)}
+                    aria-label={t("language")}
+                    className="max-w-28 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                  >
+                    {LANGUAGES.map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
               </nav>
 
               <div className="border-t border-border p-3">

@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { ArrowLeft, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 /* ── SVG ikonlar — referans stilinde büyük outlined ─────────────────── */
 const ICON_COLOR = "#a78bfa"; // violet-400
@@ -58,35 +59,6 @@ function GorselIcon() {
   );
 }
 
-function SesliIcon() {
-  return (
-    <svg width={SZ} height={SZ} viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* kitap */}
-      <rect x="14" y="14" width="48" height="62" rx="5" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} />
-      <line x1="14" y1="14" x2="14" y2="76" stroke={ICON_COLOR} strokeWidth="4" strokeLinecap="round" />
-      {/* hoparlör dalgaları */}
-      <circle cx="68" cy="44" r="8" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} fill={`${ICON_COLOR}18`} />
-      <path d="M60 34 Q52 44 60 54" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinecap="round" fill="none" opacity=".5" />
-      <path d="M78 30 Q90 44 78 58" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinecap="round" fill="none" opacity=".5" />
-      {/* iç ses ikonu */}
-      <path d="M64 40 L68 36 L68 52 L64 48 L60 48 L60 40 Z" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinejoin="round" fill={`${ICON_COLOR}30`} />
-    </svg>
-  );
-}
-
-function EtkilesimIcon() {
-  return (
-    <svg width={SZ} height={SZ} viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-      {/* el */}
-      <path d="M42 64 L42 42 Q42 38 46 38 Q50 38 50 42 L50 56 Q50 52 54 52 Q58 52 58 56 L58 58 Q58 54 62 54 Q66 54 66 58 L66 62 Q66 58 70 58 Q74 58 74 62 L74 74 Q74 80 68 82 L52 82 Q44 82 42 74 Z"
-        stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinejoin="round" fill={`${ICON_COLOR}15`} />
-      {/* dokunma dalgaları */}
-      <path d="M30 30 Q22 38 22 48 Q22 58 30 66" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinecap="round" fill="none" opacity=".5" />
-      <path d="M36 24 Q24 34 24 48 Q24 62 36 72" stroke={ICON_COLOR} strokeWidth={ICON_STROKE} strokeLinecap="round" fill="none" opacity=".3" />
-    </svg>
-  );
-}
-
 /* ── İçerik tipleri ─────────────────────────────────────────────────── */
 const CONTENT_TYPES = [
   {
@@ -102,7 +74,7 @@ const CONTENT_TYPES = [
     label: "Video Hikayesi",
     desc: "Hikayeni kısa film, fragman veya animasyonla anlat.",
     Icon: VideoIcon,
-    badge: null,
+    badge: "YAKINDA",
     href: "/yaz/video",
   },
   {
@@ -110,24 +82,8 @@ const CONTENT_TYPES = [
     label: "Görsel Hikaye",
     desc: "Çizgi roman, webtoon, manga veya fotoğraf dizileri.",
     Icon: GorselIcon,
-    badge: null,
+    badge: "YAKINDA",
     href: "/yaz/gorsel",
-  },
-  {
-    id: "sesli",
-    label: "Sesli Kitap",
-    desc: "Sesli kitap ya da podcast bölümleri şeklinde yayınla.",
-    Icon: SesliIcon,
-    badge: "YENİ",
-    href: "/yaz/sesli",
-  },
-  {
-    id: "etkilesim",
-    label: "Etkileşimli Deneyim",
-    desc: "Dallanan hikayeler ve sohbet tabanlı interaktif anlatılar.",
-    Icon: EtkilesimIcon,
-    badge: "YENİ",
-    href: "/yaz/etkilesim",
   },
 ];
 
@@ -135,7 +91,7 @@ export default function IcerikOlustur() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: "#0a0814" }}>
+    <div className="book-editor-shell min-h-screen flex flex-col" style={{ background: "#0a0814" }}>
       {/* Header */}
       <div className="flex items-center justify-between px-4 pt-12 pb-4">
         <button
@@ -169,8 +125,16 @@ export default function IcerikOlustur() {
               <button
                 key={type.id}
                 type="button"
-                onClick={() => setLocation(type.href)}
-                className={`group relative flex flex-col items-center text-center rounded-2xl px-4 pt-7 pb-5 transition-all duration-200 active:scale-95
+                onClick={() => {
+                  if (type.badge) {
+                    toast.info(`${type.label} yakında kullanıma açılacak.`, {
+                      description: "Hazırlıklarımız devam ediyor.",
+                    });
+                    return;
+                  }
+                  setLocation(type.href);
+                }}
+                className={`book-editor-card group relative flex flex-col items-center text-center rounded-2xl px-4 pt-7 pb-5 transition-all duration-200 active:scale-95
                   ${isLast ? "col-span-2 max-w-[calc(50%-8px)] mx-auto" : ""}
                 `}
                 style={{
@@ -185,7 +149,7 @@ export default function IcerikOlustur() {
                 {type.badge && (
                   <span
                     className="absolute top-3 right-3 rounded-full px-2 py-0.5 text-[9px] font-black tracking-wide"
-                    style={{ background: "#34d399", color: "#052e16" }}
+                    style={{ background: "#fbbf24", color: "#451a03" }}
                   >
                     {type.badge}
                   </span>

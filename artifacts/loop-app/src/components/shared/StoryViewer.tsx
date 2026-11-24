@@ -1,49 +1,87 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { X, ChevronLeft, ChevronRight, Send, Eye, MessageCircle, Pin } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Send, Eye, MessageCircle, Pin, Music2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
+import { UserNameWithDecorations } from "@/components/shared/UserNameWithDecorations";
 
 interface Story {
   id: number;
   mediaUrl: string;
-  mediaType: string;
+  mediaType?: string;
+  storyText?: string | null;
+  storyTextColor?: string | null;
+  storyTextBackground?: "none" | "solid" | "white" | "translucent" | null;
   createdAt: string;
-  user: { id: number; displayName: string; username: string; avatarUrl?: string | null };
+  user?: { id: number; displayName: string; username: string; avatarUrl?: string | null };
 }
 
 interface StoryGroup {
-  user: { id: number; displayName: string; username: string; avatarUrl?: string | null };
+  user: { id: number; displayName: string; username: string; avatarUrl?: string | null; badgeAssetUrl?: string | null; emblemAssetUrl?: string | null; badgeLabel?: string | null };
   stories: Story[];
 }
 
 interface StoryViewerProps {
   groups: StoryGroup[];
   startGroupIndex: number;
+  startStoryIndex?: number;
   onClose: () => void;
   onView?: (storyId: number) => void;
 }
 
-const STORY_DURATION = 5000;
+const IMAGE_STORY_DURATION = 5000;
 const EMOJI_REACTIONS = ["❤️", "😂", "😮", "🙌", "🔥", "😍", "👏", "💯"];
+
+function isVideoStory(mediaType?: string | null) {
+  return mediaType?.toLowerCase().startsWith("video") ?? false;
+}
+
+function decodeStoryShareMetadata(mediaUrl?: string | null): { kind: "post" | "loop"; id: number } | null {
+  if (!mediaUrl) return null;
+
+  try {
+    const direct = mediaUrl.match(/[?&]story-share=(post|loop):(\d+)/i);
+    if (direct) {
+      return { kind: direct[1].toLowerCase() as "post" | "loop", id: Number(direct[2]) };
+    }
+
+    if (mediaUrl.startsWith("data:image/svg+xml")) {
+      const decoded = decodeURIComponent(mediaUrl.replace(/^data:image\/svg\+xml(?:;charset=utf-8)?[,;]/i, ""));
+      const match = decoded.match(/story-share:(post|loop):(\d+)/i);
+      if (match) {
+        return { kind: match[1].toLowerCase() as "post" | "loop", id: Number(match[2]) };
+      }
+    }
+
+    const match = mediaUrl.match(/story-share:(post|loop):(\d+)/i);
+    if (match) {
+      return { kind: match[1].toLowerCase() as "post" | "loop", id: Number(match[2]) };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 // Module-level cache — component unmount/remount'tan bağımsız kalır.
 // key: storyId → pinned reply dizisi
 const _pinnedCache: Record<number, any[]> = {};
 
-export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryViewerProps) {
+export function StoryViewer({ groups, startGroupIndex, startStoryIndex = 0, onClose, onView }: StoryViewerProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const [groupIdx, setGroupIdx] = useState(startGroupIndex);
-  const [storyIdx, setStoryIdx] = useState(0);
+  const [storyIdx, setStoryIdx] = useState(startStoryIndex);
   const [progress, setProgress] = useState(0);
   const [paused, setPaused] = useState(false);
   const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const storyVideoRef = useRef<HTMLVideoElement | null>(null);
   const startTimeRef = useRef<number>(Date.now());
   const pausedAtRef = useRef<number>(0);
 
@@ -63,15 +101,151 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
   const [showViewers, setShowViewers] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [viewersLoading, setViewersLoading] = useState(false);
+  const [watermarkOffset, setWatermarkOffset] = useState({ right: 8, bottom: 72 });
+  const [sharedStoryMeta, setSharedStoryMeta] = useState<{ kind: "post" | "loop"; title: string; audio?: string | null; mediaUrl?: string; mediaType?: string; user?: { id?: number; displayName?: string; username?: string; avatarUrl?: string | null; badgeAssetUrl?: string | null; emblemAssetUrl?: string | null; badgeLabel?: string | null } | null } | null>(null);
+  const [loopWatermark, setLoopWatermark] = useState({ watermarkUrl: "/loop-logo.svg", mimeType: "image/svg+xml", text: "", size: 1 });
 
   const currentGroup = groups[groupIdx];
   const currentStory = currentGroup?.stories[storyIdx];
   const isOwnStory = !!user && currentGroup?.user?.id === user.id;
-
-  // Toggle body class so BottomNav can hide itself
+  const activePinnedReplies = currentStory
+    ? (pinnedByStory[currentStory.id] ?? []).filter((r: any) => {
+        const replyStoryId = Number(r.storyId ?? r.highlightId ?? r.story_id ?? currentStory.id);
+        return replyStoryId === currentStory.id && (r.pinned === true || r.is_pinned === true);
+      }).slice(0, 2)
+    : [];
   useEffect(() => {
+    fetch("/api/branding/watermark", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (data?.watermarkUrl) setLoopWatermark({ watermarkUrl: data.watermarkUrl, mimeType: data.mimeType || "image/svg+xml", text: data.text ?? "", size: Number(data.size ?? 1) || 1 });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const share = currentStory ? decodeStoryShareMetadata(currentStory.mediaUrl) : null;
+    if (!share) {
+      setSharedStoryMeta(null);
+      return;
+    }
+
+    let active = true;
+    const endpoint = share.kind === "post" ? `/api/posts/${share.id}` : `/api/loop/photos/${share.id}`;
+
+    fetch(endpoint, { credentials: "include", cache: "no-store" })
+      .then(async (response): Promise<void> => {
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await response.json();
+        if (!active) {
+          return;
+        }
+
+        const resolvedMediaUrl = share.kind === "post" ? (data?.mediaUrl || currentStory.mediaUrl) : (data?.mediaUrl || currentStory.mediaUrl);
+        const resolvedMediaType = share.kind === "post" ? (data?.mediaType || currentStory.mediaType) : (data?.mediaType || currentStory.mediaType);
+        const resolvedUser = share.kind === "post" ? data?.user : data?.sender;
+        const sourceTitle = share.kind === "post" ? (data?.content || "Gönderi") : (data?.title || "Loop");
+
+        setSharedStoryMeta({
+          kind: share.kind,
+          title: sourceTitle,
+          audio: share.kind === "loop" ? data?.audio : null,
+          mediaUrl: resolvedMediaUrl,
+          mediaType: resolvedMediaType,
+          user: resolvedUser || currentGroup?.user,
+        });
+      })
+      .catch((): void => {
+        if (!active) {
+          return;
+        }
+
+        setSharedStoryMeta({
+          kind: share.kind,
+          title: share.kind === "post" ? "Gönderi" : "Loop",
+          audio: null,
+          mediaUrl: currentStory.mediaUrl,
+          mediaType: currentStory.mediaType,
+          user: currentGroup?.user,
+        });
+      });
+
+    return () => { active = false; };
+  }, [currentStory?.id, currentStory?.mediaUrl, currentStory?.mediaType, currentGroup?.user]);
+
+  const handleSharedStoryOpen = useCallback(() => {
+    const share = currentStory ? decodeStoryShareMetadata(currentStory.mediaUrl) : null;
+    if (!share) return;
+    onClose();
+    setLocation(share.kind === "post" ? `/?post=${share.id}` : `/loops?loop=${share.id}`);
+  }, [currentStory, onClose, setLocation]);
+
+  const togglePlayback = useCallback(() => {
+    if (!isVideoStory(currentStory?.mediaType)) return;
+    setPaused((current) => !current);
+  }, [currentStory?.mediaType]);
+
+  useEffect(() => {
+    const video = storyVideoRef.current;
+    if (!video) return;
+    if (paused) video.pause();
+    else void video.play().catch(() => {});
+  }, [paused, currentStory?.id, sharedStoryMeta?.mediaUrl]);
+
+  useEffect(() => {
+    const video = storyVideoRef.current;
+    const container = video?.parentElement;
+    if (!video || !container) return;
+
+    const updateWatermarkOffset = () => {
+      const videoRect = video.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      setWatermarkOffset({
+        right: Math.round(containerRect.right - videoRect.right - 56),
+        bottom: Math.max(154, Math.round(containerRect.bottom - videoRect.bottom + 154)),
+      });
+    };
+
+    updateWatermarkOffset();
+    const observer = new ResizeObserver(updateWatermarkOffset);
+    observer.observe(video);
+    observer.observe(container);
+    window.addEventListener("resize", updateWatermarkOffset);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateWatermarkOffset);
+    };
+  }, [currentStory?.id, sharedStoryMeta?.mediaUrl]);
+
+  // Lock the page behind the full-screen story viewer without losing scroll position.
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    const body = document.body;
+    const previous = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      overflow: body.style.overflow,
+      overscrollBehavior: body.style.overscrollBehavior,
+    };
     document.body.classList.add("story-viewer-open");
-    return () => document.body.classList.remove("story-viewer-open");
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.width = "100%";
+    body.style.overflow = "hidden";
+    body.style.overscrollBehavior = "none";
+    return () => {
+      document.body.classList.remove("story-viewer-open");
+      body.style.position = previous.position;
+      body.style.top = previous.top;
+      body.style.width = previous.width;
+      body.style.overflow = previous.overflow;
+      body.style.overscrollBehavior = previous.overscrollBehavior;
+      window.scrollTo(0, scrollY);
+    };
   }, []);
 
   // Hikaye değiştiğinde sabitlenmiş yanıtları public endpoint'ten yükle + cache'e yaz
@@ -94,12 +268,14 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     if (storyIdx < currentGroup.stories.length - 1) {
       setStoryIdx((i) => i + 1);
       setProgress(0);
+      setPaused(false);
       setShowReplies(false);
       setShowViewers(false);
     } else if (groupIdx < groups.length - 1) {
       setGroupIdx((i) => i + 1);
       setStoryIdx(0);
       setProgress(0);
+      setPaused(false);
       setShowReplies(false);
       setShowViewers(false);
     } else {
@@ -111,12 +287,14 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     if (storyIdx > 0) {
       setStoryIdx((i) => i - 1);
       setProgress(0);
+      setPaused(false);
       setShowReplies(false);
       setShowViewers(false);
     } else if (groupIdx > 0) {
       setGroupIdx((i) => i - 1);
       setStoryIdx(0);
       setProgress(0);
+      setPaused(false);
       setShowReplies(false);
       setShowViewers(false);
     }
@@ -127,6 +305,8 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
     if (!currentStory || paused) return;
     if (onView) onView(currentStory.id);
 
+    if (isVideoStory(currentStory.mediaType)) return;
+
     startTimeRef.current = Date.now() - (pausedAtRef.current || 0);
     pausedAtRef.current = 0;
 
@@ -134,7 +314,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
 
     progressRef.current = setInterval(() => {
       const elapsed = Date.now() - startTimeRef.current;
-      const p = Math.min((elapsed / STORY_DURATION) * 100, 100);
+      const p = Math.min((elapsed / IMAGE_STORY_DURATION) * 100, 100);
       setProgress(p);
       if (p >= 100) {
         clearInterval(progressRef.current!);
@@ -284,13 +464,13 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
         {/* Progress bars */}
         <div className="absolute top-0 left-0 right-0 z-20 flex gap-1 p-2">
           {currentGroup.stories.map((_, i) => (
-            <div key={i} className="flex-1 h-[3px] bg-white/20 rounded-full">
+            <div key={i} className="h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full transition-none"
                 style={{
                   width: i < storyIdx ? "100%" : i === storyIdx ? `${progress}%` : "0%",
-                  background: "linear-gradient(90deg, #9333ea, #c026d3)",
-                  boxShadow: "0 0 7px 2px rgba(168,85,247,0.85), 0 0 2px rgba(255,255,255,0.35)",
+                  background: "linear-gradient(90deg, #a855f7, #7c3aed, #c026d3)",
+                  boxShadow: i === storyIdx ? "0 0 8px 2px #a855f7aa" : undefined,
                 }}
               />
             </div>
@@ -314,7 +494,7 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
             onClick={() => { onClose(); setLocation(`/profile/${currentGroup.user.id}`); }}
             className="flex-1 min-w-0 text-left"
           >
-            <p className="text-white font-semibold text-sm drop-shadow">{currentGroup.user.displayName}</p>
+            <UserNameWithDecorations user={currentGroup.user} showLabel className="text-white font-semibold text-sm drop-shadow [&>img]:h-4 [&>img]:w-4" />
             <p className="text-white/70 text-xs drop-shadow">
               {formatDistanceToNow(new Date(currentStory.createdAt), { locale: tr, addSuffix: true })}
             </p>
@@ -328,23 +508,125 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
         </div>
 
         {/* Media */}
-        <div className="w-full h-full bg-black flex items-center justify-center">
-          {currentStory.mediaType === "video" ? (
-            <video
-              key={currentStory.id}
-              src={currentStory.mediaUrl}
-              autoPlay
-              muted={false}
-              playsInline
-              className="w-full h-full object-contain"
-            />
-          ) : (
-            <img
-              key={currentStory.id}
-              src={currentStory.mediaUrl}
-              alt="Story"
-              className="w-full h-full object-contain"
-            />
+        <div
+          className="w-full h-full bg-black flex items-center justify-center relative select-none"
+          onContextMenu={(event) => event.preventDefault()}
+          onDragStart={(event) => event.preventDefault()}
+        >
+          {(() => {
+            const share = decodeStoryShareMetadata(currentStory.mediaUrl);
+            const mediaUrl = share ? (sharedStoryMeta?.mediaUrl || currentStory.mediaUrl) : currentStory.mediaUrl;
+            const mediaType = share ? (sharedStoryMeta?.mediaType || currentStory.mediaType) : currentStory.mediaType;
+
+            if (isVideoStory(mediaType)) {
+              return (
+                <video
+                  ref={storyVideoRef}
+                  key={`${currentStory.id}-${mediaUrl}`}
+                  src={mediaUrl}
+                  autoPlay
+                  muted={false}
+                  playsInline
+                  controls={false}
+                  controlsList="nodownload noplaybackrate noremoteplayback"
+                  disablePictureInPicture
+                  draggable={false}
+                  onContextMenu={(event) => event.preventDefault()}
+                  onClick={togglePlayback}
+                  onLoadedMetadata={(event) => {
+                    const video = event.currentTarget;
+                    if (Number.isFinite(video.duration) && video.duration > 0) {
+                      setProgress(Math.min((video.currentTime / video.duration) * 100, 100));
+                    }
+                  }}
+                  onTimeUpdate={(event) => {
+                    const video = event.currentTarget;
+                    if (Number.isFinite(video.duration) && video.duration > 0) {
+                      setProgress(Math.min((video.currentTime / video.duration) * 100, 100));
+                    }
+                  }}
+                  onEnded={() => {
+                    setProgress(100);
+                    goNext();
+                  }}
+                  className="w-full h-full object-contain"
+                />
+              );
+            }
+
+            return (
+              <img
+                key={`${currentStory.id}-${mediaUrl}`}
+                src={mediaUrl}
+                alt="Story"
+                className="w-full h-full object-contain"
+              />
+            );
+          })()}
+
+          {currentStory.storyText && isVideoStory(currentStory.mediaType) && decodeStoryShareMetadata(currentStory.mediaUrl)?.kind !== "loop" && (
+            <div
+              className="pointer-events-none absolute left-1/2 top-[38%] z-10 max-w-[78%] -translate-x-1/2 -translate-y-1/2 rounded-[0.35em] px-[0.55em] py-[0.35em] text-center text-[clamp(1.1rem,5vw,2rem)] font-bold leading-tight drop-shadow-lg"
+              style={{
+                color: currentStory.storyTextBackground === "white" ? "#111111" : currentStory.storyTextColor || "#ffffff",
+                backgroundColor: currentStory.storyTextBackground === "solid" ? "rgba(0,0,0,.88)" : currentStory.storyTextBackground === "white" ? "rgba(255,255,255,.94)" : currentStory.storyTextBackground === "translucent" ? "rgba(0,0,0,.52)" : "transparent",
+              }}
+            >
+              {currentStory.storyText}
+            </div>
+          )}
+
+          {decodeStoryShareMetadata(currentStory.mediaUrl) && sharedStoryMeta && (
+            <div className="pointer-events-none absolute left-5 top-20 z-20 max-w-[calc(100%-2.5rem)] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 shrink-0 overflow-hidden rounded-full border border-white/80 bg-black/20 shadow-lg">
+                  {sharedStoryMeta.user?.avatarUrl ? (
+                    <img src={sharedStoryMeta.user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs font-bold text-white/90">{(sharedStoryMeta.user?.displayName || sharedStoryMeta.user?.username || "U").charAt(0).toUpperCase()}</div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <UserNameWithDecorations user={sharedStoryMeta.user} showLabel className="max-w-full truncate text-[13px] font-bold text-white [&>img]:h-4 [&>img]:w-4" />
+                  <p className="mt-1 flex max-w-full items-center gap-1 text-[10px] text-white/75">
+                    <Music2 className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{sharedStoryMeta.audio || "Orijinal ses"}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {decodeStoryShareMetadata(currentStory.mediaUrl)?.kind === "loop" && (
+            <div
+              className="pointer-events-none absolute z-20 flex items-end gap-1.5 opacity-90 drop-shadow-[0_1px_5px_rgba(0,0,0,0.75)]"
+              style={{ right: `${watermarkOffset.right}px`, bottom: `${watermarkOffset.bottom}px` }}
+            >
+              {loopWatermark.text && <span className="text-[10px] font-black tracking-[0.08em] text-white/90">{loopWatermark.text}</span>}
+              {loopWatermark.mimeType.startsWith("video/") ? (
+                <video
+                  src={loopWatermark.watermarkUrl}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  controls={false}
+                  controlsList="nodownload noplaybackrate noremoteplayback"
+                  disablePictureInPicture
+                  draggable={false}
+                  onContextMenu={(event) => event.preventDefault()}
+                  className="rounded-md object-contain"
+                  style={{ width: `${Math.max(40, Math.round(110 * (loopWatermark.size || 1)))}px`, height: `${Math.max(18, Math.round(30 * (loopWatermark.size || 1)))}px` }}
+                />
+              ) : (
+                <img
+                  src={loopWatermark.watermarkUrl}
+                  alt="Loops"
+                  className="rounded-md object-contain"
+                  style={{ width: `${Math.max(40, Math.round(110 * (loopWatermark.size || 1)))}px`, height: `${Math.max(18, Math.round(30 * (loopWatermark.size || 1)))}px` }}
+                />
+              )}
+            </div>
           )}
         </div>
 
@@ -364,8 +646,16 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
 
         {/* Sent emoji animation */}
         {sentEmoji && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-            <span className="text-6xl animate-bounce">{sentEmoji}</span>
+          <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center" aria-hidden="true">
+            <div className="story-reaction-burst relative flex h-36 w-36 items-center justify-center">
+              <span className="story-reaction-ring absolute inset-4 rounded-full border border-white/50" />
+              <span className="story-reaction-glow absolute h-20 w-20 rounded-full bg-white/20 blur-xl" />
+              <span className="story-reaction-spark story-reaction-spark-1 absolute h-2 w-2 rounded-full bg-white" />
+              <span className="story-reaction-spark story-reaction-spark-2 absolute h-1.5 w-1.5 rounded-full bg-yellow-200" />
+              <span className="story-reaction-spark story-reaction-spark-3 absolute h-2 w-2 rounded-full bg-pink-200" />
+              <span className="story-reaction-spark story-reaction-spark-4 absolute h-1.5 w-1.5 rounded-full bg-cyan-200" />
+              <span className="story-reaction-emoji relative text-7xl drop-shadow-[0_8px_18px_rgba(0,0,0,0.35)]">{sentEmoji}</span>
+            </div>
           </div>
         )}
 
@@ -409,23 +699,20 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
 
           {/* Own stories: İzleyenleri Gör (left) + Yanıtları Gör (right) */}
           {isOwnStory && (
-            <div className="flex items-center justify-between px-4 pb-6 pt-2">
-              {/* Left: viewers */}
+            <div className="flex items-center justify-between gap-2 px-3 pb-6 pt-2">
               <button
                 onClick={toggleViewers}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/25 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-[11px] font-semibold hover:bg-white/25 transition-colors"
               >
                 <Eye className="w-3.5 h-3.5" />
-                İzleyenleri Gör
+                İzleyenler
               </button>
-
-              {/* Right: replies */}
               <button
                 onClick={toggleReplies}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-xs font-semibold hover:bg-white/25 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-2 rounded-full bg-white/15 backdrop-blur-sm text-white text-[11px] font-semibold hover:bg-white/25 transition-colors"
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-                Yanıtları Gör
+                Yanıtlar
               </button>
             </div>
           )}
@@ -468,10 +755,10 @@ export function StoryViewer({ groups, startGroupIndex, onClose, onView }: StoryV
           </div>
         )}
 
-        {/* ── Pinned replies overlay — tüm izleyiciler görebilir ── */}
-        {currentStory && (pinnedByStory[currentStory.id] ?? []).length > 0 && !showReplies && !showViewers && (
+        {/* ── Pinned replies overlay — yalnızca aktif story için görünür ── */}
+        {currentStory && activePinnedReplies.length > 0 && !showReplies && !showViewers && (
           <div className="absolute bottom-20 right-3 z-20 flex flex-col gap-2 items-end pointer-events-none">
-            {(pinnedByStory[currentStory.id] ?? []).slice(0, 2).map((r: any) => (
+            {activePinnedReplies.map((r: any) => (
               <div key={r.id} className="flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[190px]">
                 <div className="w-6 h-6 rounded-full overflow-hidden flex-shrink-0 bg-white/20">
                   {r.avatar_url

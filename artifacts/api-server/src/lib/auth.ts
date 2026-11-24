@@ -5,6 +5,20 @@ import { sessionsTable, usersTable } from "@workspace/db";
 import { eq, gt } from "drizzle-orm";
 import type { Request, Response, NextFunction } from "express";
 
+const DEVELOPMENT_ADMIN_EMAILS = new Set([
+  "copoglumihammetyasin@gmail.com",
+  "copogluhakki@gmail.com",
+  "tabiiisanane@gmail.com",
+]);
+const DEVELOPMENT_ADMIN_USERNAMES = new Set(["mami", "mami denemee"]);
+
+export function isPrivilegedUser(user: { role?: string | null; email?: string | null; username?: string | null }): boolean {
+  if (user.role === "admin" || user.role === "moderator") return true;
+  if (process.env.NODE_ENV === "production") return false;
+  return DEVELOPMENT_ADMIN_EMAILS.has(user.email?.toLowerCase() ?? "") ||
+    DEVELOPMENT_ADMIN_USERNAMES.has(user.username?.toLowerCase() ?? "");
+}
+
 export async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, 10);
 }

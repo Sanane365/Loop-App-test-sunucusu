@@ -12,6 +12,8 @@ export interface VoiceRoom {
   name: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  roomCode?: string | null;
   createdBy: number;
   host?: User;
   participantCount: number;

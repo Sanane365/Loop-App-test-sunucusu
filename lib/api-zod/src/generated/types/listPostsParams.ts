@@ -12,6 +12,7 @@ page?: number;
  * @nullable
  */
 userId?: number | null;
+following?: boolean;
 /**
  * @nullable
  */

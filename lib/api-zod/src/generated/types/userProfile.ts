@@ -5,6 +5,7 @@
  * Loop Social Media API
  * OpenAPI spec version: 0.1.0
  */
+import type { NullableAvatarFrameTransform } from './nullableAvatarFrameTransform';
 import type { Post } from './post';
 
 export interface UserProfile {
@@ -15,6 +16,7 @@ export interface UserProfile {
   bio?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
+  avatarFrameTransform?: NullableAvatarFrameTransform | null;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;

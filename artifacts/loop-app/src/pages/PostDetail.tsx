@@ -11,8 +11,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { tr } from "date-fns/locale";
 import { useState } from "react";
+import { useLanguage } from "@/hooks/use-language";
 
 export default function PostDetail() {
+  const { t } = useLanguage();
   const params = useParams<{ postId: string }>();
   const postId = parseInt(params.postId || "0");
   const [, navigate] = useLocation();
@@ -53,7 +55,7 @@ export default function PostDetail() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="font-bold text-lg">Gönderi</h1>
+          <h1 className="font-bold text-lg">{t("post")}</h1>
         </div>
 
         <div className="p-4 space-y-4">
@@ -62,21 +64,21 @@ export default function PostDetail() {
           ) : post ? (
             <PostCard post={post} />
           ) : (
-            <div className="text-center p-8 text-muted-foreground">Gönderi bulunamadı</div>
+            <div className="text-center p-8 text-muted-foreground">{t("notFound")}</div>
           )}
 
           <div className="bg-card rounded-2xl border border-border overflow-hidden">
             <div className="px-4 py-3 border-b border-border/60">
               <h2 className="font-semibold text-sm text-foreground">
-                Yorumlar {comments ? `(${comments.length})` : ""}
+                {t("comments")} {comments ? `(${comments.length})` : ""}
               </h2>
             </div>
 
             <div className="divide-y divide-border/40">
               {commentsLoading ? (
-                <div className="p-4 text-center text-muted-foreground text-sm">Yükleniyor...</div>
+                <div className="p-4 text-center text-muted-foreground text-sm">{t("loading")}</div>
               ) : comments?.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground text-sm">İlk yorumu sen yap!</div>
+                <div className="p-6 text-center text-muted-foreground text-sm">{t("firstComment")}</div>
               ) : (
                 comments?.map((comment) => (
                   <div key={comment.id} className="flex gap-3 p-4">

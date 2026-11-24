@@ -458,68 +458,175 @@ function gifUrl(id: string) { return `https://media.giphy.com/media/${id}/giphy.
 function gifPreview(id: string) { return `https://media.giphy.com/media/${id}/200.gif`; }
 function fmt(g: GifEntry) { return { id: g.id, url: gifUrl(g.id), preview: gifPreview(g.id), tags: g.tags }; }
 
-function expandQuery(q: string): string[] {
-  const terms = new Set<string>([q]);
-  // Direct synonym lookup
-  for (const [key, vals] of Object.entries(SYNONYMS)) {
-    if (q === key || q.includes(key) || key.includes(q)) {
-      vals.forEach(v => terms.add(v));
-    }
-  }
-  return [...terms];
+async function fetchGiphy(endpoint: "trending" | "search", query: string, limit: number, offset: number) {
+  const apiKey = process.env.GIPHY_API_KEY;
+  if (!apiKey) return null;
+  const params = new URLSearchParams({ api_key: apiKey, limit: String(Math.min(limit, 50)), offset: String(Math.max(0, offset)), rating: "pg-13", bundle: "messaging_non_clips" });
+  if (endpoint === "search") params.set("q", query);
+  const response = await fetch(`https://api.giphy.com/v1/gifs/${endpoint}?${params}`);
+  if (!response.ok) return null;
+  const payload = await response.json() as { data?: Array<{ id: string; title?: string; images?: { original?: { url?: string }; fixed_width?: { url?: string } } }> };
+  return (payload.data ?? []).map(gif => ({
+    id: `giphy-${gif.id}`,
+    url: gif.images?.original?.url ?? gif.images?.fixed_width?.url ?? "",
+    preview: gif.images?.fixed_width?.url ?? gif.images?.original?.url ?? "",
+    tags: [query || "trend", gif.title ?? ""].filter(Boolean),
+  })).filter(gif => gif.url);
 }
 
-function searchDb(q: string, limit: number) {
-  if (!q) return GIF_DB.slice(0, limit).map(fmt);
-  const needle = q.toLowerCase().trim();
-  const expanded = expandQuery(needle);
+function normalizeQueryText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
 
-  const scored = GIF_DB.map(g => {
-    let score = 0;
-    for (const tag of g.tags) {
-      for (const term of expanded) {
-        if (tag === term) score += 3;
-        else if (tag.startsWith(term) || term.startsWith(tag)) score += 2;
-        else if (tag.includes(term) || term.includes(tag)) score += 1;
+function expandQuery(q: string): string[] {
+  const normalized = normalizeQueryText(q);
+  if (!normalized) return [];
+
+  const rawTokens = normalized.split(/[\s\-_]+/).filter(Boolean);
+  const terms = new Set<string>();
+
+  rawTokens.forEach(token => {
+    if (!token || token.length < 2) return;
+    terms.add(token);
+  });
+
+  const combined = rawTokens.join(" ");
+  if (combined) terms.add(combined);
+
+  const lookups = new Set<string>([normalized, ...rawTokens]);
+  for (const token of lookups) {
+    const mapped = SYNONYMS[token] ?? [];
+    mapped.forEach(value => terms.add(normalizeQueryText(value)));
+    for (const [key, values] of Object.entries(SYNONYMS)) {
+      if (key === token || key.includes(token) || token.includes(key)) {
+        values.forEach(value => terms.add(normalizeQueryText(value)));
       }
     }
+  }
+
+  return [...terms].filter(term => term.length > 1);
+}
+
+function buildOpenEndedFallback(query: string, limit: number, offset = 0) {
+  const normalized = normalizeQueryText(query);
+  const baseSeed = normalized.split("").reduce((sum, ch) => sum + ch.charCodeAt(0), 0) || 1;
+  const buckets = new Map<string, GifEntry[]>();
+
+  for (const entry of GIF_DB) {
+    const bucketKey = entry.tags[0]?.toLowerCase() || "misc";
+    const list = buckets.get(bucketKey) ?? [];
+    list.push(entry);
+    buckets.set(bucketKey, list);
+  }
+
+  const bucketOrder = [...buckets.keys()];
+  const selected: GifEntry[] = [];
+  const seen = new Set<string>();
+  const bucketCount = Math.max(1, bucketOrder.length);
+
+  for (let i = 0; i < limit * 3 && selected.length < limit; i++) {
+    const bucketIndex = (baseSeed + offset + i) % bucketCount;
+    const bucket = buckets.get(bucketOrder[bucketIndex]) ?? [];
+    if (!bucket.length) continue;
+    const candidate = bucket[(baseSeed + offset + i * 3) % bucket.length];
+    if (!candidate || seen.has(candidate.id)) continue;
+    selected.push(candidate);
+    seen.add(candidate.id);
+  }
+
+  if (!selected.length) return GIF_DB.slice(offset, offset + limit).map(fmt);
+
+  return selected.slice(0, limit).map(fmt);
+}
+
+function searchDb(q: string, limit: number, offset = 0, allowFallback = true) {
+  if (!q) return GIF_DB.slice(offset, offset + limit).map(fmt);
+
+  const normalizedQuery = normalizeQueryText(q);
+  const expanded = expandQuery(normalizedQuery);
+  if (!expanded.length) return [];
+
+  const scored = GIF_DB.map(g => {
+    const tagSpace = g.tags.map(tag => normalizeQueryText(tag)).join(" ");
+    let score = 0;
+
+    for (const tag of g.tags) {
+      const normalizedTag = normalizeQueryText(tag);
+      for (const term of expanded) {
+        if (!term) continue;
+
+        if (normalizedTag === term) {
+          score += 220;
+        } else if (normalizedTag.startsWith(term) || term.startsWith(normalizedTag)) {
+          score += 90;
+        } else if (normalizedTag.includes(term) || term.includes(normalizedTag)) {
+          score += 24;
+        }
+      }
+    }
+
+    const queryDensity = expanded.filter(term => tagSpace.includes(term)).length;
+    if (queryDensity > 0) score += queryDensity * 60;
+
+    const phraseBoost = normalizedQuery.length > 2 && tagSpace.includes(normalizedQuery) ? 120 : 0;
+    score += phraseBoost;
+
     return { g, score };
   }).filter(x => x.score > 0).sort((a, b) => b.score - a.score);
 
-  let results = scored.slice(0, limit).map(x => fmt(x.g));
-
-  // Pad with rotating trending when results are sparse
-  if (results.length < 8) {
-    const used = new Set(results.map(r => r.id));
-    const pad = GIF_DB.filter(g => !used.has(g.id)).slice(0, limit - results.length).map(fmt);
-    results = [...results, ...pad];
+  if (!scored.length || scored[0].score < 120) {
+    if (!allowFallback) return [];
+    return buildOpenEndedFallback(normalizedQuery, limit, offset);
   }
-  return results;
+
+  return scored.slice(offset, offset + limit).map(x => fmt(x.g));
 }
 
 const router = Router();
 
 // GET /gif/trending?limit=28
-router.get("/gif/trending", (req, res) => {
+router.get("/gif/trending", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
-  const offset = Math.floor(Date.now() / 600000) % Math.max(1, GIF_DB.length - limit);
+  const offset = Math.max(0, Number(req.query["offset"] ?? 0));
+  try {
+    const remote = await fetchGiphy("trending", "", limit, offset);
+    if (remote?.length) { res.json(remote); return; }
+  } catch { /* fall back to curated kit */ }
+  const rotatingOffset = (Math.floor(Date.now() / 600000) + offset) % Math.max(1, GIF_DB.length);
   const slice: GifEntry[] = [];
-  for (let i = 0; i < limit; i++) slice.push(GIF_DB[(offset + i) % GIF_DB.length]);
+  for (let i = 0; i < limit; i++) slice.push(GIF_DB[(rotatingOffset + i) % GIF_DB.length]);
   res.json(slice.map(fmt));
 });
 
 // GET /gif/search?q=...&limit=28
-router.get("/gif/search", (req, res) => {
+router.get("/gif/search", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   const q = String(req.query["q"] ?? "").toLowerCase().trim();
   const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
-  res.json(searchDb(q, limit));
+  const offset = Math.max(0, Number(req.query["offset"] ?? 0));
+  try {
+    const remote = await fetchGiphy("search", q, limit, offset);
+    if (remote?.length) { res.json(remote); return; }
+  } catch { /* fall back to curated kit */ }
+  res.json(searchDb(q, limit, offset, false));
 });
 
 // GET /gif/category/:tag?limit=28
-router.get("/gif/category/:tag", (req, res) => {
+router.get("/gif/category/:tag", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, max-age=0");
   const tag = req.params["tag"].toLowerCase();
   const limit = Math.min(Number(req.query["limit"] ?? 28), 80);
-  res.json(searchDb(tag, limit));
+  const offset = Math.max(0, Number(req.query["offset"] ?? 0));
+  try {
+    const remote = await fetchGiphy("search", expandQuery(tag).join(" "), limit, offset);
+    if (remote?.length) { res.json(remote); return; }
+  } catch { /* fall back to curated kit */ }
+  res.json(searchDb(tag, limit, offset));
 });
 
 export default router;

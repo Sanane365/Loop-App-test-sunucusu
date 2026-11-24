@@ -38,79 +38,125 @@ export default function GifPicker({ onSelect, onClose }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [failed, setFailed] = useState<Set<string>>(new Set());
+  const offsetRef = useRef(0);
+  const loadingMoreRef = useRef(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const requestIdRef = useRef(0);
+  const queryRef = useRef("");
+  const activeCatRef = useRef("trending");
 
-  const fetchGifs = useCallback(async (q: string, tag: string | null) => {
-    // Cancel any in-flight request
+  const fetchGifs = useCallback(async (q: string, tag: string | null, append = false) => {
+    const currentRequestId = ++requestIdRef.current;
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
+    if (!append) {
+      offsetRef.current = 0;
+      setGifs([]);
+      setFailed(new Set());
+    }
+
+    if (append) loadingMoreRef.current = true;
     setLoading(true);
     setError(false);
 
     try {
       let url: string;
+      const nextOffset = append ? offsetRef.current + 28 : 0;
+
       if (q.trim()) {
-        url = `/api/gif/search?q=${encodeURIComponent(q.trim())}&limit=28`;
+        url = `/api/gif/search?q=${encodeURIComponent(q.trim())}&limit=28&offset=${nextOffset}`;
       } else if (tag) {
-        url = `/api/gif/category/${encodeURIComponent(tag)}?limit=28`;
+        url = `/api/gif/category/${encodeURIComponent(tag)}?limit=28&offset=${nextOffset}`;
       } else {
-        url = `/api/gif/trending?limit=28`;
+        url = `/api/gif/trending?limit=28&offset=${nextOffset}`;
       }
 
-      const res = await fetch(url, { signal: abortRef.current.signal });
+      const res = await fetch(url, {
+        signal: abortRef.current.signal,
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" },
+      });
       if (!res.ok) throw new Error("HTTP " + res.status);
+
       const data: GifResult[] = await res.json();
-      setGifs(data);
-      setFailed(new Set()); // reset failed set on new results
+      if (currentRequestId !== requestIdRef.current) return;
+
+      offsetRef.current = append ? offsetRef.current + data.length : 0;
+
+      setGifs(current => {
+        if (!append) return data;
+        const existingIds = new Set(current.map(gif => gif.id));
+        return [...current, ...data.filter(gif => !existingIds.has(gif.id))];
+      });
+      setFailed(new Set());
     } catch (e: any) {
-      if (e.name !== "AbortError") setError(true);
+      if (currentRequestId === requestIdRef.current && e.name !== "AbortError") setError(true);
     } finally {
-      setLoading(false);
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+        loadingMoreRef.current = false;
+      }
     }
   }, []);
 
-  // When category changes
-  useEffect(() => {
-    if (query.trim()) return; // search overrides category
-    const cat = CATEGORIES.find(c => c.id === activeCat);
-    fetchGifs("", cat?.tag ?? null);
-  }, [activeCat, fetchGifs]);
-
-  // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+
     if (!query.trim()) {
-      const cat = CATEGORIES.find(c => c.id === activeCat);
-      fetchGifs("", cat?.tag ?? null);
+      setGifs([]);
+      setError(false);
+      setFailed(new Set());
+      offsetRef.current = 0;
       return;
     }
+
     debounceRef.current = setTimeout(() => {
-      fetchGifs(query, null);
-    }, 350);
+      void fetchGifs(query, null);
+    }, 250);
+
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query, fetchGifs, activeCat]);
+  }, [query, fetchGifs]);
 
-  const handleError = (id: string) =>
-    setFailed(prev => new Set(prev).add(id));
+  useEffect(() => {
+    queryRef.current = query;
+    activeCatRef.current = activeCat;
+  }, [activeCat, query]);
 
-  const visibleGifs = gifs.filter(g => !failed.has(g.id));
+  useEffect(() => {
+    void fetchGifs("", null);
+    const refresh = window.setInterval(() => {
+      if (!queryRef.current.trim() && activeCatRef.current === "trending") void fetchGifs("", null);
+    }, 5 * 60 * 1000);
+    return () => window.clearInterval(refresh);
+  }, [fetchGifs]);
+
+  const handleError = (id: string) => setFailed(prev => new Set(prev).add(id));
+
+  const visibleGifs = gifs.filter(gif => !failed.has(gif.id));
+
+  const loadCategory = (categoryId: string) => {
+    const category = CATEGORIES.find(cat => cat.id === categoryId);
+    setActiveCat(categoryId);
+    setQuery("");
+    setError(false);
+    offsetRef.current = 0;
+    setGifs([]);
+    void fetchGifs("", category?.tag ?? null);
+  };
 
   return (
     <div
       className="border-t border-border bg-background flex flex-col"
       style={{ height: 340 }}
     >
-      {/* Header: search + close */}
       <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 flex-shrink-0">
         <div className="flex-1 relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <input
-            ref={inputRef}
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="GIF ara…"
@@ -136,7 +182,6 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         </button>
       </div>
 
-      {/* Category tabs — hidden when searching */}
       {!query.trim() && (
         <div
           className="flex gap-1 px-3 pb-2 overflow-x-auto flex-shrink-0"
@@ -145,7 +190,8 @@ export default function GifPicker({ onSelect, onClose }: Props) {
           {CATEGORIES.map(cat => (
             <button
               key={cat.id}
-              onClick={() => setActiveCat(cat.id)}
+              type="button"
+              onClick={() => loadCategory(cat.id)}
               className={`flex-shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap transition-colors ${
                 activeCat === cat.id
                   ? "bg-primary text-primary-foreground"
@@ -158,8 +204,21 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         </div>
       )}
 
-      {/* GIF grid */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
+      <div
+        className="flex-1 overflow-y-auto px-3 pb-3 min-h-0"
+        onScroll={event => {
+          const element = event.currentTarget;
+          if (
+            element.scrollHeight - element.scrollTop - element.clientHeight < 120 &&
+            !loading &&
+            !loadingMoreRef.current &&
+            visibleGifs.length >= 20
+          ) {
+            const category = CATEGORIES.find(c => c.id === activeCat);
+            void fetchGifs(query, query.trim() ? null : category?.tag ?? null, true);
+          }
+        }}
+      >
         {loading && gifs.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
@@ -168,9 +227,10 @@ export default function GifPicker({ onSelect, onClose }: Props) {
           <div className="flex flex-col items-center justify-center h-full gap-2">
             <p className="text-xs text-muted-foreground">GIF yüklenemedi</p>
             <button
+              type="button"
               onClick={() => {
-                const cat = CATEGORIES.find(c => c.id === activeCat);
-                fetchGifs(query, cat?.tag ?? null);
+                const category = CATEGORIES.find(c => c.id === activeCat);
+                void fetchGifs(query, query.trim() ? null : category?.tag ?? null);
               }}
               className="flex items-center gap-1 text-xs text-primary hover:underline"
             >
@@ -180,7 +240,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         ) : visibleGifs.length === 0 && !loading ? (
           <div className="flex items-center justify-center h-full">
             <p className="text-xs text-muted-foreground">
-              {query.trim() ? `"${query}" için sonuç bulunamadı` : "Yükleniyor…"}
+              {query.trim() ? `"${query}" için sonuç bulunamadı` : "Kategori seçin veya GIF ara…"}
             </p>
           </div>
         ) : (
@@ -188,6 +248,7 @@ export default function GifPicker({ onSelect, onClose }: Props) {
             {visibleGifs.map(gif => (
               <button
                 key={gif.id}
+                type="button"
                 onClick={() => onSelect(gif.url)}
                 className="aspect-square rounded-xl overflow-hidden bg-muted hover:opacity-80 active:scale-95 transition-all"
               >
@@ -200,7 +261,6 @@ export default function GifPicker({ onSelect, onClose }: Props) {
                 />
               </button>
             ))}
-            {/* Loading overlay when refreshing */}
             {loading && visibleGifs.length > 0 && (
               <div className="col-span-4 flex justify-center py-1">
                 <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
@@ -210,7 +270,6 @@ export default function GifPicker({ onSelect, onClose }: Props) {
         )}
       </div>
 
-      {/* Footer */}
       <p className="text-[9px] text-muted-foreground text-right px-3 pb-1.5 flex-shrink-0 opacity-60">
         Giphy
       </p>

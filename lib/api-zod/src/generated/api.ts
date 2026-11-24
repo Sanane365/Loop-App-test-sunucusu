@@ -19,12 +19,29 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get current authenticated user
  */
+export const getMeResponseAvatarFrameTransformOneXMin = -42;
+export const getMeResponseAvatarFrameTransformOneXMax = 42;
+
+export const getMeResponseAvatarFrameTransformOneYMin = -42;
+export const getMeResponseAvatarFrameTransformOneYMax = 42;
+
+export const getMeResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const getMeResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetMeResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getMeResponseAvatarFrameTransformOneXMin).max(getMeResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getMeResponseAvatarFrameTransformOneYMin).max(getMeResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getMeResponseAvatarFrameTransformOneScaleMin).max(getMeResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -44,12 +61,29 @@ export const LoginBody = zod.object({
   "password": zod.string()
 })
 
+export const loginResponseAvatarFrameTransformOneXMin = -42;
+export const loginResponseAvatarFrameTransformOneXMax = 42;
+
+export const loginResponseAvatarFrameTransformOneYMin = -42;
+export const loginResponseAvatarFrameTransformOneYMax = 42;
+
+export const loginResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const loginResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const LoginResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(loginResponseAvatarFrameTransformOneXMin).max(loginResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(loginResponseAvatarFrameTransformOneYMin).max(loginResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(loginResponseAvatarFrameTransformOneScaleMin).max(loginResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -79,12 +113,29 @@ export const ListUsersQueryParams = zod.object({
   "q": zod.coerce.string().optional()
 })
 
+export const listUsersResponseAvatarFrameTransformOneXMin = -42;
+export const listUsersResponseAvatarFrameTransformOneXMax = 42;
+
+export const listUsersResponseAvatarFrameTransformOneYMin = -42;
+export const listUsersResponseAvatarFrameTransformOneYMax = 42;
+
+export const listUsersResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const listUsersResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const ListUsersResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listUsersResponseAvatarFrameTransformOneXMin).max(listUsersResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listUsersResponseAvatarFrameTransformOneYMin).max(listUsersResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listUsersResponseAvatarFrameTransformOneScaleMin).max(listUsersResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -104,12 +155,37 @@ export const GetUserParams = zod.object({
   "userId": zod.coerce.number()
 })
 
+export const getUserResponseAvatarFrameTransformOneXMin = -42;
+export const getUserResponseAvatarFrameTransformOneXMax = 42;
+
+export const getUserResponseAvatarFrameTransformOneYMin = -42;
+export const getUserResponseAvatarFrameTransformOneYMax = 42;
+
+export const getUserResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const getUserResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+export const getUserResponsePostsItemUserAvatarFrameTransformOneXMin = -42;
+export const getUserResponsePostsItemUserAvatarFrameTransformOneXMax = 42;
+
+export const getUserResponsePostsItemUserAvatarFrameTransformOneYMin = -42;
+export const getUserResponsePostsItemUserAvatarFrameTransformOneYMax = 42;
+
+export const getUserResponsePostsItemUserAvatarFrameTransformOneScaleMin = 0.8;
+export const getUserResponsePostsItemUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetUserResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getUserResponseAvatarFrameTransformOneXMin).max(getUserResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getUserResponseAvatarFrameTransformOneYMin).max(getUserResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getUserResponseAvatarFrameTransformOneScaleMin).max(getUserResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "followerCount": zod.number().optional(),
   "followingCount": zod.number().optional(),
   "postCount": zod.number().optional(),
@@ -124,6 +200,12 @@ export const GetUserResponse = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getUserResponsePostsItemUserAvatarFrameTransformOneXMin).max(getUserResponsePostsItemUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getUserResponsePostsItemUserAvatarFrameTransformOneYMin).max(getUserResponsePostsItemUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getUserResponsePostsItemUserAvatarFrameTransformOneScaleMin).max(getUserResponsePostsItemUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -171,12 +253,29 @@ export const UpdateProfileBody = zod.object({
   "bio": zod.string().optional()
 })
 
+export const updateProfileResponseAvatarFrameTransformOneXMin = -42;
+export const updateProfileResponseAvatarFrameTransformOneXMax = 42;
+
+export const updateProfileResponseAvatarFrameTransformOneYMin = -42;
+export const updateProfileResponseAvatarFrameTransformOneYMax = 42;
+
+export const updateProfileResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const updateProfileResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const UpdateProfileResponse = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(updateProfileResponseAvatarFrameTransformOneXMin).max(updateProfileResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(updateProfileResponseAvatarFrameTransformOneYMin).max(updateProfileResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(updateProfileResponseAvatarFrameTransformOneScaleMin).max(updateProfileResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -185,6 +284,46 @@ export const UpdateProfileResponse = zod.object({
   "postCount": zod.number().optional(),
   "isFollowing": zod.boolean().optional(),
   "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Save current user's profile frame placement
+ */
+export const updateAvatarFrameTransformBodyXMin = -42;
+export const updateAvatarFrameTransformBodyXMax = 42;
+
+export const updateAvatarFrameTransformBodyYMin = -42;
+export const updateAvatarFrameTransformBodyYMax = 42;
+
+export const updateAvatarFrameTransformBodyScaleMin = 0.8;
+export const updateAvatarFrameTransformBodyScaleMax = 1.3;
+
+
+
+export const UpdateAvatarFrameTransformBody = zod.object({
+  "x": zod.number().min(updateAvatarFrameTransformBodyXMin).max(updateAvatarFrameTransformBodyXMax),
+  "y": zod.number().min(updateAvatarFrameTransformBodyYMin).max(updateAvatarFrameTransformBodyYMax),
+  "scale": zod.number().min(updateAvatarFrameTransformBodyScaleMin).max(updateAvatarFrameTransformBodyScaleMax)
+})
+
+export const updateAvatarFrameTransformResponseAvatarFrameTransformXMin = -42;
+export const updateAvatarFrameTransformResponseAvatarFrameTransformXMax = 42;
+
+export const updateAvatarFrameTransformResponseAvatarFrameTransformYMin = -42;
+export const updateAvatarFrameTransformResponseAvatarFrameTransformYMax = 42;
+
+export const updateAvatarFrameTransformResponseAvatarFrameTransformScaleMin = 0.8;
+export const updateAvatarFrameTransformResponseAvatarFrameTransformScaleMax = 1.3;
+
+
+
+export const UpdateAvatarFrameTransformResponse = zod.object({
+  "avatarFrameTransform": zod.object({
+  "x": zod.number().min(updateAvatarFrameTransformResponseAvatarFrameTransformXMin).max(updateAvatarFrameTransformResponseAvatarFrameTransformXMax),
+  "y": zod.number().min(updateAvatarFrameTransformResponseAvatarFrameTransformYMin).max(updateAvatarFrameTransformResponseAvatarFrameTransformYMax),
+  "scale": zod.number().min(updateAvatarFrameTransformResponseAvatarFrameTransformScaleMin).max(updateAvatarFrameTransformResponseAvatarFrameTransformScaleMax)
+})
 })
 
 
@@ -198,11 +337,28 @@ export const UploadAvatarResponse = zod.object({
 
 
 /**
+ * @summary Upload a gallery image as the current user's story preview cover
+ */
+export const UploadStoryPreviewCoverResponse = zod.object({
+  "storyPreviewUrl": zod.string()
+})
+
+
+/**
+ * @summary Remove the current user's story preview cover
+ */
+export const RemoveStoryPreviewCoverResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
  * @summary Get feed posts
  */
 export const ListPostsQueryParams = zod.object({
   "page": zod.coerce.number().optional(),
   "userId": zod.coerce.number().nullish(),
+  "following": zod.coerce.boolean().optional(),
   "postType": zod.coerce.string().nullish(),
   "bookmarked": zod.coerce.boolean().nullish(),
   "liked": zod.coerce.boolean().nullish(),
@@ -210,6 +366,17 @@ export const ListPostsQueryParams = zod.object({
   "saved": zod.coerce.boolean().nullish(),
   "mediaOnly": zod.coerce.boolean().nullish()
 })
+
+export const listPostsResponseUserAvatarFrameTransformOneXMin = -42;
+export const listPostsResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const listPostsResponseUserAvatarFrameTransformOneYMin = -42;
+export const listPostsResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const listPostsResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listPostsResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
 
 export const ListPostsResponseItem = zod.object({
   "id": zod.number(),
@@ -220,6 +387,12 @@ export const ListPostsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listPostsResponseUserAvatarFrameTransformOneXMin).max(listPostsResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listPostsResponseUserAvatarFrameTransformOneYMin).max(listPostsResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listPostsResponseUserAvatarFrameTransformOneScaleMin).max(listPostsResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -271,6 +444,17 @@ export const GetPostParams = zod.object({
   "postId": zod.coerce.number()
 })
 
+export const getPostResponseUserAvatarFrameTransformOneXMin = -42;
+export const getPostResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const getPostResponseUserAvatarFrameTransformOneYMin = -42;
+export const getPostResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const getPostResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const getPostResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetPostResponse = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
@@ -280,6 +464,12 @@ export const GetPostResponse = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getPostResponseUserAvatarFrameTransformOneXMin).max(getPostResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getPostResponseUserAvatarFrameTransformOneYMin).max(getPostResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getPostResponseUserAvatarFrameTransformOneScaleMin).max(getPostResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -349,6 +539,17 @@ export const ListCommentsParams = zod.object({
   "postId": zod.coerce.number()
 })
 
+export const listCommentsResponseUserAvatarFrameTransformOneXMin = -42;
+export const listCommentsResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const listCommentsResponseUserAvatarFrameTransformOneYMin = -42;
+export const listCommentsResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const listCommentsResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listCommentsResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const ListCommentsResponseItem = zod.object({
   "id": zod.number(),
   "postId": zod.number(),
@@ -359,6 +560,12 @@ export const ListCommentsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listCommentsResponseUserAvatarFrameTransformOneXMin).max(listCommentsResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listCommentsResponseUserAvatarFrameTransformOneYMin).max(listCommentsResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listCommentsResponseUserAvatarFrameTransformOneScaleMin).max(listCommentsResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -389,6 +596,26 @@ export const CreateCommentBody = zod.object({
 /**
  * @summary Get stories from followed users
  */
+export const listStoriesResponseUserAvatarFrameTransformOneXMin = -42;
+export const listStoriesResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const listStoriesResponseUserAvatarFrameTransformOneYMin = -42;
+export const listStoriesResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const listStoriesResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listStoriesResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneXMin = -42;
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneXMax = 42;
+
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneYMin = -42;
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneYMax = 42;
+
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listStoriesResponseStoriesItemUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const ListStoriesResponseItem = zod.object({
   "user": zod.object({
   "id": zod.number(),
@@ -396,6 +623,12 @@ export const ListStoriesResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listStoriesResponseUserAvatarFrameTransformOneXMin).max(listStoriesResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listStoriesResponseUserAvatarFrameTransformOneYMin).max(listStoriesResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listStoriesResponseUserAvatarFrameTransformOneScaleMin).max(listStoriesResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -414,6 +647,12 @@ export const ListStoriesResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listStoriesResponseStoriesItemUserAvatarFrameTransformOneXMin).max(listStoriesResponseStoriesItemUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listStoriesResponseStoriesItemUserAvatarFrameTransformOneYMin).max(listStoriesResponseStoriesItemUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listStoriesResponseStoriesItemUserAvatarFrameTransformOneScaleMin).max(listStoriesResponseStoriesItemUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -463,9 +702,24 @@ export const ViewStoryParams = zod.object({
 /**
  * @summary Get general chat messages
  */
+
+
+
 export const ListChatMessagesQueryParams = zod.object({
-  "before": zod.coerce.number().nullish()
+  "before": zod.coerce.number().nullish(),
+  "roomId": zod.coerce.number().min(1).optional().describe('Custom general-chat room ID; omit for the default general chat.')
 })
+
+export const listChatMessagesResponseUserAvatarFrameTransformOneXMin = -42;
+export const listChatMessagesResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const listChatMessagesResponseUserAvatarFrameTransformOneYMin = -42;
+export const listChatMessagesResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const listChatMessagesResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listChatMessagesResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
 
 export const ListChatMessagesResponseItem = zod.object({
   "id": zod.number(),
@@ -476,6 +730,12 @@ export const ListChatMessagesResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listChatMessagesResponseUserAvatarFrameTransformOneXMin).max(listChatMessagesResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listChatMessagesResponseUserAvatarFrameTransformOneYMin).max(listChatMessagesResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listChatMessagesResponseUserAvatarFrameTransformOneScaleMin).max(listChatMessagesResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -490,6 +750,7 @@ export const ListChatMessagesResponseItem = zod.object({
   "gifUrl": zod.string().nullish(),
   "voiceUrl": zod.string().nullish(),
   "voiceDuration": zod.number().nullish(),
+  "roomId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
@@ -501,17 +762,64 @@ export const ListChatMessagesResponse = zod.array(ListChatMessagesResponseItem)
 export const SendChatMessageBody = zod.object({
   "type": zod.enum(['text', 'gif']),
   "content": zod.string().nullish(),
-  "gifUrl": zod.string().nullish()
+  "gifUrl": zod.string().nullish(),
+  "roomId": zod.number().nullish()
+})
+
+
+/**
+ * @summary List simple public rooms in the general chat
+ */
+export const ListChatRoomsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "createdBy": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListChatRoomsResponse = zod.array(ListChatRoomsResponseItem)
+
+
+/**
+ * @summary Create a simple general chat room
+ */
+export const createChatRoomBodyNameMin = 2;
+export const createChatRoomBodyNameMax = 40;
+
+
+
+export const CreateChatRoomBody = zod.object({
+  "name": zod.string().min(createChatRoomBodyNameMin).max(createChatRoomBodyNameMax)
 })
 
 
 /**
  * @summary List active voice chat rooms
  */
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneXMin = -42;
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneXMax = 42;
+
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneYMin = -42;
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneYMax = 42;
+
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneScaleMin = 0.8;
+export const listVoiceRoomsResponseHostAvatarFrameTransformOneScaleMax = 1.3;
+
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneXMin = -42;
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneXMax = 42;
+
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneYMin = -42;
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneYMax = 42;
+
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneScaleMin = 0.8;
+export const listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const ListVoiceRoomsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().nullish(),
+  "roomCode": zod.string().nullish(),
   "createdBy": zod.number(),
   "host": zod.object({
   "id": zod.number(),
@@ -519,6 +827,12 @@ export const ListVoiceRoomsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listVoiceRoomsResponseHostAvatarFrameTransformOneXMin).max(listVoiceRoomsResponseHostAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listVoiceRoomsResponseHostAvatarFrameTransformOneYMin).max(listVoiceRoomsResponseHostAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listVoiceRoomsResponseHostAvatarFrameTransformOneScaleMin).max(listVoiceRoomsResponseHostAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -535,6 +849,12 @@ export const ListVoiceRoomsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneXMin).max(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneYMin).max(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneScaleMin).max(listVoiceRoomsResponseParticipantsItemAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -567,10 +887,31 @@ export const GetVoiceRoomParams = zod.object({
   "roomId": zod.coerce.number()
 })
 
+export const getVoiceRoomResponseHostAvatarFrameTransformOneXMin = -42;
+export const getVoiceRoomResponseHostAvatarFrameTransformOneXMax = 42;
+
+export const getVoiceRoomResponseHostAvatarFrameTransformOneYMin = -42;
+export const getVoiceRoomResponseHostAvatarFrameTransformOneYMax = 42;
+
+export const getVoiceRoomResponseHostAvatarFrameTransformOneScaleMin = 0.8;
+export const getVoiceRoomResponseHostAvatarFrameTransformOneScaleMax = 1.3;
+
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneXMin = -42;
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneXMax = 42;
+
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneYMin = -42;
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneYMax = 42;
+
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneScaleMin = 0.8;
+export const getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetVoiceRoomResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "description": zod.string().nullish(),
+  "roomCode": zod.string().nullish(),
   "createdBy": zod.number(),
   "host": zod.object({
   "id": zod.number(),
@@ -578,6 +919,12 @@ export const GetVoiceRoomResponse = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getVoiceRoomResponseHostAvatarFrameTransformOneXMin).max(getVoiceRoomResponseHostAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getVoiceRoomResponseHostAvatarFrameTransformOneYMin).max(getVoiceRoomResponseHostAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getVoiceRoomResponseHostAvatarFrameTransformOneScaleMin).max(getVoiceRoomResponseHostAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -594,6 +941,12 @@ export const GetVoiceRoomResponse = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneXMin).max(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneYMin).max(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneScaleMin).max(getVoiceRoomResponseParticipantsItemAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -628,6 +981,26 @@ export const LeaveVoiceRoomParams = zod.object({
 /**
  * @summary Get notifications for current user
  */
+export const listNotificationsResponseFromUserAvatarFrameTransformOneXMin = -42;
+export const listNotificationsResponseFromUserAvatarFrameTransformOneXMax = 42;
+
+export const listNotificationsResponseFromUserAvatarFrameTransformOneYMin = -42;
+export const listNotificationsResponseFromUserAvatarFrameTransformOneYMax = 42;
+
+export const listNotificationsResponseFromUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listNotificationsResponseFromUserAvatarFrameTransformOneScaleMax = 1.3;
+
+export const listNotificationsResponsePostUserAvatarFrameTransformOneXMin = -42;
+export const listNotificationsResponsePostUserAvatarFrameTransformOneXMax = 42;
+
+export const listNotificationsResponsePostUserAvatarFrameTransformOneYMin = -42;
+export const listNotificationsResponsePostUserAvatarFrameTransformOneYMax = 42;
+
+export const listNotificationsResponsePostUserAvatarFrameTransformOneScaleMin = 0.8;
+export const listNotificationsResponsePostUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const ListNotificationsResponseItem = zod.object({
   "id": zod.number(),
   "type": zod.enum(['like', 'comment', 'follow', 'repost', 'mention']),
@@ -637,6 +1010,12 @@ export const ListNotificationsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listNotificationsResponseFromUserAvatarFrameTransformOneXMin).max(listNotificationsResponseFromUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listNotificationsResponseFromUserAvatarFrameTransformOneYMin).max(listNotificationsResponseFromUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listNotificationsResponseFromUserAvatarFrameTransformOneScaleMin).max(listNotificationsResponseFromUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -655,6 +1034,12 @@ export const ListNotificationsResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(listNotificationsResponsePostUserAvatarFrameTransformOneXMin).max(listNotificationsResponsePostUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(listNotificationsResponsePostUserAvatarFrameTransformOneYMin).max(listNotificationsResponsePostUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(listNotificationsResponsePostUserAvatarFrameTransformOneScaleMin).max(listNotificationsResponsePostUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -684,6 +1069,17 @@ export const ListNotificationsResponse = zod.array(ListNotificationsResponseItem
 /**
  * @summary Get trending posts
  */
+export const getTrendingResponseUserAvatarFrameTransformOneXMin = -42;
+export const getTrendingResponseUserAvatarFrameTransformOneXMax = 42;
+
+export const getTrendingResponseUserAvatarFrameTransformOneYMin = -42;
+export const getTrendingResponseUserAvatarFrameTransformOneYMax = 42;
+
+export const getTrendingResponseUserAvatarFrameTransformOneScaleMin = 0.8;
+export const getTrendingResponseUserAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetTrendingResponseItem = zod.object({
   "id": zod.number(),
   "userId": zod.number(),
@@ -693,6 +1089,12 @@ export const GetTrendingResponseItem = zod.object({
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getTrendingResponseUserAvatarFrameTransformOneXMin).max(getTrendingResponseUserAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getTrendingResponseUserAvatarFrameTransformOneYMin).max(getTrendingResponseUserAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getTrendingResponseUserAvatarFrameTransformOneScaleMin).max(getTrendingResponseUserAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),
@@ -719,12 +1121,29 @@ export const GetTrendingResponse = zod.array(GetTrendingResponseItem)
 /**
  * @summary Get suggested users to follow
  */
+export const getSuggestedUsersResponseAvatarFrameTransformOneXMin = -42;
+export const getSuggestedUsersResponseAvatarFrameTransformOneXMax = 42;
+
+export const getSuggestedUsersResponseAvatarFrameTransformOneYMin = -42;
+export const getSuggestedUsersResponseAvatarFrameTransformOneYMax = 42;
+
+export const getSuggestedUsersResponseAvatarFrameTransformOneScaleMin = 0.8;
+export const getSuggestedUsersResponseAvatarFrameTransformOneScaleMax = 1.3;
+
+
+
 export const GetSuggestedUsersResponseItem = zod.object({
   "id": zod.number(),
   "username": zod.string(),
   "displayName": zod.string(),
   "bio": zod.string().nullish(),
   "avatarUrl": zod.string().nullish(),
+  "storyPreviewUrl": zod.string().nullish(),
+  "avatarFrameTransform": zod.union([zod.object({
+  "x": zod.number().min(getSuggestedUsersResponseAvatarFrameTransformOneXMin).max(getSuggestedUsersResponseAvatarFrameTransformOneXMax),
+  "y": zod.number().min(getSuggestedUsersResponseAvatarFrameTransformOneYMin).max(getSuggestedUsersResponseAvatarFrameTransformOneYMax),
+  "scale": zod.number().min(getSuggestedUsersResponseAvatarFrameTransformOneScaleMin).max(getSuggestedUsersResponseAvatarFrameTransformOneScaleMax)
+}),zod.null()]).optional(),
   "bannerUrl": zod.string().nullish(),
   "role": zod.string().optional(),
   "isBanned": zod.boolean().optional(),

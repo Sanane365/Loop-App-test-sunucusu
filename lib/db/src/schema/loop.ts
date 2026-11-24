@@ -6,6 +6,11 @@ export const loopPhotosTable = pgTable("loop_photos", {
   id: serial("id").primaryKey(),
   senderId: integer("sender_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   mediaUrl: text("media_url").notNull(),
+  mediaItems: text("media_items").notNull().default("[]"),
+  title: text("title").notNull().default("Yeni Loop"),
+  caption: text("caption").notNull().default(""),
+  tags: text("tags").notNull().default(""),
+  audio: text("audio").notNull().default("Orijinal ses"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -15,7 +20,7 @@ export const loopPhotoViewsTable = pgTable("loop_photo_views", {
   photoId: integer("photo_id").notNull().references(() => loopPhotosTable.id, { onDelete: "cascade" }),
   viewerId: integer("viewer_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (t) => [unique().on(t.photoId, t.viewerId)]);
+});
 
 // Fotoğraf emoji tepkileri
 export const loopPhotoReactionsTable = pgTable("loop_photo_reactions", {

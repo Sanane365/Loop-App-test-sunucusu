@@ -9,10 +9,24 @@ export const postsTable = pgTable("posts", {
   content: text("content").notNull(),
   mediaUrl: text("media_url"),
   mediaType: text("media_type"),
+  backgroundUrl: text("background_url"),
   // 'post' | 'bulletin' | 'poll'
   postType: text("post_type").notNull().default("post"),
   // Poll options stored as JSON array of strings (only used when postType='poll')
   pollOptions: jsonb("poll_options"),
+  archived: boolean("archived").notNull().default(false),
+  hideLikeCount: boolean("hide_like_count").notNull().default(false),
+  hideRepostCount: boolean("hide_repost_count").notNull().default(false),
+  hideBookmarkCount: boolean("hide_bookmark_count").notNull().default(false),
+  commentsDisabled: boolean("comments_disabled").notNull().default(false),
+  pinnedProfile: boolean("pinned_profile").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const postViewsTable = pgTable("post_views", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull().references(() => postsTable.id, { onDelete: "cascade" }),
+  viewerId: integer("viewer_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

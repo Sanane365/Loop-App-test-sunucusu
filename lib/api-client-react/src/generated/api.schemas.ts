@@ -21,6 +21,26 @@ export interface RegisterInput {
   displayName: string;
 }
 
+export interface AvatarFrameTransform {
+  /**
+     * @minimum -42
+     * @maximum 42
+     */
+  x: number;
+  /**
+     * @minimum -42
+     * @maximum 42
+     */
+  y: number;
+  /**
+     * @minimum 0.8
+     * @maximum 1.3
+     */
+  scale: number;
+}
+
+export type NullableAvatarFrameTransform = AvatarFrameTransform | null;
+
 export interface User {
   id: number;
   username: string;
@@ -29,6 +49,9 @@ export interface User {
   bio?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
+  /** @nullable */
+  storyPreviewUrl?: string | null;
+  avatarFrameTransform?: NullableAvatarFrameTransform | null;
   /** @nullable */
   bannerUrl?: string | null;
   role?: string;
@@ -66,6 +89,7 @@ export interface UserProfile {
   bio?: string | null;
   /** @nullable */
   avatarUrl?: string | null;
+  avatarFrameTransform?: NullableAvatarFrameTransform | null;
   followerCount?: number;
   followingCount?: number;
   postCount?: number;
@@ -160,7 +184,24 @@ export interface ChatMessage {
   voiceUrl?: string | null;
   /** @nullable */
   voiceDuration?: number | null;
+  /** @nullable */
+  roomId?: number | null;
   createdAt: string;
+}
+
+export interface ChatRoom {
+  id: number;
+  name: string;
+  createdBy: number;
+  createdAt: string;
+}
+
+export interface ChatRoomInput {
+  /**
+     * @minLength 2
+     * @maxLength 40
+     */
+  name: string;
 }
 
 export type ChatMessageInputType = typeof ChatMessageInputType[keyof typeof ChatMessageInputType];
@@ -177,6 +218,8 @@ export interface ChatMessageInput {
   content?: string | null;
   /** @nullable */
   gifUrl?: string | null;
+  /** @nullable */
+  roomId?: number | null;
 }
 
 export interface VoiceRoom {
@@ -184,6 +227,8 @@ export interface VoiceRoom {
   name: string;
   /** @nullable */
   description?: string | null;
+  /** @nullable */
+  roomCode?: string | null;
   createdBy: number;
   host?: User;
   participantCount: number;
@@ -223,12 +268,25 @@ export type ListUsersParams = {
 q?: string;
 };
 
+export type UpdateAvatarFrameTransform200 = {
+  avatarFrameTransform: AvatarFrameTransform;
+};
+
+export type UploadStoryPreviewCover200 = {
+  storyPreviewUrl: string;
+};
+
+export type RemoveStoryPreviewCover200 = {
+  success: boolean;
+};
+
 export type ListPostsParams = {
 page?: number;
 /**
  * @nullable
  */
 userId?: number | null;
+following?: boolean;
 /**
  * @nullable
  */
@@ -260,5 +318,10 @@ export type ListChatMessagesParams = {
  * @nullable
  */
 before?: number | null;
+/**
+ * Custom general-chat room ID; omit for the default general chat.
+ * @minimum 1
+ */
+roomId?: number;
 };
 

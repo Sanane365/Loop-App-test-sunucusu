@@ -20,8 +20,11 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  AvatarFrameTransform,
   ChatMessage,
   ChatMessageInput,
+  ChatRoom,
+  ChatRoomInput,
   Comment,
   CommentInput,
   HealthStatus,
@@ -34,9 +37,12 @@ import type {
   PostInput,
   ProfileUpdate,
   RegisterInput,
+  RemoveStoryPreviewCover200,
   Story,
   StoryInput,
+  UpdateAvatarFrameTransform200,
   UploadResult,
+  UploadStoryPreviewCover200,
   User,
   UserProfile,
   UserStories,
@@ -794,6 +800,77 @@ export const useUpdateProfile = <TError = ErrorType<unknown>,
       return useMutation(getUpdateProfileMutationOptions(options));
     }
 
+export const getUpdateAvatarFrameTransformUrl = () => {
+
+
+
+
+  return `/api/users/me/avatar-frame-transform`
+}
+
+/**
+ * @summary Save current user's profile frame placement
+ */
+export const updateAvatarFrameTransform = async (avatarFrameTransform: AvatarFrameTransform, options?: RequestInit): Promise<UpdateAvatarFrameTransform200> => {
+
+  return customFetch<UpdateAvatarFrameTransform200>(getUpdateAvatarFrameTransformUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      avatarFrameTransform,)
+  }
+);}
+
+
+
+
+export const getUpdateAvatarFrameTransformMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAvatarFrameTransform>>, TError,{data: BodyType<AvatarFrameTransform>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAvatarFrameTransform>>, TError,{data: BodyType<AvatarFrameTransform>}, TContext> => {
+
+const mutationKey = ['updateAvatarFrameTransform'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAvatarFrameTransform>>, {data: BodyType<AvatarFrameTransform>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAvatarFrameTransform(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAvatarFrameTransformMutationResult = NonNullable<Awaited<ReturnType<typeof updateAvatarFrameTransform>>>
+    export type UpdateAvatarFrameTransformMutationBody = BodyType<AvatarFrameTransform>
+    export type UpdateAvatarFrameTransformMutationError = ErrorType<void>
+
+    /**
+ * @summary Save current user's profile frame placement
+ */
+export const useUpdateAvatarFrameTransform = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAvatarFrameTransform>>, TError,{data: BodyType<AvatarFrameTransform>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAvatarFrameTransform>>,
+        TError,
+        {data: BodyType<AvatarFrameTransform>},
+        TContext
+      > => {
+      return useMutation(getUpdateAvatarFrameTransformMutationOptions(options));
+    }
+
 export const getUploadAvatarUrl = () => {
 
 
@@ -862,6 +939,146 @@ export const useUploadAvatar = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUploadAvatarMutationOptions(options));
+    }
+
+export const getUploadStoryPreviewCoverUrl = () => {
+
+
+
+
+  return `/api/users/me/story-cover`
+}
+
+/**
+ * @summary Upload a gallery image as the current user's story preview cover
+ */
+export const uploadStoryPreviewCover = async ( options?: RequestInit): Promise<UploadStoryPreviewCover200> => {
+
+  return customFetch<UploadStoryPreviewCover200>(getUploadStoryPreviewCoverUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUploadStoryPreviewCoverMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadStoryPreviewCover>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uploadStoryPreviewCover>>, TError,void, TContext> => {
+
+const mutationKey = ['uploadStoryPreviewCover'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uploadStoryPreviewCover>>, void> = () => {
+
+
+          return  uploadStoryPreviewCover(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UploadStoryPreviewCoverMutationResult = NonNullable<Awaited<ReturnType<typeof uploadStoryPreviewCover>>>
+
+    export type UploadStoryPreviewCoverMutationError = ErrorType<void>
+
+    /**
+ * @summary Upload a gallery image as the current user's story preview cover
+ */
+export const useUploadStoryPreviewCover = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uploadStoryPreviewCover>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uploadStoryPreviewCover>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getUploadStoryPreviewCoverMutationOptions(options));
+    }
+
+export const getRemoveStoryPreviewCoverUrl = () => {
+
+
+
+
+  return `/api/users/me/story-cover`
+}
+
+/**
+ * @summary Remove the current user's story preview cover
+ */
+export const removeStoryPreviewCover = async ( options?: RequestInit): Promise<RemoveStoryPreviewCover200> => {
+
+  return customFetch<RemoveStoryPreviewCover200>(getRemoveStoryPreviewCoverUrl(),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveStoryPreviewCoverMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeStoryPreviewCover>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeStoryPreviewCover>>, TError,void, TContext> => {
+
+const mutationKey = ['removeStoryPreviewCover'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeStoryPreviewCover>>, void> = () => {
+
+
+          return  removeStoryPreviewCover(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveStoryPreviewCoverMutationResult = NonNullable<Awaited<ReturnType<typeof removeStoryPreviewCover>>>
+
+    export type RemoveStoryPreviewCoverMutationError = ErrorType<void>
+
+    /**
+ * @summary Remove the current user's story preview cover
+ */
+export const useRemoveStoryPreviewCover = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeStoryPreviewCover>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeStoryPreviewCover>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getRemoveStoryPreviewCoverMutationOptions(options));
     }
 
 export const getListPostsUrl = (params?: ListPostsParams,) => {
@@ -2106,6 +2323,154 @@ export const useSendChatMessage = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getSendChatMessageMutationOptions(options));
+    }
+
+export const getListChatRoomsUrl = () => {
+
+
+
+
+  return `/api/chat/rooms`
+}
+
+/**
+ * @summary List simple public rooms in the general chat
+ */
+export const listChatRooms = async ( options?: RequestInit): Promise<ChatRoom[]> => {
+
+  return customFetch<ChatRoom[]>(getListChatRoomsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListChatRoomsQueryKey = () => {
+    return [
+    `/api/chat/rooms`
+    ] as const;
+    }
+
+
+export const getListChatRoomsQueryOptions = <TData = Awaited<ReturnType<typeof listChatRooms>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListChatRoomsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listChatRooms>>> = ({ signal }) => listChatRooms({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listChatRooms>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListChatRoomsQueryResult = NonNullable<Awaited<ReturnType<typeof listChatRooms>>>
+export type ListChatRoomsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List simple public rooms in the general chat
+ */
+
+export function useListChatRooms<TData = Awaited<ReturnType<typeof listChatRooms>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listChatRooms>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListChatRoomsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getCreateChatRoomUrl = () => {
+
+
+
+
+  return `/api/chat/rooms`
+}
+
+/**
+ * @summary Create a simple general chat room
+ */
+export const createChatRoom = async (chatRoomInput: ChatRoomInput, options?: RequestInit): Promise<ChatRoom> => {
+
+  return customFetch<ChatRoom>(getCreateChatRoomUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      chatRoomInput,)
+  }
+);}
+
+
+
+
+export const getCreateChatRoomMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChatRoom>>, TError,{data: BodyType<ChatRoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createChatRoom>>, TError,{data: BodyType<ChatRoomInput>}, TContext> => {
+
+const mutationKey = ['createChatRoom'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createChatRoom>>, {data: BodyType<ChatRoomInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createChatRoom(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateChatRoomMutationResult = NonNullable<Awaited<ReturnType<typeof createChatRoom>>>
+    export type CreateChatRoomMutationBody = BodyType<ChatRoomInput>
+    export type CreateChatRoomMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a simple general chat room
+ */
+export const useCreateChatRoom = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createChatRoom>>, TError,{data: BodyType<ChatRoomInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createChatRoom>>,
+        TError,
+        {data: BodyType<ChatRoomInput>},
+        TContext
+      > => {
+      return useMutation(getCreateChatRoomMutationOptions(options));
     }
 
 export const getSendVoiceMessageUrl = () => {

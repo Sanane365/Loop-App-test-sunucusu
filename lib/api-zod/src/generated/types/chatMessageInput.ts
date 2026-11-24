@@ -13,4 +13,6 @@ export interface ChatMessageInput {
   content?: string | null;
   /** @nullable */
   gifUrl?: string | null;
+  /** @nullable */
+  roomId?: number | null;
 }

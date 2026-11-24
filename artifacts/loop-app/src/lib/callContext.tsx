@@ -97,28 +97,12 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
   }, [callState, callMinimized]);
 
-  // ── AudioContext ref for iOS/autoplay unlock ──────────────────────────────
-  const audioCtxRef = useRef<AudioContext | null>(null);
-
   // ── Attach remote stream ──────────────────────────────────────────────────
   const attachRemoteStream = useCallback((stream: MediaStream) => {
     remoteStreamRef.current = stream;
 
     // Enable all audio tracks explicitly
     stream.getAudioTracks().forEach(t => { t.enabled = true; });
-
-    // Web Audio API approach bypasses browser autoplay restrictions
-    try {
-      if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-        audioCtxRef.current = new AudioContext();
-      }
-      const ctx = audioCtxRef.current;
-      const resume = () => ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
-      resume().then(() => {
-        const src = ctx.createMediaStreamSource(stream);
-        src.connect(ctx.destination);
-      }).catch(() => {});
-    } catch { /* fallback to audio element */ }
 
     if (remoteAudioRef.current) {
       remoteAudioRef.current.srcObject = stream;
@@ -128,6 +112,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
     }
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = stream;
+      remoteVideoRef.current.muted = true;
       remoteVideoRef.current.play().catch(() => {});
     }
   }, []);
@@ -220,7 +205,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: type === "video" ? { facingMode: "user" } : false,
       });
       localStreamRef.current = stream;
@@ -287,7 +276,11 @@ export function CallProvider({ children }: { children: ReactNode }) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
         video: type === "video" ? { facingMode: "user" } : false,
       });
       localStreamRef.current = stream;
@@ -322,10 +315,16 @@ export function CallProvider({ children }: { children: ReactNode }) {
         }).catch(() => {});
       };
 
-      const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
-      if (!res.ok) throw new Error("Arama bilgisi alınamadı");
-      const data = await res.json();
-      if (!data.offer) throw new Error("Offer henüz hazır değil, biraz bekleyin");
+      let data: { offer?: RTCSessionDescriptionInit | null; ended?: boolean } | null = null;
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const res = await fetch(`/api/calls/${callId}`, { cache: "no-store" });
+        if (!res.ok) throw new Error("Arama bilgisi alınamadı");
+        data = await res.json() as { offer?: RTCSessionDescriptionInit | null; ended?: boolean };
+        if (data.ended) throw new Error("Arama sonlandırıldı");
+        if (data.offer) break;
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+      if (!data?.offer) throw new Error("Arama teklifi alınamadı, lütfen tekrar deneyin");
 
       await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
       const answer = await pc.createAnswer();
