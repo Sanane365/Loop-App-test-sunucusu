@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @workspace/loop-app build",
-  "outputDirectory": "artifacts/loop-app/dist/public",
+  "outputDirectory": "dist/public",
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -16,3 +16,4 @@
     }
   ]
 }
+
