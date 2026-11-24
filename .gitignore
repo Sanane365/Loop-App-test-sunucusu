@@ -54,6 +54,7 @@ testem.log
 /uploads/
 /artifacts/api-server/data/
 /artifacts/api-server/uploads/
+/artifacts/loop-app/public/downloads/
 
 # Local debugging artifacts
 cookies.txt
