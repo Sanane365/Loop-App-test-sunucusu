@@ -51,7 +51,7 @@ const ensureDmStickersTable = Promise.all([
 ]);
 
 async function messageLikeData(type: "dm" | "group", messageId: number, userId: number) {
-  await ensureMessageLikesTable;
+  await ensureMessageLikesTable();
   const [count, liked, reaction] = await Promise.all([
     db.execute(sql`SELECT count(*)::int AS count FROM message_likes WHERE message_type = ${type} AND message_id = ${messageId}`),
     db.execute(sql`SELECT emoji FROM message_likes WHERE message_type = ${type} AND message_id = ${messageId} AND user_id = ${userId}`),
@@ -450,7 +450,7 @@ router.post("/dm/messages/:messageId/like", requireAuth, async (req, res) => {
     message.senderId === viewerId ? message.receiverId : message.senderId,
   );
   if (accessError) { res.status(accessError.status).json({ error: accessError.error }); return; }
-  await ensureMessageLikesTable;
+  await ensureMessageLikesTable();
   const emoji = typeof req.body?.emoji === "string" && req.body.emoji.trim() ? req.body.emoji : "❤️";
   const existing = await db.execute(sql`SELECT emoji FROM message_likes WHERE message_type = 'dm' AND message_id = ${messageId} AND user_id = ${viewerId}`);
   if (existing.rows.length && existing.rows[0]?.emoji === emoji) {
@@ -980,7 +980,7 @@ router.post("/dm/groups/:groupId/messages/:messageId/like", requireAuth, async (
     .where(and(eq(dmGroupMessagesTable.id, messageId), eq(dmGroupMessagesTable.groupId, groupId)))
     .limit(1);
   if (!message) { res.status(404).json({ error: "Mesaj bulunamadı" }); return; }
-  await ensureMessageLikesTable;
+  await ensureMessageLikesTable();
   const emoji = typeof req.body?.emoji === "string" && req.body.emoji.trim() ? req.body.emoji : "❤️";
   const existing = await db.execute(sql`SELECT emoji FROM message_likes WHERE message_type = 'group' AND message_id = ${messageId} AND user_id = ${req.user!.id}`);
   if (existing.rows.length && existing.rows[0]?.emoji === emoji) {
