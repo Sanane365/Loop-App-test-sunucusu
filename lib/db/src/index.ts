@@ -15,6 +15,7 @@ export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 let messageLikesTableMigration: Promise<void> | undefined;
+let emblemAssetsTableMigration: Promise<void> | undefined;
 
 export function ensureMessageLikesTable(): Promise<void> {
   if (!messageLikesTableMigration) {
@@ -31,6 +32,21 @@ export function ensureMessageLikesTable(): Promise<void> {
     })();
   }
   return messageLikesTableMigration;
+}
+
+export function ensureEmblemAssetsTable(): Promise<void> {
+  if (!emblemAssetsTableMigration) {
+    emblemAssetsTableMigration = (async () => {
+      await db.execute(sql`CREATE TABLE IF NOT EXISTS emblem_assets (
+        id serial PRIMARY KEY,
+        name text NOT NULL,
+        image_url text NOT NULL,
+        published boolean NOT NULL DEFAULT false,
+        created_at timestamp NOT NULL DEFAULT now()
+      )`);
+    })();
+  }
+  return emblemAssetsTableMigration;
 }
 
 export * from "./schema";
