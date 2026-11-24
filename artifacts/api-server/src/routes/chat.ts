@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, ensureMessageLikesTable } from "@workspace/db";
 import { chatMessagesTable, chatRoomsTable, voiceRoomsTable, voiceRoomParticipantsTable, usersTable } from "@workspace/db";
 import { eq, desc, lt, and, gt, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -89,18 +89,7 @@ const chatRoomCleanupTimer = setInterval(() => {
   void archiveInactiveChatRooms().catch((error) => console.error("Sohbet odası arşiv temizliği başarısız:", error));
 }, 60_000);
 chatRoomCleanupTimer.unref();
-const ensureMessageLikesTable = db.execute(sql`
-  CREATE TABLE IF NOT EXISTS message_likes (
-    message_type text NOT NULL,
-    message_id integer NOT NULL,
-    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    emoji text NOT NULL DEFAULT '❤️',
-    created_at timestamp NOT NULL DEFAULT now(),
-    PRIMARY KEY (message_type, message_id, user_id)
-  )
-`).then(() => db.execute(sql`
-  ALTER TABLE message_likes ADD COLUMN IF NOT EXISTS emoji text NOT NULL DEFAULT '❤️'
-`));
+
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
