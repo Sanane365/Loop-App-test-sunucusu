@@ -1,5 +1,5 @@
 import app from "./app";
-import { ensureMessageLikesTable } from "@workspace/db";
+import { ensureEmblemAssetsTable, ensureMessageLikesTable } from "@workspace/db";
 import { logger } from "./lib/logger";
 import { loopMetadataMigration } from "./routes/loop";
 import { profileIntroVideoSchemaMigration } from "./routes/users";
@@ -19,7 +19,7 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-Promise.all([loopMetadataMigration, profileIntroVideoSchemaMigration, ensureMessageLikesTable(), ensureDmStickersTable])
+Promise.all([loopMetadataMigration, profileIntroVideoSchemaMigration, ensureMessageLikesTable(), ensureDmStickersTable, ensureEmblemAssetsTable()])
   .then(() => {
     app.listen(port, (err) => {
       if (err) {
