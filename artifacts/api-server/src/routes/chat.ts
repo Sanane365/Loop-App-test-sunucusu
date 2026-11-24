@@ -404,7 +404,7 @@ router.get("/chat/messages", async (req, res) => {
   try {
     await chatRoomsSchemaReady;
     await archiveInactiveChatRooms();
-    await ensureMessageLikesTable;
+    await ensureMessageLikesTable();
     const viewerId = req.user?.id;
     const before = req.query["before"] ? parseInt(req.query["before"] as string) : undefined;
     const requestedRoomId = req.query["roomId"];
@@ -537,7 +537,7 @@ router.post("/chat/modi/polls/:pollId/vote", requireAuth, async (req, res) => {
 });
 
 router.post("/chat/messages/:messageId/like", requireAuth, async (req, res) => {
-  await ensureMessageLikesTable;
+  await ensureMessageLikesTable();
   const messageId = Number(req.params.messageId);
   const emoji = typeof req.body?.emoji === "string" && req.body.emoji.trim() ? req.body.emoji : "❤️";
   const existing = await db.execute(sql`SELECT emoji FROM message_likes WHERE message_type = 'chat' AND message_id = ${messageId} AND user_id = ${req.user!.id}`);
