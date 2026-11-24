@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, ensureMessageLikesTable } from "@workspace/db";
 import { directMessagesTable, usersTable, dmGroupsTable, dmGroupMembersTable, dmGroupMessagesTable } from "@workspace/db";
 import { eq, or, and, desc, sql, inArray } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -27,18 +27,7 @@ const dmRequestsReady = db.execute(sql`
   CREATE UNIQUE INDEX IF NOT EXISTS dm_message_requests_pending_pair_idx
   ON dm_message_requests (sender_id, receiver_id) WHERE status = 'pending'
 `));
-const ensureMessageLikesTable = db.execute(sql`
-  CREATE TABLE IF NOT EXISTS message_likes (
-    message_type text NOT NULL,
-    message_id integer NOT NULL,
-    user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    emoji text NOT NULL DEFAULT '❤️',
-    created_at timestamp NOT NULL DEFAULT now(),
-    PRIMARY KEY (message_type, message_id, user_id)
-  )
-`).then(() => db.execute(sql`
-  ALTER TABLE message_likes ADD COLUMN IF NOT EXISTS emoji text NOT NULL DEFAULT '❤️'
-`));
+
 
 const ensureDmContactNamesTable = Promise.resolve();
 const ensureDmStickersTable = Promise.all([
