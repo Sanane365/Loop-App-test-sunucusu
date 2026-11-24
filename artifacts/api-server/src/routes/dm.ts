@@ -30,8 +30,7 @@ const dmRequestsReady = db.execute(sql`
 
 
 const ensureDmContactNamesTable = Promise.resolve();
-const ensureDmStickersTable = Promise.all([
-  db.execute(sql`
+export const ensureDmStickersTable = db.execute(sql`
     CREATE TABLE IF NOT EXISTS dm_stickers (
       id serial PRIMARY KEY,
       creator_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -39,16 +38,14 @@ const ensureDmStickersTable = Promise.all([
       media_url text NOT NULL,
       created_at timestamp NOT NULL DEFAULT now()
     )
-  `),
-  db.execute(sql`
+  `).then(() => db.execute(sql`
     CREATE TABLE IF NOT EXISTS dm_sticker_favorites (
       user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       sticker_id integer NOT NULL REFERENCES dm_stickers(id) ON DELETE CASCADE,
       created_at timestamp NOT NULL DEFAULT now(),
       PRIMARY KEY (user_id, sticker_id)
     )
-  `),
-]);
+  `));
 
 async function messageLikeData(type: "dm" | "group", messageId: number, userId: number) {
   await ensureMessageLikesTable();
