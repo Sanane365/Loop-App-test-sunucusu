@@ -51,7 +51,6 @@ import { useAuth } from "@/lib/auth";
 import { Link, useLocation } from "wouter";
 import GifPicker from "@/components/shared/GifPicker";
 import { UserNameWithDecorations } from "@/components/shared/UserNameWithDecorations";
-import { getStoredVideoMuted, storeVideoMuted } from "@/lib/video-preferences";
 import { ChromaKeyAnimation } from "@/components/live/ChromaKeyAnimation";
 import { getListStoriesQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -3764,7 +3763,6 @@ function LoopScene({
   const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const pausedRef = useRef(false);
   const activeMediaUrl = loopMediaUrls[Math.min(activeMediaIndex, loopMediaUrls.length - 1)] ?? loop.cover;
-  const [muted, setMuted] = useState(getStoredVideoMuted);
   const [videoProgress, setVideoProgress] = useState(0);
   const [seeking, setSeeking] = useState(false);
   const [videoError, setVideoError] = useState(false);
@@ -4661,42 +4659,44 @@ function LoopScene({
     }
   };
 
-  const toggleMuted = () => {
+  const requestVideoPlayback = (video: HTMLVideoElement) => {
+    void video.play().catch((error: unknown) => {
+      if (!video.isConnected || videoRef.current !== video || !active) return;
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setPaused(true);
+      if (!(error instanceof DOMException && error.name === "NotAllowedError")) {
+        console.warn("Loop video playback failed", error);
+      }
+    });
+  };
+
+  const toggleLoopPlayback = () => {
     const video = videoRef.current;
-    if (!video) return;
-    const nextMuted = !video.muted;
-    video.muted = nextMuted;
-    setMuted(nextMuted);
-    storeVideoMuted(nextMuted);
-    revealActions();
+    if (!video) {
+      setPaused((value) => !value);
+      return;
+    }
+    if (video.paused) {
+      setPaused(false);
+      requestVideoPlayback(video);
+    } else {
+      setPaused(true);
+      video.pause();
+    }
   };
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     setVideoError(false);
-    video.muted = muted;
     video.setAttribute("fetchpriority", active ? "high" : "auto");
     if (!active || paused) {
       video.pause();
       return;
     }
     if (!video.paused) return;
-    void video.play().catch((error: unknown) => {
-      if (!video.isConnected || videoRef.current !== video || !active || pausedRef.current) return;
-      if (error instanceof DOMException && error.name === "AbortError") return;
-      if (!video.muted) {
-        video.muted = true;
-        setMuted(true);
-        void video.play().catch((retryError: unknown) => {
-          if (retryError instanceof DOMException && retryError.name === "AbortError") return;
-          console.warn("Loop video playback retry failed", retryError);
-        });
-        return;
-      }
-      console.warn("Loop video playback failed", error);
-    });
-  }, [active, paused, muted, activeMediaUrl]);
+    requestVideoPlayback(video);
+  }, [active, paused, activeMediaUrl]);
 
   useEffect(() => {
     if (active) return undefined;
@@ -5408,7 +5408,7 @@ function LoopScene({
               ref={videoRef}
               src={activeMediaUrl}
               className="loop-feed-video absolute inset-0 h-full w-full bg-black object-contain"
-              muted={muted}
+              muted={false}
               autoPlay={active}
               loop
               playsInline
@@ -5423,7 +5423,7 @@ function LoopScene({
               }}
               onLoadedData={() => {
                 if (active && !pausedRef.current)
-                  void videoRef.current?.play().catch(() => {});
+                  if (videoRef.current) requestVideoPlayback(videoRef.current);
                 if (stickerEditorOpen) {
                   setStickerFrameTime(videoRef.current?.currentTime ?? 0);
                   window.requestAnimationFrame(drawStickerFrame);
@@ -5434,7 +5434,7 @@ function LoopScene({
               }}
               onCanPlay={() => {
                 if (active && !pausedRef.current)
-                  void videoRef.current?.play().catch(() => {});
+                  if (videoRef.current) requestVideoPlayback(videoRef.current);
               }}
               onClick={(event) => {
                 event.stopPropagation();
@@ -5442,15 +5442,7 @@ function LoopScene({
                   speedHoldTriggeredRef.current = false;
                   return;
                 }
-                const video = videoRef.current;
-                if (!video) return;
-                if (video.paused) {
-                  setPaused(false);
-                  void video.play().catch(() => {});
-                } else {
-                  setPaused(true);
-                  video.pause();
-                }
+                toggleLoopPlayback();
               }}
               onPointerDown={handleSpeedHoldStart}
               onPointerUp={handleSpeedHoldEnd}
@@ -5549,7 +5541,7 @@ function LoopScene({
       <button
         type="button"
         aria-label={paused ? "Devam et" : "Duraklat"}
-        onClick={() => setPaused((value) => !value)}
+        onClick={toggleLoopPlayback}
         className="absolute inset-0 z-10 cursor-default"
       />
       {!liveConfirmOpen && !liveStudioOpen && !cameraOpen && <div
@@ -5603,24 +5595,19 @@ function LoopScene({
       </div>
       {paused && (
         <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-          <span className="rounded-full bg-black/35 p-5 text-white backdrop-blur-md">
-            <Play className="h-9 w-9 fill-white" />
-          </span>
+          <div className="flex flex-col items-center gap-2 text-white">
+            <span className="rounded-full bg-black/35 p-5 backdrop-blur-md">
+              <Play className="h-9 w-9 fill-white" />
+            </span>
+            {isVideoMediaUrl(activeMediaUrl) && (
+              <span className="rounded-full bg-black/50 px-3 py-1 text-xs font-semibold backdrop-blur-md">
+                Sesli oynatmak için dokun
+              </span>
+            )}
+          </div>
         </div>
       )}
       <div className="absolute right-1 top-[56%] z-30 flex -translate-y-1/2 flex-col items-center gap-3">
-        {isVideoMediaUrl(activeMediaUrl) && (
-          <Action
-            label={muted ? "Sesi aç" : "Sesi kapat"}
-            onClick={toggleMuted}
-          >
-            {muted ? (
-              <VolumeX className="h-6 w-6 text-violet-200" />
-            ) : (
-              <Volume2 className="h-6 w-6 text-violet-200" />
-            )}
-          </Action>
-        )}
         <div
           className={`flex min-w-[3.25rem] flex-col items-center text-purple-500 transition-opacity duration-700 ${actionsFaded ? "opacity-40" : "opacity-100"}`}
         >
