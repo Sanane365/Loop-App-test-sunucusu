@@ -104,12 +104,19 @@ export default function Chat() {
   const [reportedMessageIds, setReportedMessageIds] = useState<Set<number>>(() => new Set());
   const [modiPendingAction, setModiPendingAction] = useState<number | null>(null);
   const chatMessagesParams = selectedChatRoom ? { roomId: selectedChatRoom.id } : undefined;
+  const chatMessagesQueryKey = getListChatMessagesQueryKey(chatMessagesParams);
   const { data: messages, isLoading, error: chatError } = useListChatMessages(chatMessagesParams, {
-    query: { queryKey: getListChatMessagesQueryKey(chatMessagesParams), retry: false },
+    query: { queryKey: chatMessagesQueryKey, retry: false },
   });
+  type ChatMessageItem = NonNullable<typeof messages>[number];
   const sendMutation = useSendChatMessage();
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [animatedMessageId, setAnimatedMessageId] = useState<number | null>(null);
+  const lastMessageIdRef = useRef<number | null>(null);
+  const lastRoomIdRef = useRef<number | null>(selectedChatRoom?.id ?? null);
+  const nearBottomRef = useRef(true);
+  const optimisticMessageIdRef = useRef(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -238,17 +245,44 @@ export default function Chat() {
   const touchStartY = useRef<number | null>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const roomId = selectedChatRoom?.id ?? null;
+    if (lastRoomIdRef.current !== roomId) {
+      lastRoomIdRef.current = roomId;
+      lastMessageIdRef.current = null;
+      setAnimatedMessageId(null);
     }
-  }, [messages]);
+
+    const latestMessage = messages?.[messages.length - 1];
+    const container = scrollRef.current;
+    if (!latestMessage || !container) return;
+
+    if (lastMessageIdRef.current === null) {
+      lastMessageIdRef.current = latestMessage.id;
+      if (latestMessage.id < 0) setAnimatedMessageId(latestMessage.id);
+      container.scrollTo({ top: container.scrollHeight, behavior: "auto" });
+      return;
+    }
+    if (latestMessage.id === lastMessageIdRef.current) return;
+
+    lastMessageIdRef.current = latestMessage.id;
+    setAnimatedMessageId(latestMessage.id);
+    if (nearBottomRef.current) {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      container.scrollTo({ top: container.scrollHeight, behavior: reduceMotion ? "auto" : "smooth" });
+    }
+  }, [messages, selectedChatRoom?.id]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() });
-    }, 3000);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible" && !sendMutation.isPending) {
+        void queryClient.invalidateQueries({
+          queryKey: getListChatMessagesQueryKey(selectedChatRoom ? { roomId: selectedChatRoom.id } : undefined),
+          exact: true,
+        });
+      }
+    }, 2000);
     return () => clearInterval(interval);
-  }, [queryClient]);
+  }, [queryClient, selectedChatRoom?.id, sendMutation.isPending]);
 
   useEffect(() => {
     if (!selectedChatRoom) return;
@@ -484,19 +518,51 @@ export default function Chat() {
   const openGifPicker = () => { setGifOpen(true); };
 
   const handleSend = () => {
-    if (chatBanWarning) return;
+    if (!user || chatBanWarning) return;
     const text = content.trim();
     if (!text) return;
     const finalContent = replyTo
       ? `__LOOP_REPLY__:${replyTo.displayName}:${replyTo.content.slice(0, 100)}\n${text}`
       : text;
+    const optimisticId = optimisticMessageIdRef.current--;
+    const optimisticMessage: ChatMessageItem = {
+      id: optimisticId,
+      userId: user.id,
+      user,
+      type: "text",
+      content: finalContent,
+      gifUrl: null,
+      voiceUrl: null,
+      voiceDuration: null,
+      roomId: selectedChatRoom?.id ?? null,
+      createdAt: new Date().toISOString(),
+    };
+    nearBottomRef.current = true;
+    queryClient.setQueryData<NonNullable<typeof messages>>(chatMessagesQueryKey, (current) => [
+      ...(current ?? []),
+      optimisticMessage,
+    ]);
     setContent("");
     setMentionSearch(null);
     setMentionUsers([]);
     setReplyTo(null);
     sendMutation.mutate({ data: { type: "text", content: finalContent, roomId: selectedChatRoom?.id } }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListChatMessagesQueryKey() }),
+      onSuccess: (serverMessage) => {
+        if (lastMessageIdRef.current === optimisticId) lastMessageIdRef.current = serverMessage.id;
+        setAnimatedMessageId(serverMessage.id);
+        queryClient.setQueryData<NonNullable<typeof messages>>(chatMessagesQueryKey, (current) => [
+          ...(current ?? []).filter((message) => message.id !== optimisticId && message.id !== serverMessage.id),
+          serverMessage,
+        ]);
+      },
       onError: (error: any) => {
+        queryClient.setQueryData<NonNullable<typeof messages>>(chatMessagesQueryKey, (current) => {
+          const remainingMessages = (current ?? []).filter((message) => message.id !== optimisticId);
+          if (lastMessageIdRef.current === optimisticId) {
+            lastMessageIdRef.current = remainingMessages[remainingMessages.length - 1]?.id ?? null;
+          }
+          return remainingMessages;
+        });
         setContent(text);
         if (error?.data?.error === "modi_warning") {
           if (error.data.expiresAt) setChatBanWarning(formatChatBanWarning(error.data.reason, error.data.expiresAt));
@@ -870,6 +936,7 @@ export default function Chat() {
             if (!el) return;
             const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
             const atBottom = distanceFromBottom < 80;
+            nearBottomRef.current = atBottom;
             setComposerShift(atBottom ? 0 : 38);
           }}
           style={{
@@ -905,7 +972,10 @@ export default function Chat() {
 
               const msgPreview = (msg.type === "text" || isBobi || isModi) ? (msg.content ?? "").replace(/^__LOOP_REPLY__:[^\n]+\n/, "").slice(0, 100) : msg.type === "gif" ? "GIF" : msg.voiceUrl ? "Sesli mesaj" : "Medya";
               return (
-                <div key={msg.id} className={`relative ${sameUserAsPrev ? "mt-0.5" : "mt-4"}`}>
+                <div
+                  key={msg.id}
+                  className={`relative ${sameUserAsPrev ? "mt-0.5" : "mt-4"} ${animatedMessageId === msg.id ? (isMe ? "chat-message-enter-sent" : "chat-message-enter-received") : ""}`}
+                >
                   {/* Reply icon (fixed, revealed behind sliding row) */}
                   <div className="absolute left-2 top-1/2 -translate-y-1/2 z-0 pointer-events-none"
                     style={{ opacity: swipingMsgId === msg.id ? Math.min(swipeOffset / 48, 1) : 0, transition: swipingMsgId === msg.id ? "none" : "opacity 0.15s" }}>

@@ -1,9 +1,13 @@
 import { Router } from "express";
-import { db, ensureMessageLikesTable } from "@workspace/db";
+import { db, ensureEmblemAssetsTable, ensureMessageLikesTable } from "@workspace/db";
 import { chatMessagesTable, chatRoomsTable, voiceRoomsTable, voiceRoomParticipantsTable, usersTable } from "@workspace/db";
 import { eq, desc, lt, and, gt, isNull, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
-import { getUserWithStats } from "../lib/helpers";
+import {
+  avatarFrameTransformSchemaReady,
+  getUserWithStats,
+  storyPreviewSchemaReady,
+} from "../lib/helpers";
 import { getBlockedUserIds } from "../lib/userControls";
 import {
   checkActiveGeneralChatMute,
@@ -19,6 +23,122 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs";
 
 const router = Router();
+
+type ChatUserRow = Record<string, unknown> & {
+  id: number | string;
+  username: string;
+  displayName: string;
+  badgeAssetId: number | null;
+  badgeVisible: boolean;
+  emblemAssetId: number | null;
+  emblemVisible: boolean;
+  avatarFrameAssetId: number | null;
+  avatarFrameVisible: boolean;
+  createdAt: Date | string;
+};
+
+type ChatUserSummary = Record<string, unknown> & {
+  id: number;
+  username: string;
+  displayName: string;
+  createdAt: string;
+};
+
+type ChatReactionRow = {
+  messageId: number | string;
+  likeCount: number | string;
+  isLiked: boolean;
+  reactionEmoji: string | null;
+};
+
+async function getChatUserSummaries(userIds: number[], viewerId?: number) {
+  const ids = [...new Set(userIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
+  if (ids.length === 0) return new Map<number, ChatUserSummary>();
+
+  await Promise.all([
+    avatarFrameTransformSchemaReady,
+    storyPreviewSchemaReady,
+    ensureEmblemAssetsTable(),
+  ]);
+  const viewerUserId = viewerId ?? 0;
+  const result = await db.execute(sql`
+    SELECT
+      u.id,
+      u.username,
+      u.display_name AS "displayName",
+      u.bio,
+      u.location_city AS "locationCity",
+      u.location_country AS "locationCountry",
+      u.author_bio AS "authorBio",
+      u.avatar_url AS "avatarUrl",
+      u.banner_url AS "bannerUrl",
+      u.story_preview_url AS "storyPreviewUrl",
+      u.profile_intro_video_url AS "profileIntroVideoUrl",
+      u.profile_intro_video_transparency_mode AS "profileIntroVideoTransparencyMode",
+      u.profile_intro_video_edge_fade AS "profileIntroVideoEdgeFade",
+      u.spotify_track_id AS "spotifyTrackId",
+      u.role,
+      u.badge,
+      u.badge_label AS "badgeLabel",
+      u.avatar_frame AS "avatarFrame",
+      u.badge_asset_id AS "badgeAssetId",
+      u.badge_visible AS "badgeVisible",
+      u.emblem_asset_id AS "emblemAssetId",
+      u.emblem_visible AS "emblemVisible",
+      u.avatar_frame_asset_id AS "avatarFrameAssetId",
+      u.avatar_frame_visible AS "avatarFrameVisible",
+      u.avatar_frame_transform AS "avatarFrameTransform",
+      u.is_banned AS "isBanned",
+      u.created_at AS "createdAt",
+      (SELECT count(*)::int FROM follows f WHERE f.following_id = u.id) AS "followerCount",
+      (SELECT count(*)::int FROM follows f WHERE f.follower_id = u.id) AS "followingCount",
+      (SELECT count(*)::int FROM posts p WHERE p.user_id = u.id) AS "postCount",
+      (SELECT count(*)::int FROM stories s WHERE s.user_id = u.id) AS "storyCount",
+      (SELECT count(*)::int FROM likes l JOIN posts p ON p.id = l.post_id WHERE p.user_id = u.id) AS "likeCount",
+      CASE
+        WHEN ${viewerUserId} > 0 AND u.id <> ${viewerUserId}
+        THEN EXISTS (
+          SELECT 1 FROM follows f
+          WHERE f.follower_id = ${viewerUserId} AND f.following_id = u.id
+        )
+        ELSE false
+      END AS "isFollowing"
+    FROM users u
+    WHERE u.id = ANY(${ids}::int[])
+  `);
+  const users = result.rows as ChatUserRow[];
+  const badgeAssetIds = [...new Set(users.filter((user) => user.badgeVisible && user.badgeAssetId).map((user) => Number(user.badgeAssetId)))];
+  const emblemAssetIds = [...new Set(users.filter((user) => user.emblemVisible && user.emblemAssetId).map((user) => Number(user.emblemAssetId)))];
+  const avatarFrameAssetIds = [...new Set(users.filter((user) => user.avatarFrameVisible && user.avatarFrameAssetId).map((user) => Number(user.avatarFrameAssetId)))];
+  const [badgeAssets, emblemAssets, avatarFrameAssets] = await Promise.all([
+    badgeAssetIds.length ? db.execute(sql`SELECT id, image_url FROM badge_assets WHERE id = ANY(${badgeAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
+    emblemAssetIds.length ? db.execute(sql`SELECT id, image_url FROM emblem_assets WHERE id = ANY(${emblemAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
+    avatarFrameAssetIds.length ? db.execute(sql`SELECT id, image_url FROM frame_assets WHERE id = ANY(${avatarFrameAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
+  ]);
+  const assetUrlMap = (rows: Array<{ id: number | string; image_url: string }> | undefined) =>
+    new Map((rows ?? []).map((row) => [Number(row.id), row.image_url]));
+  const badgeUrls = assetUrlMap(badgeAssets?.rows as Array<{ id: number | string; image_url: string }> | undefined);
+  const emblemUrls = assetUrlMap(emblemAssets?.rows as Array<{ id: number | string; image_url: string }> | undefined);
+  const avatarFrameUrls = assetUrlMap(avatarFrameAssets?.rows as Array<{ id: number | string; image_url: string }> | undefined);
+
+  return new Map<number, ChatUserSummary>(users.map((user) => {
+    const id = Number(user.id);
+    return [id, {
+      ...user,
+      id,
+      badgeAssetUrl: user.badgeVisible ? badgeUrls.get(Number(user.badgeAssetId)) ?? null : null,
+      emblemAssetUrl: user.emblemVisible ? emblemUrls.get(Number(user.emblemAssetId)) ?? null : null,
+      avatarFrameAssetUrl: user.avatarFrameVisible ? avatarFrameUrls.get(Number(user.avatarFrameAssetId)) ?? null : null,
+      followerCount: Number(user.followerCount ?? 0),
+      followingCount: Number(user.followingCount ?? 0),
+      postCount: Number(user.postCount ?? 0),
+      storyCount: Number(user.storyCount ?? 0),
+      likeCount: Number(user.likeCount ?? 0),
+      createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : new Date(user.createdAt).toISOString(),
+    }];
+  }));
+}
+
 const chatRoomsSchemaReady = (async () => {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS chat_rooms (
@@ -444,23 +564,39 @@ router.get("/chat/messages", async (req, res) => {
     }
 
     const blockedUserIds = viewerId ? await getBlockedUserIds(viewerId) : new Set<number>();
-    const visibleMessages = messages.filter((message) => !blockedUserIds.has(message.userId));
-    const enriched = await Promise.all(
-      visibleMessages.reverse().map(async (m) => ({
-        id: m.id,
-        userId: m.userId,
-        user: await getUserWithStats(m.userId, viewerId),
-        type: m.type,
-        content: m.content,
-        gifUrl: m.gifUrl,
-        voiceUrl: m.voiceUrl,
-        voiceDuration: m.voiceDuration,
-        createdAt: m.createdAt.toISOString(),
-        likeCount: Number((await db.execute(sql`SELECT count(*)::int AS count FROM message_likes WHERE message_type = 'chat' AND message_id = ${m.id}`)).rows[0]?.count ?? 0),
-        isLiked: Boolean(req.user?.id && (await db.execute(sql`SELECT 1 FROM message_likes WHERE message_type = 'chat' AND message_id = ${m.id} AND user_id = ${req.user.id}`)).rows.length),
-        reactionEmoji: String((await db.execute(sql`SELECT emoji FROM message_likes WHERE message_type = 'chat' AND message_id = ${m.id} ORDER BY created_at DESC LIMIT 1`)).rows[0]?.emoji ?? "❤️"),
-      }))
-    );
+    const orderedMessages = messages.filter((message) => !blockedUserIds.has(message.userId)).reverse();
+    const usersById = await getChatUserSummaries(orderedMessages.map((message) => message.userId), viewerId);
+    const messageIds = orderedMessages.map((message) => message.id);
+    const reactionRows: ChatReactionRow[] = messageIds.length
+      ? (await db.execute(sql`
+          SELECT
+            message_id AS "messageId",
+            count(*)::int AS "likeCount",
+            COALESCE(bool_or(user_id = ${viewerId ?? 0}), false) AS "isLiked",
+            (array_agg(emoji ORDER BY created_at DESC))[1] AS "reactionEmoji"
+          FROM message_likes
+          WHERE message_type = 'chat' AND message_id = ANY(${messageIds}::int[])
+          GROUP BY message_id
+        `)).rows as ChatReactionRow[]
+      : [];
+    const reactionsByMessageId = new Map(reactionRows.map((reaction) => [Number(reaction.messageId), reaction] as const));
+    const enriched = orderedMessages.map((message) => {
+      const reaction = reactionsByMessageId.get(message.id);
+      return {
+        id: message.id,
+        userId: message.userId,
+        user: usersById.get(message.userId) ?? null,
+        type: message.type,
+        content: message.content,
+        gifUrl: message.gifUrl,
+        voiceUrl: message.voiceUrl,
+        voiceDuration: message.voiceDuration,
+        createdAt: message.createdAt.toISOString(),
+        likeCount: Number(reaction?.likeCount ?? 0),
+        isLiked: Boolean(reaction?.isLiked),
+        reactionEmoji: String(reaction?.reactionEmoji ?? "❤️"),
+      };
+    });
 
     res.json(enriched);
   } catch (err) {
@@ -617,7 +753,7 @@ router.post("/chat/messages", requireAuth, async (req, res) => {
         .catch((error) => req.log.error({ err: error }, "Bobi yanıtı oluşturulamadı."));
     }
 
-    const user = await getUserWithStats(req.user!.id, req.user!.id);
+    const user = (await getChatUserSummaries([req.user!.id], req.user!.id)).get(req.user!.id) ?? null;
     res.status(201).json({ ...msg, user, createdAt: msg.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
@@ -666,7 +802,7 @@ router.post("/chat/voice", requireAuth, upload.single("file"), async (req, res) 
       .values({ userId: req.user!.id, roomId, type: "voice", voiceUrl, voiceDuration: durationSec })
       .returning();
 
-    const user = await getUserWithStats(req.user!.id, req.user!.id);
+    const user = (await getChatUserSummaries([req.user!.id], req.user!.id)).get(req.user!.id) ?? null;
     res.status(201).json({ ...msg, user, createdAt: msg.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
@@ -710,7 +846,7 @@ router.post("/chat/media", requireAuth, upload.single("file"), async (req, res) 
       .values({ userId: req.user!.id, roomId, type: "image", content: mediaUrl })
       .returning();
 
-    const user = await getUserWithStats(req.user!.id, req.user!.id);
+    const user = (await getChatUserSummaries([req.user!.id], req.user!.id)).get(req.user!.id) ?? null;
     res.status(201).json({ ...msg, user, createdAt: msg.createdAt.toISOString() });
   } catch (err) {
     req.log.error(err);
