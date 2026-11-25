@@ -4661,6 +4661,16 @@ function LoopScene({
     }
   };
 
+  const toggleMuted = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const nextMuted = !video.muted;
+    video.muted = nextMuted;
+    setMuted(nextMuted);
+    storeVideoMuted(nextMuted);
+    revealActions();
+  };
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -4671,6 +4681,7 @@ function LoopScene({
       video.pause();
       return;
     }
+    if (!video.paused) return;
     void video.play().catch((error: unknown) => {
       if (!video.isConnected || videoRef.current !== video || !active || pausedRef.current) return;
       if (error instanceof DOMException && error.name === "AbortError") return;
@@ -5598,6 +5609,18 @@ function LoopScene({
         </div>
       )}
       <div className="absolute right-1 top-[56%] z-30 flex -translate-y-1/2 flex-col items-center gap-3">
+        {isVideoMediaUrl(activeMediaUrl) && (
+          <Action
+            label={muted ? "Sesi aç" : "Sesi kapat"}
+            onClick={toggleMuted}
+          >
+            {muted ? (
+              <VolumeX className="h-6 w-6 text-violet-200" />
+            ) : (
+              <Volume2 className="h-6 w-6 text-violet-200" />
+            )}
+          </Action>
+        )}
         <div
           className={`flex min-w-[3.25rem] flex-col items-center text-purple-500 transition-opacity duration-700 ${actionsFaded ? "opacity-40" : "opacity-100"}`}
         >
