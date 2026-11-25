@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, ensureStoryVisibilityExclusionsTable } from "@workspace/db";
 import { storiesTable, storyViewsTable, followsTable, usersTable, directMessagesTable, notificationsTable } from "@workspace/db";
 import { eq, and, gt, lte, inArray, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../lib/auth";
@@ -13,6 +13,7 @@ import fs from "fs";
 const router = Router();
 
 await Promise.all([
+  ensureStoryVisibilityExclusionsTable(),
   db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text TEXT`),
   db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text_color TEXT`),
   db.execute(sql`ALTER TABLE stories ADD COLUMN IF NOT EXISTS story_text_background TEXT`),

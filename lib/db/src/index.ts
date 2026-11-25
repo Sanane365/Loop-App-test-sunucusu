@@ -16,6 +16,7 @@ export const db = drizzle(pool, { schema });
 
 let messageLikesTableMigration: Promise<void> | undefined;
 let emblemAssetsTableMigration: Promise<void> | undefined;
+let storyVisibilityExclusionsTableMigration: Promise<void> | undefined;
 
 export function ensureMessageLikesTable(): Promise<void> {
   if (!messageLikesTableMigration) {
@@ -47,6 +48,22 @@ export function ensureEmblemAssetsTable(): Promise<void> {
     })();
   }
   return emblemAssetsTableMigration;
+}
+
+export function ensureStoryVisibilityExclusionsTable(): Promise<void> {
+  if (!storyVisibilityExclusionsTableMigration) {
+    storyVisibilityExclusionsTableMigration = (async () => {
+      await db.execute(sql`CREATE TABLE IF NOT EXISTS story_visibility_exclusions (
+        user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        excluded_user_id integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        PRIMARY KEY (user_id, excluded_user_id),
+        CHECK (user_id <> excluded_user_id)
+      )`);
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS story_visibility_exclusions_excluded_user_id_idx
+        ON story_visibility_exclusions (excluded_user_id)`);
+    })();
+  }
+  return storyVisibilityExclusionsTableMigration;
 }
 
 export * from "./schema";
