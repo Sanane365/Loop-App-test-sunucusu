@@ -51,6 +51,9 @@ type ChatReactionRow = {
   reactionEmoji: string | null;
 };
 
+const sqlNumberList = (values: number[]) =>
+  sql.join(values.map((value) => sql`${value}`), sql`, `);
+
 async function getChatUserSummaries(userIds: number[], viewerId?: number) {
   const ids = [...new Set(userIds.filter((id) => Number.isSafeInteger(id) && id > 0))];
   if (ids.length === 0) return new Map<number, ChatUserSummary>();
@@ -104,16 +107,16 @@ async function getChatUserSummaries(userIds: number[], viewerId?: number) {
         ELSE false
       END AS "isFollowing"
     FROM users u
-    WHERE u.id = ANY(${ids}::int[])
+    WHERE u.id IN (${sqlNumberList(ids)})
   `);
   const users = result.rows as ChatUserRow[];
   const badgeAssetIds = [...new Set(users.filter((user) => user.badgeVisible && user.badgeAssetId).map((user) => Number(user.badgeAssetId)))];
   const emblemAssetIds = [...new Set(users.filter((user) => user.emblemVisible && user.emblemAssetId).map((user) => Number(user.emblemAssetId)))];
   const avatarFrameAssetIds = [...new Set(users.filter((user) => user.avatarFrameVisible && user.avatarFrameAssetId).map((user) => Number(user.avatarFrameAssetId)))];
   const [badgeAssets, emblemAssets, avatarFrameAssets] = await Promise.all([
-    badgeAssetIds.length ? db.execute(sql`SELECT id, image_url FROM badge_assets WHERE id = ANY(${badgeAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
-    emblemAssetIds.length ? db.execute(sql`SELECT id, image_url FROM emblem_assets WHERE id = ANY(${emblemAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
-    avatarFrameAssetIds.length ? db.execute(sql`SELECT id, image_url FROM frame_assets WHERE id = ANY(${avatarFrameAssetIds}::int[]) AND published = true`) : Promise.resolve(null),
+    badgeAssetIds.length ? db.execute(sql`SELECT id, image_url FROM badge_assets WHERE id IN (${sqlNumberList(badgeAssetIds)}) AND published = true`) : Promise.resolve(null),
+    emblemAssetIds.length ? db.execute(sql`SELECT id, image_url FROM emblem_assets WHERE id IN (${sqlNumberList(emblemAssetIds)}) AND published = true`) : Promise.resolve(null),
+    avatarFrameAssetIds.length ? db.execute(sql`SELECT id, image_url FROM frame_assets WHERE id IN (${sqlNumberList(avatarFrameAssetIds)}) AND published = true`) : Promise.resolve(null),
   ]);
   const assetUrlMap = (rows: Array<{ id: number | string; image_url: string }> | undefined) =>
     new Map((rows ?? []).map((row) => [Number(row.id), row.image_url]));
@@ -575,7 +578,7 @@ router.get("/chat/messages", async (req, res) => {
             COALESCE(bool_or(user_id = ${viewerId ?? 0}), false) AS "isLiked",
             (array_agg(emoji ORDER BY created_at DESC))[1] AS "reactionEmoji"
           FROM message_likes
-          WHERE message_type = 'chat' AND message_id = ANY(${messageIds}::int[])
+          WHERE message_type = 'chat' AND message_id IN (${sqlNumberList(messageIds)})
           GROUP BY message_id
         `)).rows as ChatReactionRow[]
       : [];
