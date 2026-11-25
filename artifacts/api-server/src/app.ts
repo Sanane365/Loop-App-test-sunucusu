@@ -38,7 +38,7 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(sessionMiddleware);
 
-const uploadDir = path.resolve(import.meta.dirname, "..", "uploads");
+const uploadDir = path.resolve(process.cwd(), "uploads");
 const decorationDir = path.join(uploadDir, "decorations");
 
 function getExtensionlessDecorationMimeType(filePath: string): string | null {
